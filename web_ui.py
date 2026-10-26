@@ -6,7 +6,7 @@ from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from bot import create_exchange
+from exchange import create_exchange
 from reporting import parqet_csv, parqet_rows
 
 LOG = logging.getLogger("bitvavo-dca.web")
