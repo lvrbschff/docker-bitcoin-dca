@@ -11,18 +11,19 @@ A Docker-based DCA bot for buying Bitcoin with fiat deposits on Bitvavo or Krake
 
 ## 1. Choose your exchange and create an API key
 
-Set EXCHANGE in docker-compose.yml to BITVAVO or KRAKEN. Create an API key for that same exchange and grant only the permissions listed below for the features you plan to use.
+Set `EXCHANGE` in docker-compose.yml to BITVAVO or KRAKEN. Create an API key for that same exchange and grant only the permissions listed below for the features you plan to use.
 
 ### Bitvavo
 
 Create a key under **Settings → API**. Enable 2FA on your account.
 
-- Required for trading and account history: **View access** and **Trade digital assets**
+- Required for balances and history: **View access**
+- Required for live purchases: **Trade digital assets**
 - Required only for automatic withdrawals: **Withdraw digital assets**
 
-Copy the key and secret into BITVAVO_API_KEY and BITVAVO_API_SECRET in your local .env file. See Bitvavo's [API key setup guide](https://docs.bitvavo.com/docs/get-started/).
+Copy the key and secret into `BITVAVO_API_KEY` and `BITVAVO_API_SECRET` in your local .env file. See Bitvavo's [API key setup guide](https://docs.bitvavo.com/docs/get-started/).
 
-For withdrawals, add and verify the destination address in Bitvavo first. The bot uses WITHDRAW_ADDRESS and WITHDRAW_NETWORK.
+For withdrawals, add and verify the destination address in Bitvavo first. The bot uses `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK`.
 
 ### Kraken
 
@@ -32,9 +33,9 @@ Create a **Spot API key**. Enable the permissions needed for the bot's features:
 - Required for live purchases: **Modify Orders**
 - Required only for automatic withdrawals: **Withdraw Funds**
 
-Copy the key and secret into KRAKEN_API_KEY and KRAKEN_API_SECRET in your local .env file. See Kraken's [API key guide](https://support.kraken.com/in/articles/360000919966-how-to-create-an-api-key?mode=consumerapp).
+Copy the key and secret into `KRAKEN_API_KEY` and `KRAKEN_API_SECRET` in your local .env file. See Kraken's [API key guide](https://support.kraken.com/in/articles/360000919966-how-to-create-an-api-key?mode=consumerapp).
 
-For withdrawals, first add a Bitcoin withdrawal method in Kraken. Set its saved method name in KRAKEN_WITHDRAW_KEY. This is the name of the saved method, not the wallet address.
+For withdrawals, first add a Bitcoin withdrawal method in Kraken. Set its saved method name in `KRAKEN_WITHDRAW_KEY` in your local .env file. This is the saved method name, not the wallet address.
 
 Kraken's withdrawal endpoints currently used by the bot are marked as legacy. Kraken says they remain active and recommends migrating to its newer Funding API. See the official [withdrawal endpoint documentation](https://docs.kraken.com/api-reference/funding/withdraw-funds).
 
@@ -46,37 +47,37 @@ Copy the example file and fill in the credentials for the selected exchange:
 cp .env.example .env
 ~~~
 
-For Bitvavo, fill in BITVAVO_API_KEY and BITVAVO_API_SECRET. For Kraken, fill in KRAKEN_API_KEY and KRAKEN_API_SECRET. Leave the other exchange's credentials empty. Never commit .env or API credentials to the repository.
+For Bitvavo, fill in `BITVAVO_API_KEY` and `BITVAVO_API_SECRET`. For Kraken, fill in `KRAKEN_API_KEY` and `KRAKEN_API_SECRET`. Leave the other exchange's credentials empty. Never commit .env or API credentials to the repository.
 
-WEB_UI_PORT can also be set in .env. The other bot settings are configured directly in docker-compose.yml.
+`WEB_UI_PORT` and, if needed, `KRAKEN_WITHDRAW_KEY` are set in .env. The other bot settings are configured directly in docker-compose.yml.
 
 ## 3. Configure the bot
 
-Open docker-compose.yml and set EXCHANGE to BITVAVO or KRAKEN. Then review the settings below. Keep LIVE_TRADING set to false for the initial startup.
+Review the settings below in docker-compose.yml. `EXCHANGE` selects the exchange; the matching API key and secret must be present in .env. Keep `LIVE_TRADING` set to false for the initial startup.
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| EXCHANGE | BITVAVO | Exchange to use: BITVAVO or KRAKEN. The matching API key and secret are required. |
-| QUOTE_CURRENCY | EUR | Fiat or quote currency for deposits and the BTC market, for example EUR or USD. The selected exchange must support the currency and market. |
-| BASE_ASSET | BTC | Asset to buy. The market is formed as BASE_ASSET-QUOTE_CURRENCY. |
-| BUY_AMOUNT | 0 | Desired BTC amount per purchase. 0 uses the smallest amount allowed by the selected exchange's market rules. |
-| DEPOSIT_DAY | 1 | Day of the month that starts a new deposit cycle. If a month is shorter, its final day is used. |
-| TIMEZONE | Europe/Berlin | Time zone used to calculate the deposit-cycle boundary. |
-| LIVE_TRADING | false | Set to true to submit real orders. Keep false to run in dry-run mode. |
-| CHECK_INTERVAL_SECONDS | 300 | How often the bot checks deposits, balances, and prices. Values below 60 are raised to 60 seconds. |
-| FEE_BUFFER_PERCENT | 1 | Share of deposits reserved for trading fees and rounding. |
-| WITHDRAWALS_ENABLED | false | Enables automatic Bitcoin withdrawals. Also requires LIVE_TRADING=true. |
-| WITHDRAW_THRESHOLD_QUOTE | 1000 | Withdraw when the available BTC balance reaches this value in QUOTE_CURRENCY. |
-| WITHDRAW_ADDRESS | Empty | Bitvavo destination address. Required for Bitvavo withdrawals; add and verify it at Bitvavo. |
-| WITHDRAW_NETWORK | BTC | Bitvavo withdrawal network. |
-| KRAKEN_WITHDRAW_KEY | Empty | Kraken's saved Bitcoin withdrawal method name. Required for Kraken withdrawals. |
-| WEB_UI_ENABLED | true | Enables the local portfolio dashboard. |
-| WEB_UI_PORT | 8080 | Web UI port. Set this in .env to change the host and container port. |
-| BITVAVO_API_KEY | Required for Bitvavo | Bitvavo API key, stored in .env. |
-| BITVAVO_API_SECRET | Required for Bitvavo | Bitvavo API secret, stored in .env. |
-| KRAKEN_API_KEY | Required for Kraken | Kraken API key, stored in .env. |
-| KRAKEN_API_SECRET | Required for Kraken | Kraken API secret, stored in .env. |
-| LOG_LEVEL | INFO | Python log level, such as INFO, WARNING, or DEBUG. |
+| `EXCHANGE` | BITVAVO | Exchange to use: BITVAVO or KRAKEN. The matching API key and secret are required. |
+| `QUOTE_CURRENCY` | EUR | Fiat or quote currency for deposits and the BTC market, for example EUR or USD. The selected exchange must support the currency and market. |
+| `BASE_ASSET` | BTC | Asset to buy. The market is formed as `BASE_ASSET`-`QUOTE_CURRENCY`. |
+| `BUY_AMOUNT` | 0 | Desired BTC amount per purchase. 0 uses the smallest amount allowed by the selected exchange's market rules. |
+| `DEPOSIT_DAY` | 1 | Day of the month that starts a new deposit cycle. If a month is shorter, its final day is used. |
+| `TIMEZONE` | Europe/Berlin | Time zone used to calculate the deposit-cycle boundary. |
+| `LIVE_TRADING` | false | Set to true to submit real orders. Keep false to run in dry-run mode. |
+| `CHECK_INTERVAL_SECONDS` | 300 | How often the bot checks deposits, balances, and prices. Values below 60 are raised to 60 seconds. |
+| `FEE_BUFFER_PERCENT` | 1 | Share of deposits reserved for trading fees and rounding. |
+| `WITHDRAWALS_ENABLED` | false | Enables automatic Bitcoin withdrawals. Also requires `LIVE_TRADING`=true. |
+| `WITHDRAW_THRESHOLD_QUOTE` | 1000 | Withdraw when the available BTC balance reaches this value in `QUOTE_CURRENCY`. |
+| `WITHDRAW_ADDRESS` | Empty | Bitvavo destination address. Required for Bitvavo withdrawals; add and verify it at Bitvavo. |
+| `WITHDRAW_NETWORK` | BTC | Bitvavo withdrawal network. |
+| `KRAKEN_WITHDRAW_KEY` | Empty | Kraken's saved Bitcoin withdrawal method name. Required for Kraken withdrawals. |
+| `WEB_UI_ENABLED` | true | Enables the local portfolio dashboard. |
+| `WEB_UI_PORT` | 8080 | Web UI port. Set this in .env to change the host and container port. |
+| `BITVAVO_API_KEY` | Required for Bitvavo | Bitvavo API key, stored in .env. |
+| `BITVAVO_API_SECRET` | Required for Bitvavo | Bitvavo API secret, stored in .env. |
+| `KRAKEN_API_KEY` | Required for Kraken | Kraken API key, stored in .env. |
+| `KRAKEN_API_SECRET` | Required for Kraken | Kraken API secret, stored in .env. |
+| `LOG_LEVEL` | INFO | Python log level, such as INFO, WARNING, or DEBUG. |
 
 ## 4. Start with dry-run mode
 
@@ -87,9 +88,9 @@ docker compose up -d --build
 docker compose logs -f
 ~~~
 
-The dashboard is available at [http://localhost:8080](http://localhost:8080) by default. It is bound to the Docker host's loopback address, so it is not exposed to the home network or the public internet. If you set WEB_UI_PORT in .env, use that port in the address.
+The dashboard is available at [http://localhost:8080](http://localhost:8080) by default. It is bound to the Docker host's loopback address, so it is not exposed to the home network or the public internet. If you set `WEB_UI_PORT` in .env, use that port in the address.
 
-When you are ready to place real orders, set LIVE_TRADING to true in docker-compose.yml and recreate the container:
+When you are ready to place real orders, set `LIVE_TRADING` to true in docker-compose.yml and recreate the container:
 
 ~~~sh
 docker compose up -d --build
@@ -97,31 +98,31 @@ docker compose up -d --build
 
 ## How the purchase schedule works
 
-- The bot totals completed deposits in QUOTE_CURRENCY since the current deposit cycle began. It does not use a fixed monthly budget.
+- The bot totals completed deposits in `QUOTE_CURRENCY` since the current deposit cycle began. It does not use a fixed monthly budget.
 - In live mode, the available balance on the selected exchange also limits how much can be bought. The configured fee buffer is left unspent.
-- BUY_AMOUNT sets the desired BTC amount per purchase. If it is zero, the bot calculates the smallest amount that meets the selected market's minimum quantity and order value.
-- The bot recalculates the interval using remaining deposited funds, the minimum order value, the current price, and the time until the next DEPOSIT_DAY. The first eligible purchase in a cycle is due immediately.
+- `BUY_AMOUNT` sets the desired BTC amount per purchase. If it is zero, the bot calculates the smallest amount that meets the selected market's minimum quantity and order value.
+- The bot recalculates the interval using remaining deposited funds, the minimum order value, the current price, and the time until the next `DEPOSIT_DAY`. The first eligible purchase in a cycle is due immediately.
 - Only completed deposits recorded by the selected exchange are counted. The bot waits for a deposit before buying.
-- Market orders do not guarantee an execution price. A configured BUY_AMOUNT can cost more or less than estimated as the market price changes.
+- Market orders do not guarantee an execution price. A configured `BUY_AMOUNT` can cost more or less than estimated as the market price changes.
 
 ## Automatic Bitcoin withdrawals
 
-Automatic withdrawals are disabled by default. To enable them, set WITHDRAWALS_ENABLED to true and LIVE_TRADING to true.
+Automatic withdrawals are disabled by default. To enable them, set `WITHDRAWALS_ENABLED` to true and `LIVE_TRADING` to true.
 
-The bot checks the available BTC balance and its value in QUOTE_CURRENCY. When the value reaches WITHDRAW_THRESHOLD_QUOTE, it requests the available BTC balance less the withdrawal fee.
+The bot checks the available BTC balance and its value in `QUOTE_CURRENCY`. When the value reaches `WITHDRAW_THRESHOLD_QUOTE`, it requests the available BTC balance less the withdrawal fee.
 
 | Exchange | Withdrawal setup |
 | --- | --- |
-| Bitvavo | Set WITHDRAW_ADDRESS and WITHDRAW_NETWORK. The address must already be added and verified in your Bitvavo account. The API key also needs Withdraw digital assets permission. |
-| Kraken | Add a Bitcoin withdrawal method in Kraken and set its saved method name as KRAKEN_WITHDRAW_KEY. The API key needs Withdraw Funds permission. |
+| Bitvavo | Set `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK`. The address must already be added and verified in your Bitvavo account. The API key also needs Withdraw digital assets permission. |
+| Kraken | Add a Bitcoin withdrawal method in Kraken and set its saved method name as `KRAKEN_WITHDRAW_KEY`. The API key needs Withdraw Funds permission. |
 
 Check the destination and network carefully before enabling automatic withdrawals. If a Kraken withdrawal request has an ambiguous response, the bot does not send it again automatically. Check the withdrawal status in Kraken before taking further action.
 
 ## Portfolio web UI
 
-The read-only dashboard uses the exchange selected in EXCHANGE. It displays the BTC balance and value, purchases, average purchase price, fees, withdrawals, and net BTC for the selected period.
+The read-only dashboard uses the exchange selected in `EXCHANGE`. It displays the BTC balance and value, purchases, average purchase price, fees, withdrawals, and net BTC for the selected period.
 
-Choose an interval between completed Bitcoin withdrawals or enter custom start and end dates. Download the displayed period as a Parqet-compatible CSV. Set WEB_UI_ENABLED to false to disable the dashboard.
+Choose an interval between completed Bitcoin withdrawals or enter custom start and end dates. Download the displayed period as a Parqet-compatible CSV. Set `WEB_UI_ENABLED` to false to disable the dashboard.
 
 ## Parqet CSV exports
 
@@ -131,7 +132,7 @@ The CSV uses Parqet's semicolon-separated activity format. Trade and withdrawal 
 
 On first startup, the latest existing completed BTC withdrawal is used as the starting point. If no earlier withdrawal exists, the first export includes available BTC purchase history up to that withdrawal. You can also generate a CSV for any period from the web UI. Import the file into Parqet using its [CSV activity import](https://faq.parqet.com/de/articles/870989-csv-import-aktivitaten-aus-einer-eigenen-csv-datei-importieren).
 
-Exports need read access to trade and withdrawal history. For Kraken, grant Query ledger entries to read withdrawal history. This does not require enabling automatic withdrawals.
+Exports need read access to trade and withdrawal history. For Kraken, Query ledger entries allows the bot to read ledger and withdrawal history; it does not require the Withdraw Funds permission.
 
 ## Logs
 
@@ -149,6 +150,6 @@ The workflow in .github/workflows/publish.yml builds and publishes the image to 
 
 ## Limitations
 
-The bot supports BTC withdrawals and Parqet exports for Bitcoin activity. Exchange markets, deposit history, minimums, fees, and available fiat currencies differ. Confirm that the selected exchange supports your QUOTE_CURRENCY and BTC market before using live trading.
+The bot supports BTC withdrawals and Parqet exports for Bitcoin activity. Exchange markets, deposit history, minimums, fees, and available fiat currencies differ. Confirm that the selected exchange supports your `QUOTE_CURRENCY` and BTC market before using live trading.
 
 This project is a technical example, not investment advice.
