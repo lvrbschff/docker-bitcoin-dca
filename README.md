@@ -53,31 +53,52 @@ For Bitvavo, fill in `BITVAVO_API_KEY` and `BITVAVO_API_SECRET`. For Kraken, fil
 
 ## 3. Configure the bot
 
-Review the settings below in docker-compose.yml. `EXCHANGE` selects the exchange; the matching API key and secret must be present in .env. Keep `LIVE_TRADING` set to false for the initial startup.
+Choose `EXCHANGE` in docker-compose.yml. Only credentials for that exchange are required; variables for the other exchange may stay empty. The adapters validate credentials only for the selected exchange.
+
+Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings below go in docker-compose.yml.
+
+### Common settings
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| `EXCHANGE` | BITVAVO | Exchange to use: BITVAVO or KRAKEN. The matching API key and secret are required. |
-| `QUOTE_CURRENCY` | EUR | Fiat or quote currency for deposits and the BTC market, for example EUR or USD. The selected exchange must support the currency and market. |
-| `BASE_ASSET` | BTC | Asset to buy. The market is formed as `BASE_ASSET`-`QUOTE_CURRENCY`. |
-| `BUY_AMOUNT` | 0 | Desired BTC amount per purchase. 0 uses the smallest amount allowed by the selected exchange's market rules. |
-| `DEPOSIT_DAY` | 1 | Day of the month that starts a new deposit cycle. If a month is shorter, its final day is used. |
-| `TIMEZONE` | Europe/Berlin | Time zone used to calculate the deposit-cycle boundary. |
-| `LIVE_TRADING` | false | Set to true to submit real orders. Keep false to run in dry-run mode. |
-| `CHECK_INTERVAL_SECONDS` | 300 | How often the bot checks deposits, balances, and prices. Values below 60 are raised to 60 seconds. |
-| `FEE_BUFFER_PERCENT` | 1 | Share of deposits reserved for trading fees and rounding. |
-| `WITHDRAWALS_ENABLED` | false | Enables automatic Bitcoin withdrawals. Also requires `LIVE_TRADING`=true. |
-| `WITHDRAW_THRESHOLD_QUOTE` | 1000 | Withdraw when the available BTC balance reaches this value in `QUOTE_CURRENCY`. |
-| `WITHDRAW_ADDRESS` | Empty | Bitvavo destination address. Required for Bitvavo withdrawals; add and verify it at Bitvavo. |
-| `WITHDRAW_NETWORK` | BTC | Bitvavo withdrawal network. |
-| `KRAKEN_WITHDRAW_KEY` | Empty | Kraken's saved Bitcoin withdrawal method name. Required for Kraken withdrawals. |
-| `WEB_UI_ENABLED` | true | Enables the local portfolio dashboard. |
-| `WEB_UI_PORT` | 8080 | Web UI port. Set this in .env to change the host and container port. |
-| `BITVAVO_API_KEY` | Required for Bitvavo | Bitvavo API key, stored in .env. |
-| `BITVAVO_API_SECRET` | Required for Bitvavo | Bitvavo API secret, stored in .env. |
-| `KRAKEN_API_KEY` | Required for Kraken | Kraken API key, stored in .env. |
-| `KRAKEN_API_SECRET` | Required for Kraken | Kraken API secret, stored in .env. |
-| `LOG_LEVEL` | INFO | Python log level, such as INFO, WARNING, or DEBUG. |
+| `EXCHANGE` | `BITVAVO` | Exchange to use: `BITVAVO` or `KRAKEN`. |
+| `QUOTE_CURRENCY` | `EUR` | Fiat or quote currency for deposits and the BTC market, for example `EUR` or `USD`. The selected exchange must support the currency and market. |
+| `BASE_ASSET` | `BTC` | Asset to buy. The market is formed as `BASE_ASSET-QUOTE_CURRENCY`. |
+| `BUY_AMOUNT` | `0` | Desired BTC amount per purchase. `0` uses the smallest amount allowed by the selected exchange's market rules. |
+| `DEPOSIT_DAY` | `1` | Day of the month that starts a new deposit cycle. If a month is shorter, its final day is used. |
+| `TIMEZONE` | `Europe/Berlin` | Time zone used to calculate the deposit-cycle boundary. |
+| `LIVE_TRADING` | `false` | Set to `true` to submit real orders. Keep `false` to run in dry-run mode. |
+| `CHECK_INTERVAL_SECONDS` | `300` | How often the bot checks deposits, balances, and prices. Values below 60 are raised to 60 seconds. |
+| `FEE_BUFFER_PERCENT` | `1` | Share of deposits reserved for trading fees and rounding. |
+| `WITHDRAWALS_ENABLED` | `false` | Enables automatic Bitcoin withdrawals. Also requires `LIVE_TRADING=true`. |
+| `WITHDRAW_THRESHOLD_QUOTE` | `1000` | Withdraw when the available BTC balance reaches this value in `QUOTE_CURRENCY`. |
+| `WEB_UI_ENABLED` | `true` | Enables the local portfolio dashboard. |
+| `LOG_LEVEL` | `INFO` | Python log level, such as `INFO`, `WARNING`, or `DEBUG`. |
+
+### Bitvavo settings
+
+These variables are used only when `EXCHANGE=BITVAVO`. Put the API key and secret in .env. Set the withdrawal address and network in docker-compose.yml only if Bitvavo withdrawals are enabled.
+
+| Variable | Required when | Description |
+| --- | --- | --- |
+| `BITVAVO_API_KEY` | `EXCHANGE=BITVAVO` | Bitvavo API key in .env. |
+| `BITVAVO_API_SECRET` | `EXCHANGE=BITVAVO` | Bitvavo API secret in .env. |
+| `WITHDRAW_ADDRESS` | Bitvavo withdrawals enabled | Verified Bitvavo Bitcoin destination address in docker-compose.yml. |
+| `WITHDRAW_NETWORK` | Bitvavo withdrawals enabled | Bitvavo withdrawal network in docker-compose.yml. |
+
+### Kraken settings
+
+These variables are used only when `EXCHANGE=KRAKEN`. Put the API key and secret in .env. The withdrawal method name is required only if Kraken withdrawals are enabled.
+
+| Variable | Required when | Description |
+| --- | --- | --- |
+| `KRAKEN_API_KEY` | `EXCHANGE=KRAKEN` | Kraken API key in .env. |
+| `KRAKEN_API_SECRET` | `EXCHANGE=KRAKEN` | Kraken API secret in .env. |
+| `KRAKEN_WITHDRAW_KEY` | Kraken withdrawals enabled | Name of the saved Bitcoin withdrawal method in Kraken; set it in .env. |
+
+### Web UI port
+
+Set `WEB_UI_PORT` in .env to change the default port from 8080. Compose uses it for both the host and container port. The dashboard remains bound to the local host only.
 
 ## 4. Start with dry-run mode
 
