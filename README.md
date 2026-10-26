@@ -1,6 +1,6 @@
 # Bitvavo Bitcoin DCA Bot
 
-A Docker service that buys a configurable base asset (BTC by default) with a configurable quote currency (EUR by default). It reads the current Bitvavo market rules, detects completed fiat deposits, and schedules purchases until the next configured deposit day.
+A Docker service that buys a configurable base asset (BTC by default) with a configurable quote currency (EUR by default). It reads the current Bitvavo market rules, detects completed fiat deposits, and schedules purchases until the next configured deposit day. A local web UI visualizes your Bitcoin purchases, fees, and withdrawals, and lets you generate Parqet-compatible CSV exports.
 
 ## Prerequisites
 
