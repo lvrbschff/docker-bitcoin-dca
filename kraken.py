@@ -150,6 +150,19 @@ class Kraken:
         ticker = next(iter(result.values()))
         return Decimal(ticker["c"][0])
 
+    def estimate_taker_fee(self, symbol, quote_amount):
+        pair = self._pair_info(symbol)
+        result = self.private("TradeVolume", {"pair": pair["_key"]})
+        fee_table = result.get("fees", {})
+        fee_info = fee_table.get(pair["_key"])
+        if fee_info is None and len(fee_table) == 1:
+            fee_info = next(iter(fee_table.values()))
+        if not isinstance(fee_info, dict) or "fee" not in fee_info:
+            raise ValueError(f"Kraken did not return a taker fee for {symbol}")
+        # Kraken returns percentage points (for example 0.2600 for 0.26%).
+        rate = Decimal(str(fee_info["fee"])) / Decimal(100)
+        return Decimal(str(quote_amount)) * rate
+
     def balance(self, currency):
         balances = self.private("BalanceEx")
         wanted = _canonical_asset(currency)
