@@ -269,7 +269,7 @@ def maybe_withdraw_btc(api, state, settings):
     LOG.warning("BTC withdrawal submitted: amount=%s BTC (fee deducted from amount), value at submission=%s %s, withdrawalId=%s", withdrawal["amount"], value, settings["quote"], result.get("id"))
 
 
-def run_once(api, settings):
+def run_once(api, settings, check_interval, schedule_only=False):
     quote, base = settings["quote"], settings["base"]
     symbol = f"{base}-{quote}"
     state_path = Path("/data/state.json")
@@ -305,8 +305,8 @@ def run_once(api, settings):
         state.pop("pending_order", None)
         save_state(state_path, state)
         settings["first_purchase_done"] = True
-        LOG.info("Reconciled previous %s order %s; status=%s; saved %s bot activity record(s). Next interval will be recalculated.", settings["exchange"], event_id, result.get("status", "found"), added)
-        return
+        LOG.info("Reconciled previous %s order %s; status=%s; saved %s bot activity record(s). Recalculating the next purchase schedule now.", settings["exchange"], event_id, result.get("status", "found"), added)
+        now = local_now(settings["timezone"])
     try:
         maybe_withdraw_btc(api, state, settings)
     except requests.RequestException as exc:
@@ -374,7 +374,12 @@ def run_once(api, settings):
                     next_purchase_at.strftime("%Y-%m-%d %H:%M:%S %Z"),
                     affordable_budget, quote, possible_buys,
                 )
-                return
+                return remaining_seconds
+
+    if schedule_only:
+        # If the computed time has already arrived while recording the last order,
+        # wake the normal loop immediately instead of submitting from this pass.
+        return 1
 
     if settings["live"]:
         if available < order_quote:
@@ -418,6 +423,9 @@ def run_once(api, settings):
     state["last_order_quote"] = str(order_quote)
     state.pop("pending_order", None)
     save_state(state_path, state)
+    # Refresh balance, market minimum and price after recording the purchase,
+    # then return the newly calculated delay to the bot loop.
+    return run_once(api, settings, interval, schedule_only=True)
 
 
 def bot_loop(api, settings, interval):
@@ -428,13 +436,16 @@ def bot_loop(api, settings, interval):
         )
         time.sleep(settings["first_buy_delay_seconds"])
     while True:
+        next_wait = interval
         try:
-            run_once(api, settings)
+            calculated_wait = run_once(api, settings, interval)
+            if calculated_wait is not None:
+                next_wait = max(1, int(calculated_wait))
         except requests.RequestException as exc:
             LOG.error("%s request failed: %s", settings["exchange"], exc)
         except Exception:
             LOG.exception("Cycle failed")
-        time.sleep(interval)
+        time.sleep(next_wait)
 
 
 def main():
