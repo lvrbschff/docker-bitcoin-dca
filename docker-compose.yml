@@ -4,12 +4,12 @@ services:
     container_name: bitcoin-dca
     restart: unless-stopped
     environment:
-      EXCHANGE: ${EXCHANGE:-BITVAVO}
+      EXCHANGE: ${EXCHANGE:-KRAKEN}
       QUOTE_CURRENCY: EUR
       BASE_ASSET: BTC
       BUY_AMOUNT: "0"
       DEPOSIT_DAY: "1"
-      FIRST_BUY_DELAY_SECONDS: "0"
+      FIRST_BUY_DELAY_SECONDS: "60"
       TIMEZONE: Europe/Berlin
       LIVE_TRADING: "false"
       CHECK_INTERVAL_SECONDS: "300"
@@ -18,13 +18,13 @@ services:
       WITHDRAW_ADDRESS: ""
       WITHDRAW_NETWORK: BTC
       WEB_UI_ENABLED: "true"
-      WEB_UI_PORT: "${WEB_UI_PORT:-8080}"
+      WEB_UI_PORT: "${WEB_UI_PORT:-6890}"
       BITVAVO_API_KEY: ${BITVAVO_API_KEY:-}
       BITVAVO_API_SECRET: ${BITVAVO_API_SECRET:-}
       KRAKEN_API_KEY: ${KRAKEN_API_KEY:-}
       KRAKEN_API_SECRET: ${KRAKEN_API_SECRET:-}
       KRAKEN_WITHDRAW_KEY: ${KRAKEN_WITHDRAW_KEY:-}
     ports:
-      - "127.0.0.1:${WEB_UI_PORT:-8080}:${WEB_UI_PORT:-8080}"
+      - "127.0.0.1:${WEB_UI_PORT:-6890}:${WEB_UI_PORT:-6890}"
     volumes:
       - ./state:/data
