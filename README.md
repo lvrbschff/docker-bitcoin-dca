@@ -109,7 +109,7 @@ docker compose up -d --build
 docker compose logs -f
 ~~~
 
-The dashboard is available at [http://localhost:6890](http://localhost:8080) by default. It is bound to the Docker host's loopback address, so it is not exposed to the home network or the public internet. If you set `WEB_UI_PORT` in .env, use that port in the address.
+The dashboard is available at [http://localhost:6890](http://localhost:6890) by default. It is bound to the Docker host's loopback address, so it is not exposed to the home network or the public internet. If you set `WEB_UI_PORT` in .env, use that port in the address.
 
 When you are ready to place real orders, set `LIVE_TRADING` to true in docker-compose.yml and recreate the container:
 
