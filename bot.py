@@ -402,7 +402,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
                 symbol, pending["clientOrderId"], pending.get("exchangeOrderId")
             )
         except requests.RequestException:
-            LOG.exception("Order was accepted but its fill details could not be fetched; it will be reconciled before another purchase.")
+            LOG.exception("Kraken accepted the order, but fill details are not visible yet; it remains pending and will be reconciled before another purchase.")
             return check_interval
         records, added = persist_bot_buy(
             api, order_details, settings, pending["clientOrderId"], pending["submittedAt"]
