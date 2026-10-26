@@ -28,4 +28,3 @@ services:
       - "127.0.0.1:${WEB_UI_PORT:-8080}:${WEB_UI_PORT:-8080}"
     volumes:
       - ./state:/data
-      - ./exports:/exports
