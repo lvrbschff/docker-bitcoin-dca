@@ -4,6 +4,7 @@ services:
     container_name: bitvavo-dca
     restart: unless-stopped
     environment:
+      EXCHANGE: ${EXCHANGE:-BITVAVO}
       QUOTE_CURRENCY: EUR
       BASE_ASSET: BTC
       BUY_AMOUNT: "0"
@@ -18,8 +19,11 @@ services:
       WITHDRAW_NETWORK: BTC
       WEB_UI_ENABLED: "true"
       WEB_UI_PORT: "${WEB_UI_PORT:-8080}"
-      BITVAVO_API_KEY: ${BITVAVO_API_KEY:?Add BITVAVO_API_KEY to your untracked .env file}
-      BITVAVO_API_SECRET: ${BITVAVO_API_SECRET:?Add BITVAVO_API_SECRET to your untracked .env file}
+      BITVAVO_API_KEY: ${BITVAVO_API_KEY:-}
+      BITVAVO_API_SECRET: ${BITVAVO_API_SECRET:-}
+      KRAKEN_API_KEY: ${KRAKEN_API_KEY:-}
+      KRAKEN_API_SECRET: ${KRAKEN_API_SECRET:-}
+      KRAKEN_WITHDRAW_KEY: ${KRAKEN_WITHDRAW_KEY:-}
     ports:
       - "127.0.0.1:${WEB_UI_PORT:-8080}:${WEB_UI_PORT:-8080}"
     volumes:
