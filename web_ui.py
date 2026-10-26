@@ -25,9 +25,9 @@ main{max-width:1180px;margin:0 auto;padding:36px 22px 64px}.top{display:flex;jus
 .panel{background:linear-gradient(145deg,rgba(21,31,52,.96),rgba(15,22,39,.96));border:1px solid var(--line);border-radius:18px;padding:20px;margin:18px 0;box-shadow:0 14px 40px #0002}
 .controls{display:grid;grid-template-columns:2fr 1fr 1fr auto auto;gap:12px;align-items:end}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}select,input,button{font:inherit;color:var(--text);background:#0c1425;border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%}button{width:auto;cursor:pointer;background:var(--accent);border-color:var(--accent);color:#081122;font-weight:700}button.secondary{background:transparent;color:var(--text);border-color:var(--line)}button:hover{filter:brightness(1.08)}
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card{padding:17px;border:1px solid var(--line);border-radius:14px;background:#0c1425a8}.card label{display:block;color:var(--muted);font-size:12px;margin-bottom:9px}.value{font-size:22px;font-weight:700;letter-spacing:-.02em}.small{font-size:12px;color:var(--muted);margin-top:4px}
-h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:740px}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}td.num{text-align:right;font-variant-numeric:tabular-nums}.positive{color:var(--green)}.negative{color:var(--red)}.notice{color:var(--muted);font-size:13px;margin-top:12px}.error{color:var(--red);margin:12px 0}.hidden{display:none}
+h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:740px}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}td.num{text-align:right;font-variant-numeric:tabular-nums}.positive{color:var(--green)}.negative{color:var(--red)}.notice{color:var(--muted);font-size:13px;margin-top:12px}.error{color:var(--red);margin:12px 0}.hidden{display:none}.activity-heading,.pagination{display:flex;align-items:center;justify-content:space-between;gap:12px}.activity-heading h2{margin:0}.page-size{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}.page-size select{width:auto;padding:7px 10px}.pagination{margin-top:12px}.pagination button{padding:8px 12px}.pagination .notice{margin:0;text-align:center}
 @media(max-width:850px){.controls{grid-template-columns:1fr 1fr}.controls .field:first-child{grid-column:span 2}.grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:520px){main{padding:24px 14px}.top{align-items:flex-start;flex-direction:column}h1{font-size:25px}.controls{grid-template-columns:1fr}.controls .field:first-child{grid-column:auto}.grid{gap:9px}.card{padding:13px}.value{font-size:18px}}
+@media(max-width:520px){main{padding:24px 14px}.top{align-items:flex-start;flex-direction:column}h1{font-size:25px}.controls{grid-template-columns:1fr}.controls .field:first-child{grid-column:auto}.grid{gap:9px}.card{padding:13px}.value{font-size:18px}.activity-heading{align-items:flex-start;flex-direction:column}.pagination{gap:8px}.pagination button{padding:8px}.pagination .notice{font-size:11px}}
 </style>
 </head>
 <body><main>
@@ -58,11 +58,11 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <div class="card"><label>Date range</label><div class="value" id="periodLabel">—</div></div>
 <div class="card"><label>Last updated</label><div class="value" id="updated">—</div></div>
 </div></section>
-<section class="panel"><h2>Activity</h2><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th><th>Action</th></tr></thead><tbody id="activities"></tbody></table></div></section>
+<section class="panel"><div class="activity-heading"><h2>Activity</h2><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>10</option><option selected>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th><th>Action</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><button class="secondary" id="previousPage">Previous</button><span id="pageInfo" class="notice"></span><button class="secondary" id="nextPage">Next</button></div></section>
 </main>
 <script>
 const $=id=>document.getElementById(id);
-let quote="EUR", dataCurrency="EUR";
+let quote="EUR", dataCurrency="EUR", activityRows=[], currentPage=1;
 function localInput(ms){const d=new Date(ms);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
 function parseInput(el){return new Date(el.value).getTime()}
 function money(v,c){try{return new Intl.NumberFormat("en-GB",{style:"currency",currency:c,maximumFractionDigits:2}).format(Number(v||0))}catch(e){return Number(v||0).toFixed(2)+" "+c}}
@@ -79,6 +79,25 @@ async function loadIntervals(){
  else {select.value="";$("start").value=localInput(withdrawals.length===1?withdrawals[0].timestamp:now-90*86400000);$("end").value=localInput(now)}
 }
 $("interval").addEventListener("change",()=>{if(!$("interval").value)return;const p=$("interval").value.split(",").map(Number);$("start").value=localInput(p[0]);$("end").value=localInput(p[1]);loadAnalytics()});
+function renderActivities(){
+ const body=$("activities");body.innerHTML="";
+ const pageSize=Number($("pageSize").value),total=activityRows.length,totalPages=Math.max(1,Math.ceil(total/pageSize));
+ currentPage=Math.min(Math.max(1,currentPage),totalPages);
+ const start=(currentPage-1)*pageSize,end=Math.min(start+pageSize,total);
+ for(const row of activityRows.slice(start,end)){
+  const tr=document.createElement("tr"),type=row.simulated?"Simulated buy (dry run)":(row.type==="TransferOut"?"Withdrawal":row.type),vals=[dateLabel(Date.parse(row.datetime)),type,btc(row.shares),money(row.price,quote)+"/BTC",money(row.amount,quote),(row.simulated?"~":"")+money(row.fee,quote)];
+  vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i>=2)td.className="num";tr.appendChild(td)});
+  const action=document.createElement("td");
+  if(row.type==="Buy"){const button=document.createElement("button");button.className="secondary";button.textContent="Delete";button.addEventListener("click",async()=>{if(!confirm("Delete this purchase from local bot history? This does not reverse an exchange order."))return;try{const response=await fetch("/api/activity/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({activityId:row.activityId})});const result=await response.json();if(!response.ok)throw new Error(result.error||"Could not delete purchase.");await loadAnalytics()}catch(e){showError(e.message)}});action.appendChild(button)}
+  action.className="num";tr.appendChild(action);body.appendChild(tr)
+ }
+ if(!total){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=7;td.textContent="No BTC activity in this period.";td.className="notice";tr.appendChild(td);body.appendChild(tr)}
+ $("pageInfo").textContent=total?("Showing "+(start+1)+"–"+end+" of "+total+" · Page "+currentPage+" of "+totalPages):"No entries";
+ $("previousPage").disabled=currentPage<=1;$("nextPage").disabled=currentPage>=totalPages;
+}
+$("pageSize").addEventListener("change",()=>{currentPage=1;renderActivities()});
+$("previousPage").addEventListener("click",()=>{if(currentPage>1){currentPage--;renderActivities()}});
+$("nextPage").addEventListener("click",()=>{currentPage++;renderActivities()});
 async function loadAnalytics(){
  try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end);const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load the report.");quote=d.quote;dataCurrency=quote;const ex=d.exchange==="KRAKEN"?"Kraken":"Bitvavo";$("exchangeName").textContent=ex+" · DCA";$("exchangeLabel").textContent=ex;document.title=ex+" DCA · Portfolio";
  $("balance").textContent=btc(d.snapshot.balance);$("spot").textContent=money(d.snapshot.price,quote)+"/BTC";$("balanceValue").textContent=money(d.snapshot.value,quote);
@@ -88,9 +107,7 @@ async function loadAnalytics(){
  $("tradeFees").textContent=money(d.summary.tradeFees,quote);$("withdrawBtc").textContent=btc(d.summary.withdrawnBtc);$("withdrawCount").textContent=d.summary.withdrawalCount+" withdrawals";
  $("withdrawFees").textContent=money(d.summary.withdrawalFees,quote);$("netBtc").textContent=btc(d.summary.netBtc);
  $("periodLabel").textContent=new Date(p.start).toLocaleDateString("en-GB")+" – "+new Date(p.end).toLocaleDateString("en-GB");$("updated").textContent=new Date(d.snapshot.updatedAt||Date.now()).toLocaleTimeString("en-GB");
- const body=$("activities");body.innerHTML="";
- for(const row of d.activities.slice().reverse()){const tr=document.createElement("tr"),vals=[dateLabel(Date.parse(row.datetime)),row.simulated?"Simulated buy (dry run)":row.type,btc(row.shares),money(row.price,quote)+"/BTC",money(row.amount,quote),(row.simulated?'~':'')+money(row.fee,quote)];vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i>=2)td.className="num";tr.appendChild(td)});const action=document.createElement("td");if(row.type==="Buy"){const button=document.createElement("button");button.className="secondary";button.textContent="Delete";button.addEventListener("click",async()=>{if(!confirm("Delete this purchase from local bot history? This does not reverse an exchange order."))return;try{const response=await fetch("/api/activity/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({activityId:row.activityId})});const result=await response.json();if(!response.ok)throw new Error(result.error||"Could not delete purchase.");await loadAnalytics()}catch(e){showError(e.message)}});action.appendChild(button)}action.className="num";tr.appendChild(action);body.appendChild(tr)}
- if(!d.activities.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=7;td.textContent="No BTC activity in this period.";td.className="notice";tr.appendChild(td);body.appendChild(tr)}
+ activityRows=d.activities.slice().reverse();currentPage=1;renderActivities();
  }catch(e){showError(e.message)}
 }
 $("refresh").addEventListener("click",loadAnalytics);
