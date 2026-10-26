@@ -26,7 +26,7 @@ For withdrawals, Bitvavo uses a verified WITHDRAW_ADDRESS and WITHDRAW_NETWORK. 
 ## How the purchase schedule works
 
 - The bot derives the cycle budget from all completed deposits in the configured quote currency since the current deposit cycle began. There is no fixed monthly budget setting.
-- In live mode, the available Bitvavo balance also limits purchases. The bot keeps the configured fee buffer unspent.
+- In live mode, the available balance on the selected exchange (Bitvavo or Kraken) also limits purchases. The bot keeps the configured fee buffer unspent.
 - `BUY_AMOUNT` sets the desired amount of the base asset per purchase. `0` means the bot calculates the smallest valid amount from Bitvavo's market minimums. Configured amounts are rounded up to the market's allowed quantity precision.
 - The next interval is recalculated from the remaining deposited funds, the minimum order value, the current price, and the time until the next deposit day. The first purchase in a cycle is due immediately once funds are available.
 - Docker Compose manages the bot's internal state automatically through the `./state` mount; no manual state configuration is needed.
