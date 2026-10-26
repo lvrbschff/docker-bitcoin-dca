@@ -309,6 +309,10 @@ class Kraken:
             raise KrakenAPIError("Kraken could not find the order with the saved user reference")
         return next(iter(result.values()))
 
+    def validate_withdrawal_settings(self, settings):
+        if not self.withdraw_key:
+            raise ValueError("KRAKEN_WITHDRAW_KEY is required for Kraken automatic withdrawals")
+
     def withdrawal_request(self, amount, idempotency_key, settings):
         if not self.withdraw_key:
             raise ValueError("KRAKEN_WITHDRAW_KEY is required when automatic withdrawals are enabled")
