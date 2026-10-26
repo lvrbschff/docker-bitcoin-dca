@@ -61,12 +61,12 @@ Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings 
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| `EXCHANGE` | `BITVAVO` | Exchange to use: `BITVAVO` or `KRAKEN`. |
+| `EXCHANGE` | `KRAKEN` | Exchange to use: `BITVAVO` or `KRAKEN`. |
 | `QUOTE_CURRENCY` | `EUR` | Fiat or quote currency for deposits and the BTC market, for example `EUR` or `USD`. The selected exchange must support the currency and market. |
 | `BASE_ASSET` | `BTC` | Asset to buy. The market is formed as `BASE_ASSET-QUOTE_CURRENCY`. |
 | `BUY_AMOUNT` | `0` | Desired BTC amount per purchase. `0` uses the smallest amount currently allowed by the selected exchange's market rules; these rules are fetched dynamically on every execution. |
 | `DEPOSIT_DAY` | `1` | Day of the month that starts a new DCA scheduling period. If a month is shorter, its final day is used. |
-| `FIRST_BUY_DELAY_SECONDS` | `0` | Seconds to wait after container startup before the first purchase check. The next interval is recalculated after the first purchase. |
+| `FIRST_BUY_DELAY_SECONDS` | `60` | Seconds to wait after container startup before the first purchase check. The next interval is recalculated after the first purchase. |
 | `TIMEZONE` | `Europe/Berlin` | Time zone used to calculate the deposit-cycle boundary. |
 | `LIVE_TRADING` | `false` | Set to `true` to submit real orders. Keep `false` to run in dry-run mode. |
 | `CHECK_INTERVAL_SECONDS` | `300` | How often the bot checks deposits, balances, and prices. Values below 60 are raised to 60 seconds. |
@@ -98,7 +98,7 @@ These variables are used only when `EXCHANGE=KRAKEN`. Put the API key and secret
 
 ### Web UI port
 
-Set `WEB_UI_PORT` in .env to change the default port from 8080. Compose uses it for both the host and container port. The dashboard remains bound to the local host only.
+Set `WEB_UI_PORT` in .env to change the default port from 6890. Compose uses it for both the host and container port. The dashboard remains bound to the local host only.
 
 ## 4. Start with dry-run mode
 
@@ -109,7 +109,7 @@ docker compose up -d --build
 docker compose logs -f
 ~~~
 
-The dashboard is available at [http://localhost:8080](http://localhost:8080) by default. It is bound to the Docker host's loopback address, so it is not exposed to the home network or the public internet. If you set `WEB_UI_PORT` in .env, use that port in the address.
+The dashboard is available at [http://localhost:6890](http://localhost:8080) by default. It is bound to the Docker host's loopback address, so it is not exposed to the home network or the public internet. If you set `WEB_UI_PORT` in .env, use that port in the address.
 
 When you are ready to place real orders, set `LIVE_TRADING` to true in docker-compose.yml and recreate the container:
 
