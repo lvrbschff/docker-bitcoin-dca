@@ -8,7 +8,7 @@ A Docker service that buys a configurable base asset (BTC by default) with a con
 - In live mode, the available Bitvavo balance also limits purchases. The bot keeps the configured fee buffer unspent.
 - `BUY_AMOUNT` sets the desired amount of the base asset per purchase. `0` means the bot calculates the smallest valid amount from Bitvavo's market minimums. Configured amounts are rounded up to the market's allowed quantity precision.
 - The next interval is recalculated from the remaining deposited funds, the minimum order value, the current price, and the time until the next deposit day. The first purchase in a cycle is due immediately once funds are available.
-- The bot stores cycle spending and order state in `/data/state.json`. Keep the mounted `./state` directory persistent.
+- Docker Compose manages the bot's internal state automatically through the `./state` mount; no manual state configuration is needed.
 - If an order response is ambiguous, the bot checks the saved `clientOrderId` with Bitvavo before placing another order. If the order cannot be resolved, inspect it in Bitvavo before manually clearing `pending_order` from the state file.
 - Live trading is disabled by default.
 
