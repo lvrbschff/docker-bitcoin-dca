@@ -44,7 +44,7 @@ Copy `.env.example` to `.env` and enter `BITVAVO_API_KEY` and `BITVAVO_API_SECRE
 cp .env.example .env
 ```
 
-Docker Compose reads the `.env` file to fill the credential references in `docker-compose.yml`. `.env` is ignored by Git. Do not put API credentials in the versioned Compose file or commit them to this public repository.
+Docker Compose reads the `.env` file to fill the credential references in `docker-compose.yml`. Do not commit `.env` or API credentials to this public repository. Without a `.dockerignore`, files in the project directory are also included in the Docker build context.
 
 ### Create the API key in Bitvavo
 
