@@ -329,7 +329,9 @@ def maybe_withdraw_btc(api, state, settings):
     try:
         result = api.withdraw_crypto(withdrawal)
     except requests.RequestException:
-        LOG.exception("Withdrawal outcome is uncertain; the same request will be retried next check.")
+        LOG.exception("Withdrawal outcome is uncertain; check the exchange before taking further action.")
+        if not getattr(api, "supports_withdrawal_idempotency", False):
+            LOG.error("This exchange does not support idempotent withdrawal retries; the saved request will not be resent automatically.")
         return
     state["last_withdrawal"] = {
         "id": result.get("id"),
