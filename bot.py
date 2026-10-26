@@ -216,12 +216,13 @@ def export_parqet_cycle(api, state, settings):
         (item for item in completed if item["txId"] not in exported_ids),
         key=lambda item: (int(item["timestamp"]), item["txId"]),
     )
+    period_start_ms = start_ms
     for withdrawal in pending:
         withdrawal_ms = int(withdrawal["timestamp"])
-        buys = api.account_history(start_ms, withdrawal_ms)
+        buys = api.account_history(period_start_ms, withdrawal_ms)
         btc_buys = [
             item for item in buys
-            if item.get("type") == "buy"
+            if item.get("type") in ("buy", "convert_buy")
             and item.get("receivedCurrency", "").upper() == "BTC"
             and Decimal(item.get("receivedAmount", "0")) > 0
         ]
@@ -260,7 +261,6 @@ def export_parqet_cycle(api, state, settings):
         withdrawal_amount = Decimal(withdrawal["amount"])
         withdrawal_fee = Decimal(withdrawal.get("fee", "0"))
         withdrawal_price = api.historical_price(market, withdrawal_ms)
-        gross_out = withdrawal_amount + withdrawal_fee
         fee_quote = withdrawal_fee * withdrawal_price
         rows.append({
             "datetime": datetime.fromtimestamp(withdrawal_ms / 1000, timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -268,8 +268,8 @@ def export_parqet_cycle(api, state, settings):
             "identifier": "BTC",
             "assetType": "Crypto",
             "price": csv_decimal(withdrawal_price),
-            "shares": csv_decimal(gross_out),
-            "amount": csv_decimal(gross_out * withdrawal_price),
+            "shares": csv_decimal(withdrawal_amount),
+            "amount": csv_decimal(withdrawal_amount * withdrawal_price),
             "currency": settings["quote"],
             "fee": csv_decimal(fee_quote),
             "tax": "0",
@@ -294,6 +294,7 @@ def export_parqet_cycle(api, state, settings):
         exported_ids.add(withdrawal["txId"])
         tracker["exported_ids"] = sorted(exported_ids)
         tracker["last_timestamp"] = max(int(tracker.get("last_timestamp", 0)), withdrawal_ms)
+        period_start_ms = withdrawal_ms
         state["parqet_export"] = tracker
         save_state(Path("/data/state.json"), state)
         LOG.info("Created Parqet CSV %s with %s BTC buys and the completed withdrawal; trade and withdrawal fees included.", output, len(btc_buys))
