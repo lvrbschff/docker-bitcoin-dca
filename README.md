@@ -123,7 +123,7 @@ docker compose up -d --build
 - The bot divides the available balance by the current minimum order value to estimate how many purchases remain until the next `DEPOSIT_DAY`.
 - `BUY_AMOUNT` sets the desired BTC amount per purchase. If it is zero, the bot fetches the selected market's rules on every execution and calculates the smallest amount that meets its current minimum quantity and order value.
 - At every check, the bot fetches the current available balance and BTC price, then recalculates the purchase interval from the affordable order count and time until the next `DEPOSIT_DAY`. The first eligible purchase check runs after `FIRST_BUY_DELAY_SECONDS`; subsequent purchases follow the recalculated interval. The log entry `Recalculated DCA schedule` shows the values used.
-- The schedule does not depend on finding a completed deposit record for the current period. In dry-run mode, simulated purchases appear in the web UI, are marked as simulated, and are subtracted from the balance for scheduling. They are excluded from Parqet CSV exports.
+- The schedule does not depend on finding a completed deposit record for the current period. In dry-run mode, simulated purchases appear in the web UI, are marked as simulated, and are subtracted from the balance for scheduling. Their fee is estimated from the selected exchange's current taker fee tier; simulated records are excluded from Parqet CSV exports.
 - Market orders do not guarantee an execution price. A configured `BUY_AMOUNT` can cost more or less than estimated as the market price changes.
 
 ## Automatic Bitcoin withdrawals
@@ -143,7 +143,7 @@ Check the destination and network carefully before enabling automatic withdrawal
 
 The dashboard displays purchases and withdrawals recorded when this bot places them. It reads its activity and latest price snapshot from local files; the web UI does not query Kraken or Bitvavo for transaction history. The displayed BTC amount is the net amount tracked from the bot's recorded purchases and withdrawals, not the full exchange-account balance.
 
-Choose an interval between bot-recorded Bitcoin withdrawals or enter custom start and end dates. The activity table distinguishes simulated dry-run purchases from real purchases. Use **Delete** to remove an individual purchase from the local activity history; this does not reverse an order on the exchange. Download the selected period as a Parqet-compatible CSV for import into Parqet. Simulated purchases are excluded. Activity from before local tracking is enabled is not imported automatically. Set `WEB_UI_ENABLED` to false to disable the dashboard.
+Choose an interval between bot-recorded Bitcoin withdrawals or enter custom start and end dates. The activity table distinguishes simulated dry-run purchases from real purchases. Simulated fees are estimates based on your current exchange taker fee tier and are prefixed with `~`. Use **Delete** to remove an individual purchase from the local activity history; this does not reverse an order on the exchange. Download the selected period as a Parqet-compatible CSV for import into Parqet. Simulated purchases are excluded. Activity from before local tracking is enabled is not imported automatically. Set `WEB_UI_ENABLED` to false to disable the dashboard.
 
 ## Parqet CSV exports
 
