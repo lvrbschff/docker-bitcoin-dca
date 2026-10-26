@@ -105,22 +105,6 @@ docker compose up -d --build
 - Only completed deposits recorded by the selected exchange are counted. The bot waits for a deposit before buying.
 - Market orders do not guarantee an execution price. A configured `BUY_AMOUNT` can cost more or less than estimated as the market price changes.
 
-## Project structure and Docker files
-
-The Docker and configuration files have different jobs:
-
-- **Dockerfile** is the image build recipe. It installs Python dependencies and copies the bot and adapter code into the image.
-- **docker-compose.yml** builds and runs that image, sets the bot's runtime options, and publishes the local web UI port.
-- **.env.example** is a template for a local .env file. Use it for exchange API credentials, WEB_UI_PORT, and KRAKEN_WITHDRAW_KEY when needed. It is not a second Docker build file, and it contains no actual credentials by default.
-
-The code is separated by responsibility:
-
-- **bot.py** contains the exchange-independent DCA schedule, state handling, and bot workflow.
-- **exchange.py** selects the configured exchange adapter.
-- **bitvavo.py** and **kraken.py** implement the same exchange interface for their respective APIs.
-- **reporting.py** converts normalized trade and withdrawal history into Parqet CSV rows.
-- **web_ui.py** serves the local dashboard and on-demand CSV download.
-
 ## Automatic Bitcoin withdrawals
 
 Automatic withdrawals are disabled by default. To enable them, set `WITHDRAWALS_ENABLED` to true and `LIVE_TRADING` to true.
@@ -159,6 +143,22 @@ docker compose logs -f
 ~~~
 
 The logs show startup settings, deposit and balance checks, calculated purchase intervals, submitted orders, withdrawal activity, and errors returned by the selected exchange. Do not share logs without checking them for account-specific information.
+
+## Project structure and Docker files
+
+The Docker and configuration files have different jobs:
+
+- **Dockerfile** is the image build recipe. It installs Python dependencies and copies the bot and adapter code into the image.
+- **docker-compose.yml** builds and runs that image, sets the bot's runtime options, and publishes the local web UI port.
+- **.env.example** is a template for a local .env file. Use it for exchange API credentials, WEB_UI_PORT, and KRAKEN_WITHDRAW_KEY when needed. It is not a second Docker build file, and it contains no actual credentials by default.
+
+The code is separated by responsibility:
+
+- **bot.py** contains the exchange-independent DCA schedule, state handling, and bot workflow.
+- **exchange.py** selects the configured exchange adapter.
+- **bitvavo.py** and **kraken.py** implement the same exchange interface for their respective APIs.
+- **reporting.py** converts normalized trade and withdrawal history into Parqet CSV rows.
+- **web_ui.py** serves the local dashboard and on-demand CSV download.
 
 ## GitHub Container Registry
 
