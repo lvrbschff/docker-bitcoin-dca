@@ -429,36 +429,6 @@ def run_once(api, settings):
     save_state(state_path, state)
 
 
-def main():
-    logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(), format="%(asctime)s %(levelname)s %(message)s")
-    deposit_day = int(os.getenv("DEPOSIT_DAY", "1"))
-    if not 1 <= deposit_day <= 31:
-        raise ValueError("DEPOSIT_DAY must be between 1 and 31")
-    settings = {
-        "quote": os.getenv("QUOTE_CURRENCY", "EUR").upper(),
-        "base": os.getenv("BASE_ASSET", "BTC").upper(),
-        "buy_amount": env_decimal("BUY_AMOUNT", 0),
-        "deposit_day": deposit_day,
-        "timezone": os.getenv("TIMEZONE", "Europe/Berlin"),
-        "live": os.getenv("LIVE_TRADING", "false").lower() == "true",
-        "fee_buffer": env_decimal("FEE_BUFFER_PERCENT", 1),
-        "withdrawals_enabled": os.getenv("WITHDRAWALS_ENABLED", "false").lower() == "true",
-        "withdraw_threshold": env_decimal("WITHDRAW_THRESHOLD_QUOTE", 1000),
-        "withdraw_address": os.getenv("WITHDRAW_ADDRESS", "").strip(),
-        "withdraw_network": os.getenv("WITHDRAW_NETWORK", "BTC").upper(),
-    }
-    if settings["withdrawals_enabled"]:
-        if settings["base"] != "BTC":
-            raise ValueError("Automatic withdrawals currently support BASE_ASSET=BTC only")
-        if not settings["withdraw_address"]:
-            raise ValueError("WITHDRAW_ADDRESS is required when WITHDRAWALS_ENABLED=true")
-        if not settings["withdraw_network"]:
-            raise ValueError("WITHDRAW_NETWORK is required when WITHDRAWALS_ENABLED=true")
-        if settings["withdraw_threshold"] <= 0:
-            raise ValueError("WITHDRAW_THRESHOLD_QUOTE must be greater than zero")
-    interval = max(60, int(os.getenv("CHECK_INTERVAL_SECONDS", "300")))
-    api = Bitvavo()
-    LOG.info("Starting %s; live trading=%s; quote currency=%s; requested buy amount=%s %s; deposit day=%s; timezone=%s; check interval=%ss", f"{settings['base']}-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], settings["base"], deposit_day, settings["timezone"], interval)
 def bot_loop(api, settings, interval):
     while True:
         try:
