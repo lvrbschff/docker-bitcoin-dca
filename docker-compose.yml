@@ -29,7 +29,6 @@ services:
     volumes:
       - ./state:/data
       - bitcoin_dca_webui_data:/webui-data
-      - ./webui-data:/webui-legacy-data:ro
 
 volumes:
   bitcoin_dca_webui_data:
