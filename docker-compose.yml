@@ -12,7 +12,6 @@ services:
       TIMEZONE: Europe/Berlin
       LIVE_TRADING: "false"
       CHECK_INTERVAL_SECONDS: "300"
-      FEE_BUFFER_PERCENT: "1"
       WITHDRAWALS_ENABLED: "false"
       WITHDRAW_THRESHOLD_QUOTE: "1000"
       WITHDRAW_ADDRESS: ""
