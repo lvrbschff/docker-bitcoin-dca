@@ -8,7 +8,6 @@ services:
       BASE_ASSET: BTC
       BUY_AMOUNT: "0"
       DEPOSIT_DAY: "1"
-      TIMEZONE: Europe/Berlin
       LIVE_TRADING: "false"
       CHECK_INTERVAL_SECONDS: "300"
       FEE_BUFFER_PERCENT: "1"

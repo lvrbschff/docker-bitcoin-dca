@@ -12,7 +12,7 @@ A Docker service that buys a configurable base asset (BTC by default) with a con
 - If an order response is ambiguous, the bot checks the saved `clientOrderId` with Bitvavo before placing another order. If the order cannot be resolved, inspect it in Bitvavo before manually clearing `pending_order` from the state file.
 - Live trading is disabled by default.
 
-`DEPOSIT_DAY` defines the day of the month when a new cycle starts. `TIMEZONE` sets the time zone for that boundary. If a month does not contain the selected day, its last calendar day is used. The bot counts only completed deposits visible in Bitvavo's deposit history; it will not buy until a deposit is detected. In live mode, the quote balance must also be sufficient.
+`DEPOSIT_DAY` defines the day of the month when a new cycle starts. The boundary uses the fixed time zone `Europe/Berlin`. If a month does not contain the selected day, its last calendar day is used. The bot counts only completed deposits visible in Bitvavo's deposit history; it will not buy until a deposit is detected. In live mode, the quote balance must also be sufficient.
 
 ## Configuration
 
@@ -24,15 +24,14 @@ The non-secret settings are configured directly in `docker-compose.yml`. Change 
 | `BASE_ASSET` | `BTC` | Asset to buy. The market is built as `<BASE_ASSET>-<QUOTE_CURRENCY>`. |
 | `BUY_AMOUNT` | `0` | Desired base-asset amount per order. `0` selects the minimum valid order amount based on Bitvavo's market rules. |
 | `DEPOSIT_DAY` | `1` | Deposit-cycle boundary day, from `1` to `31`. Missing calendar days resolve to that month's last day. |
-| `TIMEZONE` | `Europe/Berlin` | Time zone used to determine the deposit-cycle boundary. |
 | `LIVE_TRADING` | `false` | Set to `true` to submit real orders. Keep `false` for dry-run logging. |
 | `CHECK_INTERVAL_SECONDS` | `300` | How often to check deposits, balances, and market data. Values below `60` are clamped to `60`. This is a polling interval; purchase timing is calculated separately. |
 | `FEE_BUFFER_PERCENT` | `1` | Percentage of cycle deposits left aside for fees and rounding. |
 | `BITVAVO_API_KEY` | Required | Bitvavo API key. Keep it in the local, untracked `.env` file. |
 | `BITVAVO_API_SECRET` | Required | Bitvavo API secret. Keep it in the local, untracked `.env` file. |
-| `STATE_FILE` | `/data/state.json` | Path used for persistent cycle and order state. The default matches the Compose volume. |
-| `OPERATOR_ID` | `1` | Identifier sent with order requests. Usually the default is sufficient. |
 | `LOG_LEVEL` | `INFO` | Python logging level, such as `INFO`, `WARNING`, or `DEBUG`. |
+
+The time zone (`Europe/Berlin`), state-file path (`/data/state.json`), and order `operatorId` (`1`) are fixed in the code and are not configurable.
 
 `MONTHLY_BUDGET` is not used. The bot derives its budget from completed deposits recorded by Bitvavo.
 
