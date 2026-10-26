@@ -281,7 +281,7 @@ def run_once(api, settings):
     pending = state.get("pending_order")
     if settings["live"] and pending:
         try:
-            result = api.get_order(symbol, pending["clientOrderId"])
+            result = api.get_order(symbol, pending["clientOrderId"], pending.get("exchangeOrderId"))
         except requests.RequestException as exc:
             LOG.error("Previous order %s is unresolved; refusing another order until it can be checked: %s", pending["clientOrderId"], exc)
             return
@@ -382,8 +382,12 @@ def run_once(api, settings):
         save_state(state_path, state)
         result = api.buy_base(symbol, order_amount, pending["clientOrderId"])
         status = result.get("status", "submitted")
+        pending["exchangeOrderId"] = result.get("orderId")
+        save_state(state_path, state)
         try:
-            order_details = api.get_order(symbol, pending["clientOrderId"])
+            order_details = api.get_order(
+                symbol, pending["clientOrderId"], pending.get("exchangeOrderId")
+            )
         except requests.RequestException:
             LOG.exception("Order was accepted but its fill details could not be fetched; it will be reconciled before another purchase.")
             return
