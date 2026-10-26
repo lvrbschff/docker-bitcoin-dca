@@ -122,7 +122,7 @@ docker compose up -d --build
 - Before each purchase check, the bot reads the current available `QUOTE_CURRENCY` balance on the selected exchange. Existing funds are included, even if they were deposited before the current scheduling period.
 - The configured fee buffer is reserved from that balance. The bot divides the spendable balance by the current minimum order value to estimate how many purchases remain until the next `DEPOSIT_DAY`.
 - `BUY_AMOUNT` sets the desired BTC amount per purchase. If it is zero, the bot fetches the selected market's rules on every execution and calculates the smallest amount that meets its current minimum quantity and order value.
-- The purchase interval is recalculated at every check using the current balance, minimum order value, current price, and time until the next `DEPOSIT_DAY`. The first eligible purchase is due immediately.
+- At every check, the bot fetches the current available balance and BTC price, then recalculates the purchase interval from the affordable order count and time until the next `DEPOSIT_DAY`. The first eligible purchase is due immediately. The log entry `Recalculated DCA schedule` shows the values used.
 - The schedule does not depend on finding a completed deposit record for the current period. In dry-run mode, previously simulated purchases are subtracted from the balance for scheduling.
 - Market orders do not guarantee an execution price. A configured `BUY_AMOUNT` can cost more or less than estimated as the market price changes.
 
