@@ -4,7 +4,7 @@ import logging
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal, ROUND_CEILING, ROUND_DOWN
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -365,7 +365,15 @@ def run_once(api, settings):
         if last_order:
             elapsed = (now - datetime.fromisoformat(last_order)).total_seconds()
             if elapsed < interval_seconds:
-                LOG.info("Next purchase in about %s minutes (recomputed from %s %s available and %s possible buys).", int((interval_seconds - elapsed) / 60), affordable_budget, quote, possible_buys)
+                remaining_seconds = max(0, int(interval_seconds - elapsed))
+                next_purchase_at = now + timedelta(seconds=remaining_seconds)
+                LOG.info(
+                    "Next purchase in about %s minutes, estimated around %s local time "
+                    "(recomputed from %s %s available and %s possible buys).",
+                    int(remaining_seconds / 60),
+                    next_purchase_at.strftime("%Y-%m-%d %H:%M:%S %Z"),
+                    affordable_budget, quote, possible_buys,
+                )
                 return
 
     if settings["live"]:
