@@ -7,6 +7,7 @@ import logging
 import os
 import threading
 import time
+from datetime import datetime, timezone
 from decimal import Decimal
 from urllib.parse import urlencode
 
@@ -333,6 +334,36 @@ class Kraken:
         if not result:
             raise KrakenAPIError("Kraken could not find the order with the saved user reference")
         return next(iter(result.values()))
+
+    def normalize_bot_buy(self, order, quote, base, event_id, fallback_timestamp_ms):
+        filled = Decimal(str(order.get("vol_exec", "0")))
+        quote_amount = Decimal(str(order.get("cost", "0")))
+        if filled <= 0:
+            return []
+        if quote_amount <= 0:
+            quote_amount = filled * Decimal(str(order.get("price", "0")))
+        if quote_amount <= 0:
+            return []
+        price = quote_amount / filled
+        fee_quote = Decimal(str(order.get("fee", "0")))
+        timestamp_seconds = order.get("closetm") or order.get("opentm")
+        timestamp_ms = int(float(timestamp_seconds) * 1000) if timestamp_seconds else fallback_timestamp_ms
+        timestamp = datetime.fromtimestamp(timestamp_ms / 1000, timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+        return [{
+            "id": f"buy:{event_id}",
+            "row": {
+                "datetime": timestamp,
+                "type": "Buy",
+                "identifier": base,
+                "assetType": "Crypto",
+                "price": format(price, "f"),
+                "shares": format(filled, "f"),
+                "amount": format(quote_amount, "f"),
+                "currency": quote,
+                "fee": format(fee_quote, "f"),
+                "tax": "0",
+            },
+        }]
 
     def validate_withdrawal_settings(self, settings):
         if not self.withdraw_key:
