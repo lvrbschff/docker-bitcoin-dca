@@ -12,6 +12,10 @@ services:
       LIVE_TRADING: "false"
       CHECK_INTERVAL_SECONDS: "300"
       FEE_BUFFER_PERCENT: "1"
+      WITHDRAWALS_ENABLED: "false"
+      WITHDRAW_THRESHOLD_QUOTE: "1000"
+      WITHDRAW_ADDRESS: ""
+      WITHDRAW_NETWORK: BTC
       BITVAVO_API_KEY: ${BITVAVO_API_KEY:?Add BITVAVO_API_KEY to your untracked .env file}
       BITVAVO_API_SECRET: ${BITVAVO_API_SECRET:?Add BITVAVO_API_SECRET to your untracked .env file}
     volumes:
