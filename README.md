@@ -29,7 +29,7 @@ For withdrawals, add and verify the destination address in Bitvavo first. The bo
 
 Create a **Spot API key**. Enable the permissions needed for the bot's features:
 
-- Required for balances and account history: **Query Funds**, **Query ledger entries**, and **Query Closed Orders & Trades**
+- Required for balances and bot-order fill details: **Query Funds** and **Query Closed Orders & Trades**
 - Required for live purchases: **Modify Orders**
 - Required only for automatic withdrawals: **Withdraw Funds**
 
@@ -147,15 +147,9 @@ Choose an interval between bot-recorded Bitcoin withdrawals or enter custom star
 
 ## Parqet CSV exports
 
-The automatic export creates a CSV in the host's ./exports directory after each completed Bitcoin withdrawal, including BTC buys and fees since the previous completed withdrawal. This automatic export uses the selected exchange's account history and can include manual purchases or purchases made by other tools.
+The bot does not create Parqet CSV files automatically. To export, select a period in the web UI and click **Download Parqet CSV**. The file contains only purchases and withdrawals recorded from this bot, uses Parqet's semicolon-separated activity format, and can be imported with Parqet's [CSV activity import](https://faq.parqet.com/de/articles/870989-csv-import-aktivitaten-aus-einer-eigenen-csv-datei-importieren).
 
-The web UI's on-demand CSV is separate: it includes only purchases and withdrawals recorded from this bot's own orders. Its local activity history starts when this version is deployed; earlier bot orders are not backfilled automatically.
-
-The CSV uses Parqet's semicolon-separated activity format. Trade and withdrawal fees are represented in the configured quote currency; BTC-denominated fees are valued using the trade price or the closing price of the one-minute candle containing the withdrawal timestamp. The underlying withdrawal fee remains denominated in BTC at the exchange.
-
-On first startup, the latest existing completed BTC withdrawal is used as the starting point. If no earlier withdrawal exists, the first export includes available BTC purchase history up to that withdrawal. You can also generate a CSV for any period from the web UI. Import the file into Parqet using its [CSV activity import](https://faq.parqet.com/de/articles/870989-csv-import-aktivitaten-aus-einer-eigenen-csv-datei-importieren).
-
-Exports need read access to trade and withdrawal history. For Kraken, Query ledger entries allows the bot to read ledger and withdrawal history; it does not require the Withdraw Funds permission.
+The local activity history starts when this version is deployed; earlier bot orders are not backfilled automatically. The export uses the saved transaction amounts, prices, and fees, so generating it does not query Kraken or Bitvavo for transaction history.
 
 ## Logs
 
