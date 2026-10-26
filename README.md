@@ -2,6 +2,30 @@
 
 A Docker service that buys a configurable base asset (BTC by default) with a configurable quote currency (EUR by default). It reads the current Bitvavo market rules, detects completed fiat deposits, and schedules purchases until the next configured deposit day.
 
+## Prerequisites
+
+### Bitvavo API credentials
+
+Copy `.env.example` to `.env` and enter `BITVAVO_API_KEY` and `BITVAVO_API_SECRET` there:
+
+```sh
+cp .env.example .env
+```
+
+Docker Compose reads the `.env` file to fill the credential references in `docker-compose.yml`. Do not commit `.env` or API credentials to this public repository. Without a `.dockerignore`, files in the project directory are also included in the Docker build context.
+
+### Create the API key in Bitvavo
+
+1. Enable two-factor authentication (2FA) on your Bitvavo account.
+2. In Bitvavo, open **Settings → API → Add new API key** and give the key a recognizable name.
+3. If your server has a fixed public IP address, add it to the key's IP whitelist.
+4. Enable **View access** and **Trade digital assets** for deposits, balances, transaction history, and orders.
+5. Enable **Withdraw digital assets** only if you intend to use automatic withdrawals. Add and verify the destination wallet address in Bitvavo's address book before entering it in `WITHDRAW_ADDRESS` and enabling withdrawals.
+6. Confirm with 2FA, then copy the API key and secret into your local `.env` file. Store the secret securely; Bitvavo says it cannot be retrieved later.
+
+See Bitvavo's [API key setup guide](https://docs.bitvavo.com/docs/get-started/) for the current dashboard steps. API withdrawals do not require 2FA or email confirmation, and funds sent to an incorrect address cannot be recovered. Keep `WITHDRAWALS_ENABLED` set to `false` unless the address and network have been checked carefully. Automatic withdrawals require the additional **Withdraw digital assets** permission; the read-only dashboard and Parqet exports do not.
+
+
 ## How the purchase schedule works
 
 - The bot derives the cycle budget from all completed deposits in the configured quote currency since the current deposit cycle began. There is no fixed monthly budget setting.
@@ -20,7 +44,7 @@ Automatic withdrawals are disabled by default. To enable them, set `WITHDRAWALS_
 
 At each check, the bot values the available BTC balance using the current `BTC-<QUOTE_CURRENCY>` price. Once it reaches `WITHDRAW_THRESHOLD_QUOTE`, the bot requests a withdrawal of the entire available BTC balance. Bitvavo deducts the withdrawal fee from that amount, so the wallet receives the balance minus the fee. The threshold uses `QUOTE_CURRENCY`; for example, with `QUOTE_CURRENCY: EUR`, a value of `1000` means €1,000.
 
-This feature needs Bitvavo's **Withdraw digital assets** API permission. API withdrawals do not require 2FA or email confirmation, and an incorrect destination address can result in unrecoverable loss. Verify the address and network carefully before enabling it. See Bitvavo's [crypto withdrawal API](https://docs.bitvavo.com/docs/rest-api/withdraw-crypto-assets/) for required fields and behavior.
+This feature needs the additional **Withdraw digital assets** API permission. Verify the address and network carefully before enabling it. See Bitvavo's [crypto withdrawal API](https://docs.bitvavo.com/docs/rest-api/withdraw-crypto-assets/) for required fields and behavior; the API withdrawal safety requirements are listed under Prerequisites.
 
 ## Portfolio web UI
 
@@ -63,26 +87,6 @@ The non-secret settings are configured directly in `docker-compose.yml`. Change 
 | `BITVAVO_API_SECRET` | Required | Bitvavo API secret. Keep it in the local, untracked `.env` file. |
 | `LOG_LEVEL` | `INFO` | Python logging level, such as `INFO`, `WARNING`, or `DEBUG`. |
 
-
-### API credentials
-
-Copy `.env.example` to `.env` and enter `BITVAVO_API_KEY` and `BITVAVO_API_SECRET` there:
-
-```sh
-cp .env.example .env
-```
-
-Docker Compose reads the `.env` file to fill the credential references in `docker-compose.yml`. Do not commit `.env` or API credentials to this public repository. Without a `.dockerignore`, files in the project directory are also included in the Docker build context.
-
-### Create the API key in Bitvavo
-
-1. Enable two-factor authentication (2FA) on your Bitvavo account.
-2. In Bitvavo, open **Settings → API → Add new API key** and give the key a recognizable name.
-3. If your server has a fixed public IP address, add it to the key's IP whitelist.
-4. Enable **View access** and **Trade digital assets**. Enable **Withdraw digital assets** only if you intentionally turn on automatic withdrawals; leave it disabled otherwise.
-5. Confirm with 2FA, then copy the API key and secret into your local `.env` file. Store the secret securely; Bitvavo says it cannot be retrieved later.
-
-See Bitvavo's [API key setup guide](https://docs.bitvavo.com/docs/get-started/) for the current dashboard steps. The API key needs read and trading access for deposit history, balance checks, and order placement. Automatic withdrawals also require **Withdraw digital assets**. Bitvavo warns that API withdrawals do not require 2FA or email confirmation, so keep `WITHDRAWALS_ENABLED` set to `false` until you have carefully checked the address and network.
 
 ## Run with Docker Compose
 
