@@ -1,42 +1,72 @@
-# Bitvavo DCA Bot
+# Bitvavo Bitcoin DCA Bot
 
-Ein kleiner Docker-Dienst, der ein konfigurierbares Asset (standardmäßig BTC) gegen eine konfigurierbare Quote-Währung (standardmäßig EUR) kauft. Er liest Bitvavos aktuelle Mindestorder-Regeln und den aktuellen Preis und verteilt die ausstehende Monatsrate auf die verbleibende Zeit bis zur nächsten Einzahlung.
+A Docker service that buys a configurable base asset (BTC by default) with a configurable quote currency (EUR by default). It reads the current Bitvavo market rules, detects completed fiat deposits, and schedules purchases until the next configured deposit day.
 
-## Wie die Kaufplanung funktioniert
+## How the purchase schedule works
 
-- Der Bot berechnet die kleinste zulässige Market-Order aus `minOrderInQuoteAsset` und `minOrderInBaseAsset` des Bitvavo-Markts.
-- `BUY_AMOUNT` legt die gewünschte Menge des Basis-Assets je Kauf fest. `0` bedeutet automatische Mindestmenge. Liegt der konfigurierte Wert unter dem tatsächlichen Bitvavo-Minimum, verwendet der Bot mindestens die zulässige Menge und rundet auf die erlaubte Stellenzahl auf.
-- Das Budget ergibt sich aus allen abgeschlossenen Einzahlungen der Quote-Währung seit dem konfigurierten Einzahlungstag. Im Live-Modus begrenzt zusätzlich das tatsächlich verfügbare Guthaben auf Bitvavo die Kaufplanung; ein Gebührenpuffer bleibt frei.
-- Aus verfügbarem Budget, Mindestorderwert und verbleibender Zeit bis zum nächsten Einzahlungstag wird das nächste Intervall ermittelt. Der Wert wird nach jedem Kauf anhand des aktuellen Guthabens und Marktpreises neu berechnet.
-- `state/state.json` hält die bereits verbrauchte Monatsrate fest. Das Verzeichnis muss dauerhaft gespeichert werden.
-- Bei einer unklaren API-Antwort bleibt die Order-ID in `state.json` stehen. Der Bot prüft diese Order zuerst bei Bitvavo und kauft bis zur Klärung nicht erneut. Falls Bitvavo sie nicht auflösen kann, überprüfe die Order im Bitvavo-Konto und entferne `pending_order` aus der Zustandsdatei erst, nachdem du das Ergebnis geklärt hast.
-- Im Dry-Run werden keine Orders gesendet. Zum Schutz startet der Bot standardmäßig nicht mit echten Käufen.
+- The bot derives the cycle budget from all completed deposits in the configured quote currency since the current deposit cycle began. There is no fixed monthly budget setting.
+- In live mode, the available Bitvavo balance also limits purchases. The bot keeps the configured fee buffer unspent.
+- `BUY_AMOUNT` sets the desired amount of the base asset per purchase. `0` means the bot calculates the smallest valid amount from Bitvavo's market minimums. Configured amounts are rounded up to the market's allowed quantity precision.
+- The next interval is recalculated from the remaining deposited funds, the minimum order value, the current price, and the time until the next deposit day. The first purchase in a cycle is due immediately once funds are available.
+- The bot stores cycle spending and order state in `/data/state.json`. Keep the mounted `./state` directory persistent.
+- If an order response is ambiguous, the bot checks the saved `clientOrderId` with Bitvavo before placing another order. If the order cannot be resolved, inspect it in Bitvavo before manually clearing `pending_order` from the state file.
+- Live trading is disabled by default.
 
-`DEPOSIT_DAY` legt den Tag des Monats fest (1–31); `TIMEZONE` bestimmt, wann der neue Zyklus beginnt (Standard `Europe/Berlin`). Gibt es den Tag in einem Monat nicht, gilt dessen letzter Kalendertag. Der Bot liest abgeschlossene Einzahlungen der Quote-Währung über Bitvavos Einzahlungsverlauf aus und verwendet deren Summe im laufenden Zyklus als Budget. Ohne erkannte Einzahlung kauft er nichts. Im Live-Modus muss außerdem genügend Quote-Guthaben verfügbar sein.
+`DEPOSIT_DAY` defines the day of the month when a new cycle starts. `TIMEZONE` sets the time zone for that boundary. If a month does not contain the selected day, its last calendar day is used. The bot counts only completed deposits visible in Bitvavo's deposit history; it will not buy until a deposit is detected. In live mode, the quote balance must also be sufficient.
 
-## Starten
+## Configuration
+
+The non-secret settings are configured directly in `docker-compose.yml`. Change their values there before starting the service.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `QUOTE_CURRENCY` | `EUR` | Fiat or quote currency used for deposits and the market, for example `EUR` or `USD`. |
+| `BASE_ASSET` | `BTC` | Asset to buy. The market is built as `<BASE_ASSET>-<QUOTE_CURRENCY>`. |
+| `BUY_AMOUNT` | `0` | Desired base-asset amount per order. `0` selects the minimum valid order amount based on Bitvavo's market rules. |
+| `DEPOSIT_DAY` | `1` | Deposit-cycle boundary day, from `1` to `31`. Missing calendar days resolve to that month's last day. |
+| `TIMEZONE` | `Europe/Berlin` | Time zone used to determine the deposit-cycle boundary. |
+| `LIVE_TRADING` | `false` | Set to `true` to submit real orders. Keep `false` for dry-run logging. |
+| `CHECK_INTERVAL_SECONDS` | `300` | How often to check deposits, balances, and market data. Values below `60` are clamped to `60`. This is a polling interval; purchase timing is calculated separately. |
+| `FEE_BUFFER_PERCENT` | `1` | Percentage of cycle deposits left aside for fees and rounding. |
+| `BITVAVO_API_KEY` | Required | Bitvavo API key. Keep it in the local, untracked `.env` file. |
+| `BITVAVO_API_SECRET` | Required | Bitvavo API secret. Keep it in the local, untracked `.env` file. |
+| `STATE_FILE` | `/data/state.json` | Path used for persistent cycle and order state. The default matches the Compose volume. |
+| `OPERATOR_ID` | `1` | Identifier sent with order requests. Usually the default is sufficient. |
+| `LOG_LEVEL` | `INFO` | Python logging level, such as `INFO`, `WARNING`, or `DEBUG`. |
+
+`MONTHLY_BUDGET` is not used. The bot derives its budget from completed deposits recorded by Bitvavo.
+
+### API credentials
+
+Copy `.env.example` to `.env` and enter `BITVAVO_API_KEY` and `BITVAVO_API_SECRET` there:
 
 ```sh
 cp .env.example .env
 ```
 
-Die nicht geheimen Einstellungen trägst du direkt in `docker-compose.yml` ein: `QUOTE_CURRENCY`, `BASE_ASSET`, `BUY_AMOUNT`, `DEPOSIT_DAY`, `TIMEZONE`, `LIVE_TRADING`, `CHECK_INTERVAL_SECONDS` und `FEE_BUFFER_PERCENT`. Ein separates Monatsbudget ist nicht nötig: Es wird aus den abgeschlossenen Einzahlungen ermittelt. Mit `BUY_AMOUNT: "0"` wird die jeweils minimale erlaubte Menge gekauft. Starte zunächst mit `LIVE_TRADING: "false"` und prüfe die Container-Logs.
+Docker Compose reads the `.env` file to fill the credential references in `docker-compose.yml`. `.env` is ignored by Git. Do not put API credentials in the versioned Compose file or commit them to this public repository.
 
-Für die Zugangsdaten kopiere `.env.example` nach `.env` und trage dort `BITVAVO_API_KEY` und `BITVAVO_API_SECRET` ein. Compose liest diese Variablen für die Platzhalter in `docker-compose.yml` ein. `.env` wird von Git ignoriert. API-Zugangsdaten direkt in die versionierte Compose-Datei einzutragen würde sie im öffentlichen GitHub-Repository veröffentlichen.
+Create a Bitvavo API key with **View access** and **Trade digital assets**. Do not enable **Withdraw digital assets**. If possible, restrict the key to the host's fixed IP address.
 
-Für echte Käufe ändere `LIVE_TRADING` in `docker-compose.yml` auf `"true"`. Erstelle dafür einen Bitvavo-API-Key mit **View access** und **Trade digital assets**. **Withdraw digital assets darf nicht aktiviert sein.** Wenn möglich, begrenze den Schlüssel in Bitvavo auf die feste IP-Adresse des Hosts.
+## Run with Docker Compose
+
+Start with `LIVE_TRADING: "false"` and review the logs:
 
 ```sh
 docker compose up -d --build
 docker compose logs -f
 ```
 
-`CHECK_INTERVAL_SECONDS` legt fest, wie oft der Bot Guthaben und Marktregeln prüft (Minimum 60 Sekunden). Das ist die Prüfungsfrequenz; der Bot kauft erst, wenn der dynamisch berechnete nächste Kaufzeitpunkt erreicht ist. `FEE_BUFFER_PERCENT` lässt einen Anteil des Budgets für Gebühren frei.
+To enable real orders, set `LIVE_TRADING: "true"` in `docker-compose.yml` and recreate the service:
 
-## GitHub / GitHub Container Registry
+```sh
+docker compose up -d --build
+```
 
-Der Workflow unter `.github/workflows/publish.yml` veröffentlicht das Image bei Pushes nach `main`, bei Versions-Tags wie `v1.0.0` und manuell über GitHub Actions in GHCR. Zugangsdaten gehören in die Runtime-Umgebung des Servers, niemals in das Image oder Repository.
+## GitHub Container Registry
 
-## Grenzen
+The workflow in `.github/workflows/publish.yml` builds and publishes the image to GHCR on pushes to `main`, version tags such as `v1.0.0`, and manual workflow dispatches. Runtime credentials belong on the host, never in the image or repository.
 
-Market-Orders sind nicht preisgarantiert; der tatsächliche Ausführungspreis und Gebühren können abweichen. Bei einer festen `BUY_AMOUNT` ist der geplante Quote-Gegenwert daher eine Schätzung anhand des letzten Preises. Beobachte die Logs und halte den Host bzw. seine IP stabil, falls du IP-Whitelisting nutzt. Das Projekt ist ein technisches Beispiel und keine Anlageberatung.
+## Limitations
+
+Market orders do not guarantee an execution price. With a fixed `BUY_AMOUNT`, the quote-currency cost is estimated from the latest price and can differ at execution; fees can also vary. Monitor the logs and keep the host's IP stable if you use IP whitelisting. This project is a technical example, not investment advice.
