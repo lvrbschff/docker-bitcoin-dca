@@ -342,6 +342,10 @@ def maybe_withdraw_btc(api, state, settings):
 
     available = api.balance("BTC")
     if available <= 0:
+        if not state.get("withdrawal_armed", True):
+            state["withdrawal_armed"] = True
+            save_state(Path("/data/state.json"), state)
+            LOG.info("BTC balance is below the withdrawal threshold again; automatic withdrawal is re-armed.")
         return
     price = api.price(f"BTC-{settings['quote']}")
     value = available * price
@@ -382,7 +386,6 @@ def maybe_withdraw_btc(api, state, settings):
         "createdAt": result.get("createdAt"),
     }
     state.pop("pending_withdrawal", None)
-    save_state(Path("/data/state.json"), state)
     state["withdrawal_armed"] = False
     save_state(Path("/data/state.json"), state)
     LOG.warning("BTC withdrawal submitted: amount=%s BTC (fee deducted from amount), value at submission=%s %s, withdrawalId=%s", withdrawal["amount"], value, settings["quote"], result.get("id"))
