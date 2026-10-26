@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 import threading
 import time
 from decimal import Decimal
@@ -44,8 +45,8 @@ class Kraken:
     supports_withdrawal_idempotency = False
 
     def __init__(self, quote_currency, withdraw_key=""):
-        self.key = __import__("os").getenv("KRAKEN_API_KEY", "")
-        self.secret = __import__("os").getenv("KRAKEN_API_SECRET", "")
+        self.key = os.getenv("KRAKEN_API_KEY", "")
+        self.secret = os.getenv("KRAKEN_API_SECRET", "")
         if not self.key or not self.secret:
             raise ValueError("Set KRAKEN_API_KEY and KRAKEN_API_SECRET for EXCHANGE=KRAKEN")
         try:
@@ -249,33 +250,28 @@ class Kraken:
         return rows
 
     def btc_withdrawals(self, start_ms=0, end_ms=None):
-        end_s = int(end_ms / 1000) if end_ms is not None else int(time.time())
         params = {
-            "asset": self._internal_asset("BTC"),
+            "asset": "XBT",
             "start": str(int(start_ms / 1000)),
-            "end": str(end_s),
+            "end": str(int(end_ms / 1000)) if end_ms is not None else str(int(time.time())),
             "limit": 500,
             "cursor": "true",
         }
+        result = self.private("WithdrawStatus", params)
+        if not isinstance(result, list):
+            raise KrakenAPIError("Unexpected Kraken withdrawal-history response")
         withdrawals = []
-        while True:
-            result = self.private("WithdrawStatus", params)
-            page = result.get("withdrawals", result if isinstance(result, list) else [])
-            for item in page:
-                status = str(item.get("status", "")).lower()
-                timestamp = int(float(item.get("time", 0)) * 1000)
-                withdrawals.append({
-                    "timestamp": timestamp,
-                    "symbol": "BTC",
-                    "amount": str(item.get("amount", "0")),
-                    "fee": str(item.get("fee", "0")),
-                    "status": "completed" if status in ("success", "settled") else status,
-                    "txId": item.get("refid") or item.get("txid") or "",
-                })
-            cursor = result.get("cursor") if isinstance(result, dict) else None
-            if not cursor or cursor is True:
-                break
-            params = {"cursor": cursor, "limit": 500}
+        for item in result:
+            status = str(item.get("status", "")).lower()
+            timestamp = int(float(item.get("time", 0)) * 1000)
+            withdrawals.append({
+                "timestamp": timestamp,
+                "symbol": "BTC",
+                "amount": str(item.get("amount", "0")),
+                "fee": str(item.get("fee", "0")),
+                "status": "completed" if status in ("success", "settled") else status,
+                "txId": item.get("refid") or item.get("txid") or "",
+            })
         return withdrawals
 
     def historical_price(self, market, timestamp_ms):
@@ -316,11 +312,20 @@ class Kraken:
     def withdrawal_request(self, amount, idempotency_key, settings):
         if not self.withdraw_key:
             raise ValueError("KRAKEN_WITHDRAW_KEY is required when automatic withdrawals are enabled")
-        return {
+        info = self.private("WithdrawInfo", {
             "asset": "XBT",
             "key": self.withdraw_key,
             "amount": format(amount, "f"),
-            "idempotencyKey": idempotency_key,
+        })
+        fee = Decimal(str(info.get("fee", "0")))
+        net_amount = amount - fee
+        if net_amount <= 0:
+            raise ValueError("Kraken withdrawal fee is greater than or equal to the available BTC balance")
+        return {
+            "asset": "XBT",
+            "key": self.withdraw_key,
+            "amount": format(net_amount, "f"),
+            "fee": format(fee, "f"),
         }
 
     def withdraw_crypto(self, withdrawal):
