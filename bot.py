@@ -97,17 +97,19 @@ class Bitvavo:
 
     def account_history(self, start_ms, end_ms):
         items = []
-        page = 1
-        while True:
-            result = self.request(
-                "GET", "/account/history",
-                params={"fromDate": start_ms, "toDate": end_ms, "page": page, "maxItems": 100, "type": "buy"},
-                private=True,
-            )
-            items.extend(result.get("items", []))
-            if page >= int(result.get("totalPages", 1)):
-                return items
-            page += 1
+        for transaction_type in ("buy", "convert_buy"):
+            page = 1
+            while True:
+                result = self.request(
+                    "GET", "/account/history",
+                    params={"fromDate": start_ms, "toDate": end_ms, "page": page, "maxItems": 100, "type": transaction_type},
+                    private=True,
+                )
+                items.extend(result.get("items", []))
+                if page >= int(result.get("totalPages", 1)):
+                    break
+                page += 1
+        return items
 
     def btc_withdrawals(self, start_ms=0, end_ms=None):
         params = {"symbol": "BTC", "start": start_ms, "limit": 1000}
@@ -261,6 +263,8 @@ def export_parqet_cycle(api, state, settings):
         withdrawal_amount = Decimal(withdrawal["amount"])
         withdrawal_fee = Decimal(withdrawal.get("fee", "0"))
         withdrawal_price = api.historical_price(market, withdrawal_ms)
+        if withdrawal_price <= 0:
+            raise ValueError(f"Invalid historical {market} price for withdrawal timestamp {withdrawal_ms}")
         fee_quote = withdrawal_fee * withdrawal_price
         rows.append({
             "datetime": datetime.fromtimestamp(withdrawal_ms / 1000, timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -308,7 +312,10 @@ def run_once(api, settings):
     cycle_key, cycle_start, next_deposit = cycle_dates(now, settings["deposit_day"])
     state = read_state(state_path, cycle_key)
     state["cycle"] = cycle_key
-    export_parqet_cycle(api, state, settings)
+    try:
+        export_parqet_cycle(api, state, settings)
+    except Exception:
+        LOG.exception("Parqet export failed; continuing with the DCA cycle")
     spent = Decimal(state.get("spent", "0"))
     pending = state.get("pending_order")
     if settings["live"] and pending:
