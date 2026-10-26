@@ -69,7 +69,6 @@ Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings 
 | `TIMEZONE` | `Europe/Berlin` | Time zone used to calculate the deposit-cycle boundary. |
 | `LIVE_TRADING` | `false` | Set to `true` to submit real orders. Keep `false` to run in dry-run mode. |
 | `CHECK_INTERVAL_SECONDS` | `300` | How often the bot checks deposits, balances, and prices. Values below 60 are raised to 60 seconds. |
-| `FEE_BUFFER_PERCENT` | `1` | Percentage of the available quote balance withheld from the purchase budget as a fee and rounding buffer. The logs show the setting and the reserved amount. |
 | `WITHDRAWALS_ENABLED` | `false` | Enables automatic Bitcoin withdrawals. Also requires `LIVE_TRADING=true`. |
 | `WITHDRAW_THRESHOLD_QUOTE` | `1000` | Withdraw when the available BTC balance reaches this value in `QUOTE_CURRENCY`. |
 | `WEB_UI_ENABLED` | `true` | Enables the local portfolio dashboard. |
@@ -120,7 +119,7 @@ docker compose up -d --build
 ## How the purchase schedule works
 
 - Before each purchase check, the bot reads the current available `QUOTE_CURRENCY` balance on the selected exchange. Existing funds are included, even if they were deposited before the current scheduling period.
-- The configured fee buffer is reserved from that balance. The bot divides the spendable balance by the current minimum order value to estimate how many purchases remain until the next `DEPOSIT_DAY`.
+- The bot divides the available balance by the current minimum order value to estimate how many purchases remain until the next `DEPOSIT_DAY`.
 - `BUY_AMOUNT` sets the desired BTC amount per purchase. If it is zero, the bot fetches the selected market's rules on every execution and calculates the smallest amount that meets its current minimum quantity and order value.
 - At every check, the bot fetches the current available balance and BTC price, then recalculates the purchase interval from the affordable order count and time until the next `DEPOSIT_DAY`. The first eligible purchase is due immediately. The log entry `Recalculated DCA schedule` shows the values used.
 - The schedule does not depend on finding a completed deposit record for the current period. In dry-run mode, previously simulated purchases are subtracted from the balance for scheduling.
@@ -159,7 +158,7 @@ View the container logs with:
 docker compose logs -f
 ~~~
 
-The logs show startup settings including `FEE_BUFFER_PERCENT`, its reserved quote-currency amount, balance checks, calculated purchase intervals, submitted orders, withdrawal activity, and errors returned by the selected exchange. Do not share logs without checking them for account-specific information.
+The logs show startup settings, balance checks, calculated purchase intervals, submitted orders, withdrawal activity, and errors returned by the selected exchange. Do not share logs without checking them for account-specific information.
 
 ## Project structure and Docker files
 
