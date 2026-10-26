@@ -18,7 +18,7 @@ Docker Compose reads .env for the credentials. Only credentials for the selected
 
 **Bitvavo:** Enable 2FA and create an API key under Settings → API. Grant View access and Trade digital assets. Add Withdraw digital assets only if you plan to use automatic withdrawals. Copy the key and secret into BITVAVO_API_KEY and BITVAVO_API_SECRET. See Bitvavo's [API key setup guide](https://docs.bitvavo.com/docs/get-started/).
 
-**Kraken:** Create a Spot API key and copy it into KRAKEN_API_KEY and KRAKEN_API_SECRET. Grant permissions to query funds and ledger entries, modify orders, and query closed orders and trades. Add Withdraw Funds only for automatic withdrawals. See Kraken's [API key guide](https://support.kraken.com/in/articles/360000919966-how-to-create-an-api-key?mode=consumerapp).
+**Kraken:** Create a Spot API key and copy it into KRAKEN_API_KEY and KRAKEN_API_SECRET. Grant permissions to query funds and ledger entries, modify orders, and query closed orders and trades. Add Withdraw Funds only for automatic withdrawals. See Kraken's [API key guide](https://support.kraken.com/in/articles/360000919966-how-to-create-an-api-key?mode=consumerapp). Kraken withdrawal support uses legacy funding endpoints that remain active but Kraken recommends migrating to its newer Funding API.
 
 For withdrawals, Bitvavo uses a verified WITHDRAW_ADDRESS and WITHDRAW_NETWORK. Kraken uses an existing saved Bitcoin withdrawal method selected by KRAKEN_WITHDRAW_KEY; this is the method name, not a wallet address. Verify the destination and network at the exchange before enabling withdrawals.
 
@@ -81,10 +81,9 @@ The non-secret settings are configured directly in `docker-compose.yml`. Change 
 | `WITHDRAW_THRESHOLD_QUOTE` | `1000` | Withdraw when the available BTC balance reaches this value in `QUOTE_CURRENCY`. |
 | `WITHDRAW_ADDRESS` | Empty | Bitvavo destination Bitcoin address; required for Bitvavo withdrawals. Add and verify it in Bitvavo first. |
 | `WITHDRAW_NETWORK` | `BTC` | Bitvavo network for the withdrawal. |
-| `KRAKEN_WITHDRAW_KEY` | Empty | Existing saved Kraken Bitcoin withdrawal method name; required for Kraken withdrawals. |
 | `WEB_UI_ENABLED` | `true` | Enables the local read-only portfolio dashboard. |
 | `WEB_UI_PORT` | `8080` | Dashboard port on the host and inside the container. Set it in `.env` to override the default. |
-| `BITVAVO_API_KEY` | Required | Bitvavo API key. Keep it in the local, untracked `.env` file. |
+| `BITVAVO_API_KEY` | Required for Bitvavo | Bitvavo API key. Keep it in the local, untracked `.env` file. |
 | `BITVAVO_API_SECRET` | Required for Bitvavo | Bitvavo API secret in the local `.env` file. |
 | `KRAKEN_API_KEY` | Required for Kraken | Kraken API key in the local `.env` file. |
 | `KRAKEN_API_SECRET` | Required for Kraken | Kraken API secret in the local `.env` file. |
