@@ -326,13 +326,26 @@ def run_once(api, settings):
         except requests.RequestException as exc:
             LOG.error("Previous order %s is unresolved; refusing another order until it can be checked: %s", pending["clientOrderId"], exc)
             return
+        event_id = pending["clientOrderId"]
+        records, added = persist_bot_buy(
+            api, result, settings, event_id, int(pending.get("submittedAt", int(time.time() * 1000)))
+        )
+        if not records:
+            status = str(result.get("status", "")).lower()
+            if status in ("closed", "filled", "expired", "canceled"):
+                state.pop("pending_order", None)
+                save_state(state_path, state)
+                LOG.warning("Previous %s order %s ended without a recorded fill (status=%s).", settings["exchange"], event_id, status)
+            else:
+                LOG.info("Previous %s order %s has no confirmed fill yet (status=%s); waiting before another purchase.", settings["exchange"], event_id, result.get("status", "unknown"))
+            return
         order_quote = Decimal(pending["amountQuote"])
         state["spent"] = str(spent + order_quote)
         state["last_order_at"] = datetime.now(timezone.utc).isoformat()
         state["last_order_quote"] = str(order_quote)
         state.pop("pending_order", None)
         save_state(state_path, state)
-        LOG.info("Reconciled previous %s order %s; status=%s. Next interval will be recalculated.", settings["exchange"], pending["clientOrderId"], result.get("status", "found"))
+        LOG.info("Reconciled previous %s order %s; status=%s; saved %s bot activity record(s). Next interval will be recalculated.", settings["exchange"], event_id, result.get("status", "found"), added)
         return
     try:
         maybe_withdraw_btc(api, state, settings)
@@ -344,6 +357,9 @@ def run_once(api, settings):
     balance_after_simulated_spend = (
         max(Decimal(0), balance - spent) if not settings["live"] else balance
     )
+    market = api.market(symbol)
+    price = api.price(symbol)
+    update_dashboard_snapshot(settings, balance, price)
     if balance_after_simulated_spend <= 0:
         simulated_spent = spent if not settings["live"] else Decimal(0)
         LOG.info(
@@ -351,12 +367,9 @@ def run_once(api, settings):
             quote, balance, simulated_spent,
         )
         return
-
-    market = api.market(symbol)
     if market.get("status") != "trading":
         LOG.info("Market %s is %s; waiting.", symbol, market.get("status"))
         return
-    price = api.price(symbol)
     min_quote = Decimal(market["minOrderInQuoteAsset"])
     min_base = Decimal(market["minOrderInBaseAsset"])
     quantity_decimals = int(market["quantityDecimals"])
@@ -375,10 +388,11 @@ def run_once(api, settings):
     seconds_left = max(60, (next_deposit - now).total_seconds())
     interval_seconds = max(60, int(seconds_left / possible_buys))
     LOG.info(
-        "Recalculated DCA schedule: balance=%s %s; spendable=%s %s; price=%s %s/%s; "
-        "estimated order=%s %s (%s %s); possible buys=%s; next deposit day=%s; "
-        "purchase interval=%s minutes.",
-        balance, quote, affordable_budget, quote, price, quote, base,
+        "Recalculated DCA schedule: balance=%s %s; fee buffer=%s%% (reserved=%s %s); "
+        "spendable=%s %s; price=%s %s/%s; estimated order=%s %s (%s %s); "
+        "possible buys=%s; next deposit day=%s; purchase interval=%s minutes.",
+        balance, quote, settings["fee_buffer"], reserve, quote,
+        affordable_budget, quote, price, quote, base,
         order_amount, base, order_quote, quote, possible_buys,
         next_deposit.isoformat(), int(interval_seconds / 60),
     )
@@ -393,14 +407,30 @@ def run_once(api, settings):
 
     if settings["live"]:
         if available < order_quote:
-            LOG.info("Waiting for deposit: available %s %s; minimum order %s %s.", available, quote, order_quote, quote)
+            LOG.info("Waiting for sufficient available balance: %s %s; minimum order %s %s.", available, quote, order_quote, quote)
             return
-        pending = {"clientOrderId": str(uuid.uuid4()), "amountQuote": str(order_quote), "amountBase": str(order_amount)}
+        pending = {
+            "clientOrderId": str(uuid.uuid4()),
+            "amountQuote": str(order_quote),
+            "amountBase": str(order_amount),
+            "submittedAt": int(time.time() * 1000),
+        }
         state["pending_order"] = pending
         save_state(state_path, state)
         result = api.buy_base(symbol, order_amount, pending["clientOrderId"])
         status = result.get("status", "submitted")
-        LOG.info("Order submitted: %s %s (estimated %s %s); status=%s orderId=%s", order_amount, base, order_quote, quote, status, result.get("orderId"))
+        try:
+            order_details = api.get_order(symbol, pending["clientOrderId"])
+        except requests.RequestException:
+            LOG.exception("Order was accepted but its fill details could not be fetched; it will be reconciled before another purchase.")
+            return
+        records, added = persist_bot_buy(
+            api, order_details, settings, pending["clientOrderId"], pending["submittedAt"]
+        )
+        if not records:
+            LOG.warning("Order response had no confirmed BTC fill yet (status=%s); keeping it pending for reconciliation.", order_details.get("status", status))
+            return
+        LOG.info("Order submitted: %s %s (estimated %s %s); status=%s orderId=%s; saved %s bot activity record(s).", order_amount, base, order_quote, quote, status, result.get("orderId"), added)
     else:
         LOG.info("DRY RUN: would market-buy %s %s (estimated %s %s at %s %s/%s).", order_amount, base, order_quote, quote, price, quote, base)
 
@@ -452,6 +482,7 @@ def main():
             raise ValueError("WITHDRAW_THRESHOLD_QUOTE must be greater than zero")
     interval = max(60, int(os.getenv("CHECK_INTERVAL_SECONDS", "300")))
     LOG.info("Starting on %s: %s; live trading=%s; quote currency=%s; requested buy amount=%s %s; deposit day=%s; timezone=%s; check interval=%ss", settings["exchange"], f"{settings['base']}-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], settings["base"], deposit_day, settings["timezone"], interval)
+    LOG.info("FEE_BUFFER_PERCENT=%s%%; applied to the current quote balance and excluded from the spendable purchase budget.", settings["fee_buffer"])
 
     if os.getenv("WEB_UI_ENABLED", "true").lower() == "true":
         port = int(os.getenv("WEB_UI_PORT", "8080"))
