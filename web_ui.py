@@ -6,8 +6,8 @@ from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from exchange import create_exchange
-from reporting import parqet_csv, parqet_rows
+from activity import read_activity_records, read_dashboard_snapshot
+from reporting import parqet_csv
 
 LOG = logging.getLogger("bitvavo-dca.web")
 
@@ -31,19 +31,19 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 </style>
 </head>
 <body><main>
-<header class="top"><div><div class="eyebrow" id="exchangeName">Exchange · DCA</div><h1>Bitcoin Portfolio</h1><p class="sub">Purchases, fees, withdrawals and Parqet exports</p></div><div class="badge">Local access only</div></header>
+<header class="top"><div><div class="eyebrow" id="exchangeName">Exchange · DCA</div><h1>Bitcoin Portfolio</h1><p class="sub">Purchases, fees, withdrawals and Parqet exports recorded by the bot</p></div><div class="badge">Local access only</div></header>
 <section class="panel">
 <div class="controls">
 <div class="field"><label for="interval">Withdrawal interval</label><select id="interval"></select></div>
 <div class="field"><label for="start">From</label><input id="start" type="datetime-local"></div>
 <div class="field"><label for="end">To</label><input id="end" type="datetime-local"></div>
 <button id="refresh">Load report</button><button class="secondary" id="download">Download Parqet CSV</button>
-</div><div id="error" class="error hidden"></div><div class="notice">Choose an interval between completed BTC withdrawals or set a custom date range. The CSV download is formatted for importing BTC activity into Parqet and uses the selected date range.</div>
+</div><div id="error" class="error hidden"></div><div class="notice">Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The CSV is formatted for importing the bot’s recorded BTC activity into Parqet and uses the selected date range. Earlier exchange activity is not imported.</div>
 </section>
 <section class="panel"><h2>Balance on <span id="exchangeLabel">the exchange</span></h2><div class="grid">
-<div class="card"><label>Available BTC balance</label><div class="value" id="balance">—</div></div>
+<div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
 <div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div></div>
-<div class="card"><label>Balance value</label><div class="value" id="balanceValue">—</div></div>
+<div class="card"><label>Estimated bot-tracked value</label><div class="value" id="balanceValue">—</div></div>
 <div class="card"><label>Withdrawal threshold</label><div class="value" id="threshold">—</div><div class="small">Configured in Docker Compose</div></div>
 </div></section>
 <section class="panel"><h2>Selected period summary</h2><div class="grid">
@@ -86,7 +86,7 @@ async function loadAnalytics(){
  $("buyVolume").textContent=money(d.summary.buyVolume,quote);$("avgPrice").textContent="Average: "+money(d.summary.averagePrice,quote)+"/BTC";
  $("tradeFees").textContent=money(d.summary.tradeFees,quote);$("withdrawBtc").textContent=btc(d.summary.withdrawnBtc);$("withdrawCount").textContent=d.summary.withdrawalCount+" completed withdrawals";
  $("withdrawFees").textContent=money(d.summary.withdrawalFees,quote);$("netBtc").textContent=btc(d.summary.netBtc);
- $("periodLabel").textContent=new Date(p.start).toLocaleDateString("en-GB")+" – "+new Date(p.end).toLocaleDateString("en-GB");$("updated").textContent=new Date().toLocaleTimeString("en-GB");
+ $("periodLabel").textContent=new Date(p.start).toLocaleDateString("en-GB")+" – "+new Date(p.end).toLocaleDateString("en-GB");$("updated").textContent=new Date(d.snapshot.updatedAt||Date.now()).toLocaleTimeString("en-GB");
  const body=$("activities");body.innerHTML="";
  for(const row of d.activities.slice().reverse()){const tr=document.createElement("tr"),vals=[dateLabel(Date.parse(row.datetime)),row.type,btc(row.shares),money(row.price,quote)+"/BTC",money(row.amount,quote),money(row.fee,quote)];vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i>=2)td.className="num";tr.appendChild(td)});body.appendChild(tr)}
  if(!d.activities.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=6;td.textContent="No BTC activity in this period.";td.className="notice";tr.appendChild(td);body.appendChild(tr)}
@@ -137,26 +137,32 @@ class Handler(BaseHTTPRequestHandler):
             return
         query = parse_qs(parsed.query)
         try:
-            api = create_exchange(self.settings)
+            records = read_activity_records()
             if parsed.path == "/api/withdrawals":
-                now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-                rows = api.btc_withdrawals(start_ms=0, end_ms=now_ms)
                 withdrawals = [
-                    {"timestamp": int(row["timestamp"]), "txId": row.get("txId", "")}
-                    for row in rows
-                    if row.get("symbol", "").upper() == "BTC" and row.get("status") == "completed"
+                    {
+                        "timestamp": _row_timestamp_ms(record["row"]),
+                        "txId": record.get("id", ""),
+                    }
+                    for record in records
+                    if record["row"].get("type") == "TransferOut"
                 ]
                 withdrawals.sort(key=lambda item: item["timestamp"])
                 self._json(200, withdrawals)
                 return
             if parsed.path in ("/api/analytics", "/api/export.csv"):
                 start_ms, end_ms = _period(query)
-                rows = parqet_rows(api, start_ms, end_ms, self.settings["quote"])
+                rows = [
+                    record["row"] for record in records
+                    if start_ms < _row_timestamp_ms(record["row"]) <= end_ms
+                ]
                 if parsed.path == "/api/export.csv":
                     filename = "parqet_btc_" + str(start_ms) + "_" + str(end_ms) + ".csv"
                     self._send(200, parqet_csv(rows), "text/csv; charset=utf-8", filename)
                 else:
-                    result = _analytics_from_rows(api, self.settings, rows)
+                    result = _analytics_from_rows(
+                        self.settings, rows, read_dashboard_snapshot()
+                    )
                     self._json(200, result)
                 return
             self._json(404, {"error": "Not found"})
@@ -164,14 +170,19 @@ class Handler(BaseHTTPRequestHandler):
             self._json(400, {"error": str(exc)})
         except Exception as exc:
             LOG.exception("Web UI request failed")
-            self._json(502, {"error": "Exchange data could not be loaded. Check the container logs."})
+            self._json(502, {"error": "Stored bot activity could not be loaded. Check the container logs."})
 
     def log_message(self, fmt, *args):
         LOG.info("Web UI %s - %s", self.address_string(), fmt % args)
 
 
-def _analytics_from_rows(api, settings, rows):
-    quote = settings["quote"]
+def _row_timestamp_ms(row):
+    value = datetime.fromisoformat(row["datetime"].replace("Z", "+00:00"))
+    return int(value.timestamp() * 1000)
+
+
+def _analytics_from_rows(settings, rows, snapshot):
+    quote = snapshot.get("quote", settings["quote"])
     buys = [row for row in rows if row["type"] == "Buy"]
     withdrawals = [row for row in rows if row["type"] == "TransferOut"]
     bought_btc = sum((Decimal(row["shares"]) for row in buys), Decimal(0))
@@ -179,16 +190,19 @@ def _analytics_from_rows(api, settings, rows):
     trade_fees = sum((Decimal(row["fee"]) for row in buys), Decimal(0))
     withdrawn_btc = sum((Decimal(row["shares"]) for row in withdrawals), Decimal(0))
     withdrawal_fees = sum((Decimal(row["fee"]) for row in withdrawals), Decimal(0))
-    price = api.price("BTC-" + quote)
-    balance = api.balance("BTC")
+    balance = Decimal(str(snapshot.get("trackedBtc", "0")))
+    price = Decimal(str(snapshot.get("price", "0")))
+    value = Decimal(str(snapshot.get("value", balance * price)))
     return {
         "quote": quote,
-        "exchange": settings["exchange"],
+        "exchange": snapshot.get("exchange", settings["exchange"]),
         "snapshot": {
             "balance": str(balance),
             "price": str(price),
-            "value": str(balance * price),
-            "withdrawThreshold": str(settings["withdraw_threshold"]),
+            "value": str(value),
+            "quoteBalance": str(snapshot.get("quoteBalance", "0")),
+            "withdrawThreshold": str(snapshot.get("withdrawThreshold", settings["withdraw_threshold"])),
+            "updatedAt": snapshot.get("updatedAt"),
         },
         "summary": {
             "buyCount": len(buys),
