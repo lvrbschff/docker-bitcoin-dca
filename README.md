@@ -2,6 +2,22 @@
 
 A Docker-based DCA bot for buying Bitcoin with fiat deposits on Bitvavo or Kraken. Choose the exchange, quote currency, purchase amount, and deposit day. The bot calculates purchase timing from completed deposits and the exchange's minimum order rules. A local web UI shows portfolio activity and can generate Parqet-compatible CSV exports.
 
+## Project structure and Docker files
+
+The Docker and configuration files have different jobs:
+
+- **Dockerfile** is the image build recipe. It installs Python dependencies and copies the bot and adapter code into the image.
+- **docker-compose.yml** builds and runs that image, sets the bot's runtime options, and publishes the local web UI port.
+- **.env.example** is a template for a local .env file. Use it for exchange API credentials, WEB_UI_PORT, and KRAKEN_WITHDRAW_KEY when needed. It is not a second Docker build file, and it contains no actual credentials by default.
+
+The code is separated by responsibility:
+
+- **bot.py** contains the exchange-independent DCA schedule, state handling, and bot workflow.
+- **exchange.py** selects the configured exchange adapter.
+- **bitvavo.py** and **kraken.py** implement the same exchange interface for their respective APIs.
+- **reporting.py** converts normalized trade and withdrawal history into Parqet CSV rows.
+- **web_ui.py** serves the local dashboard and on-demand CSV download.
+
 ## What you need
 
 - Docker Engine and the Docker Compose plugin
