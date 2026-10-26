@@ -7,7 +7,7 @@ import os
 import time
 import uuid
 from datetime import datetime, timezone
-from decimal import Decimal, ROUND_CEILING
+from decimal import Decimal, ROUND_CEILING, ROUND_DOWN
 from pathlib import Path
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
@@ -83,6 +83,9 @@ class Bitvavo:
             params={"symbol": currency, "start": start_ms, "end": end_ms, "limit": 1000},
             private=True,
         )
+
+    def withdraw_crypto(self, withdrawal):
+        return self.request("POST", "/crypto/withdrawal", body=withdrawal, private=True)
 
     def buy_base(self, symbol, amount, client_order_id):
         body = {
@@ -169,6 +172,10 @@ def read_state(path, cycle_key):
             fresh["pending_order"] = state["pending_order"]
         if state.get("parqet_export"):
             fresh["parqet_export"] = state["parqet_export"]
+        if state.get("pending_withdrawal"):
+            fresh["pending_withdrawal"] = state["pending_withdrawal"]
+        if state.get("last_withdrawal"):
+            fresh["last_withdrawal"] = state["last_withdrawal"]
         return fresh
     return state
 
@@ -304,6 +311,70 @@ def export_parqet_cycle(api, state, settings):
         LOG.info("Created Parqet CSV %s with %s BTC buys and the completed withdrawal; trade and withdrawal fees included.", output, len(btc_buys))
 
 
+
+def maybe_withdraw_btc(api, state, settings):
+    if not settings["withdrawals_enabled"]:
+        return
+    if not settings["live"]:
+        LOG.warning("Automatic withdrawal is enabled but LIVE_TRADING is false; no withdrawal will be sent.")
+        return
+
+    pending = state.get("pending_withdrawal")
+    if pending:
+        LOG.warning("Retrying unresolved withdrawal with the same Bitvavo idempotency key.")
+        try:
+            result = api.withdraw_crypto(pending)
+        except requests.RequestException:
+            LOG.exception("Withdrawal outcome is uncertain; the same request will be retried next check.")
+            return
+        state["last_withdrawal"] = {
+            "id": result.get("id"),
+            "amount": pending["amount"],
+            "createdAt": result.get("createdAt"),
+        }
+        state.pop("pending_withdrawal", None)
+        save_state(Path("/data/state.json"), state)
+        LOG.info("BTC withdrawal submitted: amount=%s BTC, address=%s, withdrawalId=%s", pending["amount"], pending["address"], result.get("id"))
+        return
+
+    available = api.balance("BTC")
+    if available <= 0:
+        return
+    price = api.price(f"BTC-{settings['quote']}")
+    value = available * price
+    if value < settings["withdraw_threshold"]:
+        LOG.info("BTC withdrawal threshold not reached: available value %s %s, threshold %s %s.", value, settings["quote"], settings["withdraw_threshold"], settings["quote"])
+        return
+
+    amount = available.quantize(Decimal("0.00000001"), rounding=ROUND_DOWN)
+    if amount <= 0:
+        LOG.info("No withdrawable BTC remains after applying Bitcoin precision.")
+        return
+    withdrawal = {
+        "asset": "BTC",
+        "network": settings["withdraw_network"],
+        "address": settings["withdraw_address"],
+        "amount": format(amount, "f"),
+        "deductFeeFromAmount": True,
+        "idempotencyKey": str(uuid.uuid4()),
+    }
+    state["pending_withdrawal"] = withdrawal
+    save_state(Path("/data/state.json"), state)
+    try:
+        result = api.withdraw_crypto(withdrawal)
+    except requests.RequestException:
+        LOG.exception("Withdrawal outcome is uncertain; the same request will be retried next check.")
+        return
+    state["last_withdrawal"] = {
+        "id": result.get("id"),
+        "amount": withdrawal["amount"],
+        "createdAt": result.get("createdAt"),
+    }
+    state.pop("pending_withdrawal", None)
+    save_state(Path("/data/state.json"), state)
+    LOG.warning("BTC withdrawal submitted: amount=%s BTC (fee deducted from amount), value at submission=%s %s, destination=%s, withdrawalId=%s", withdrawal["amount"], value, settings["quote"], settings["withdraw_address"], result.get("id"))
+
+
 def run_once(api, settings):
     quote, base = settings["quote"], settings["base"]
     symbol = f"{base}-{quote}"
@@ -332,6 +403,10 @@ def run_once(api, settings):
         save_state(state_path, state)
         LOG.info("Reconciled previous Bitvavo order %s; status=%s. Next interval will be recalculated.", pending["clientOrderId"], result.get("status", "found"))
         return
+    try:
+        maybe_withdraw_btc(api, state, settings)
+    except requests.RequestException as exc:
+        LOG.error("Automatic BTC withdrawal check failed: %s", exc)
     deposits = api.fiat_deposits(
         quote,
         int(cycle_start.timestamp() * 1000),
@@ -412,7 +487,18 @@ def main():
         "timezone": os.getenv("TIMEZONE", "Europe/Berlin"),
         "live": os.getenv("LIVE_TRADING", "false").lower() == "true",
         "fee_buffer": env_decimal("FEE_BUFFER_PERCENT", 1),
+        "withdrawals_enabled": os.getenv("WITHDRAWALS_ENABLED", "false").lower() == "true",
+        "withdraw_threshold": env_decimal("WITHDRAW_THRESHOLD_QUOTE", 1000),
+        "withdraw_address": os.getenv("WITHDRAW_ADDRESS", "").strip(),
+        "withdraw_network": os.getenv("WITHDRAW_NETWORK", "BTC").upper(),
     }
+    if settings["withdrawals_enabled"]:
+        if settings["base"] != "BTC":
+            raise ValueError("Automatic withdrawals currently support BASE_ASSET=BTC only")
+        if not settings["withdraw_address"]:
+            raise ValueError("WITHDRAW_ADDRESS is required when WITHDRAWALS_ENABLED=true")
+        if settings["withdraw_threshold"] <= 0:
+            raise ValueError("WITHDRAW_THRESHOLD_QUOTE must be greater than zero")
     interval = max(60, int(os.getenv("CHECK_INTERVAL_SECONDS", "300")))
     api = Bitvavo()
     LOG.info("Starting %s; live trading=%s; quote currency=%s; requested buy amount=%s %s; deposit day=%s; timezone=%s; check interval=%ss", f"{settings['base']}-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], settings["base"], deposit_day, settings["timezone"], interval)
