@@ -64,7 +64,7 @@ Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings 
 | `EXCHANGE` | `BITVAVO` | Exchange to use: `BITVAVO` or `KRAKEN`. |
 | `QUOTE_CURRENCY` | `EUR` | Fiat or quote currency for deposits and the BTC market, for example `EUR` or `USD`. The selected exchange must support the currency and market. |
 | `BASE_ASSET` | `BTC` | Asset to buy. The market is formed as `BASE_ASSET-QUOTE_CURRENCY`. |
-| `BUY_AMOUNT` | `0` | Desired BTC amount per purchase. `0` uses the smallest amount allowed by the selected exchange's market rules. |
+| `BUY_AMOUNT` | `0` | Desired BTC amount per purchase. `0` uses the smallest amount currently allowed by the selected exchange's market rules; these rules are fetched dynamically on every execution. |
 | `DEPOSIT_DAY` | `1` | Day of the month that starts a new deposit cycle. If a month is shorter, its final day is used. |
 | `TIMEZONE` | `Europe/Berlin` | Time zone used to calculate the deposit-cycle boundary. |
 | `LIVE_TRADING` | `false` | Set to `true` to submit real orders. Keep `false` to run in dry-run mode. |
@@ -121,7 +121,7 @@ docker compose up -d --build
 
 - The bot totals completed deposits in `QUOTE_CURRENCY` since the current deposit cycle began. It does not use a fixed monthly budget.
 - In live mode, the available balance on the selected exchange also limits how much can be bought. The configured fee buffer is left unspent.
-- `BUY_AMOUNT` sets the desired BTC amount per purchase. If it is zero, the bot calculates the smallest amount that meets the selected market's minimum quantity and order value.
+- `BUY_AMOUNT` sets the desired BTC amount per purchase. If it is zero, the bot fetches the selected market's rules on every execution and calculates the smallest amount that meets its current minimum quantity and order value.
 - The bot recalculates the interval using remaining deposited funds, the minimum order value, the current price, and the time until the next `DEPOSIT_DAY`. The first eligible purchase in a cycle is due immediately.
 - Only completed deposits recorded by the selected exchange are counted. The bot waits for a deposit before buying.
 - Market orders do not guarantee an execution price. A configured `BUY_AMOUNT` can cost more or less than estimated as the market price changes.
