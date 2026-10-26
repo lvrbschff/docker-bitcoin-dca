@@ -6,7 +6,7 @@ from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from bot import Bitvavo
+from bot import create_exchange
 from reporting import parqet_csv, parqet_rows
 
 LOG = logging.getLogger("bitvavo-dca.web")
@@ -31,7 +31,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 </style>
 </head>
 <body><main>
-<header class="top"><div><div class="eyebrow">Bitvavo · DCA</div><h1>Bitcoin-Übersicht</h1><p class="sub">Käufe, Gebühren, Auszahlungen und Parqet-Export</p></div><div class="badge">Nur lokal erreichbar</div></header>
+<header class="top"><div><div class="eyebrow" id="exchangeName">Exchange · DCA</div><h1>Bitcoin-Übersicht</h1><p class="sub">Käufe, Gebühren, Auszahlungen und Parqet-Export</p></div><div class="badge">Nur lokal erreichbar</div></header>
 <section class="panel">
 <div class="controls">
 <div class="field"><label for="interval">Auszahlungsintervall</label><select id="interval"></select></div>
@@ -40,7 +40,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <button id="refresh">Auswertung laden</button><button class="secondary" id="download">CSV herunterladen</button>
 </div><div id="error" class="error hidden"></div><div class="notice">Wähle ein Intervall zwischen zwei abgeschlossenen BTC-Auszahlungen oder lege den Zeitraum manuell fest.</div>
 </section>
-<section class="panel"><h2>Bestand auf Bitvavo</h2><div class="grid">
+<section class="panel"><h2>Bestand auf <span id="exchangeLabel">der Börse</span></h2><div class="grid">
 <div class="card"><label>Verfügbarer BTC-Bestand</label><div class="value" id="balance">—</div></div>
 <div class="card"><label>Aktueller BTC-Kurs</label><div class="value" id="spot">—</div></div>
 <div class="card"><label>Gegenwert des Bestands</label><div class="value" id="balanceValue">—</div></div>
@@ -79,7 +79,7 @@ async function loadIntervals(){
 }
 $("interval").addEventListener("change",()=>{if(!$("interval").value)return;const p=$("interval").value.split(",").map(Number);$("start").value=localInput(p[0]);$("end").value=localInput(p[1]);loadAnalytics()});
 async function loadAnalytics(){
- try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end);const d=await response.json();if(!response.ok)throw new Error(d.error||"Auswertung fehlgeschlagen.");quote=d.quote;dataCurrency=quote;
+ try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end);const d=await response.json();if(!response.ok)throw new Error(d.error||"Auswertung fehlgeschlagen.");quote=d.quote;dataCurrency=quote;const ex=d.exchange==="KRAKEN"?"Kraken":"Bitvavo";$("exchangeName").textContent=ex+" · DCA";$("exchangeLabel").textContent=ex;document.title=ex+" DCA · Portfolio";
  $("balance").textContent=btc(d.snapshot.balance);$("spot").textContent=money(d.snapshot.price,quote)+"/BTC";$("balanceValue").textContent=money(d.snapshot.value,quote);
  $("threshold").textContent=money(d.snapshot.withdrawThreshold,quote);
  $("buyCount").textContent=d.summary.buyCount;$("buyBtc").textContent=btc(d.summary.boughtBtc);
@@ -137,7 +137,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         query = parse_qs(parsed.query)
         try:
-            api = Bitvavo()
+            api = create_exchange(self.settings)
             if parsed.path == "/api/withdrawals":
                 now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
                 rows = api.btc_withdrawals(start_ms=0, end_ms=now_ms)
@@ -164,7 +164,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(400, {"error": str(exc)})
         except Exception as exc:
             LOG.exception("Web UI request failed")
-            self._json(502, {"error": "Bitvavo data could not be loaded. Check the container logs."})
+            self._json(502, {"error": "Exchange data could not be loaded. Check the container logs."})
 
     def log_message(self, fmt, *args):
         LOG.info("Web UI %s - %s", self.address_string(), fmt % args)
@@ -183,6 +183,7 @@ def _analytics_from_rows(api, settings, rows):
     balance = api.balance("BTC")
     return {
         "quote": quote,
+        "exchange": settings["exchange"],
         "snapshot": {
             "balance": str(balance),
             "price": str(price),
