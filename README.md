@@ -14,6 +14,14 @@ A Docker service that buys a configurable base asset (BTC by default) with a con
 
 `DEPOSIT_DAY` defines the day of the month when a new cycle starts. `TIMEZONE` sets the time zone used for that boundary (default: `Europe/Berlin`). If a month does not contain the selected day, its last calendar day is used. The bot counts only completed deposits visible in Bitvavo's deposit history; it will not buy until a deposit is detected. In live mode, the quote balance must also be sufficient.
 
+## Automatic BTC withdrawals
+
+Automatic withdrawals are disabled by default. To enable them, set `WITHDRAWALS_ENABLED: "true"`, set `LIVE_TRADING: "true"`, and enter a Bitcoin address and network in `docker-compose.yml`. The destination address must already be added and verified in your Bitvavo address book.
+
+At each check, the bot values the available BTC balance using the current `BTC-<QUOTE_CURRENCY>` price. Once it reaches `WITHDRAW_THRESHOLD_QUOTE`, the bot requests a withdrawal of the entire available BTC balance. Bitvavo deducts the withdrawal fee from that amount, so the wallet receives the balance minus the fee. The threshold uses `QUOTE_CURRENCY`; for example, with `QUOTE_CURRENCY: EUR`, a value of `1000` means €1,000.
+
+This feature needs Bitvavo's **Withdraw digital assets** API permission. API withdrawals do not require 2FA or email confirmation, and an incorrect destination address can result in unrecoverable loss. Verify the address and network carefully before enabling it. See Bitvavo's [crypto withdrawal API](https://docs.bitvavo.com/docs/rest-api/withdraw-crypto-assets/) for required fields and behavior.
+
 ## Parqet CSV exports
 
 After the first startup, the bot watches Bitvavo for completed BTC withdrawals. Every later completed withdrawal creates a CSV file in `./exports` containing all BTC buy transactions since the previous completed withdrawal and the withdrawal itself. This includes buys made manually or by other tools on the same Bitvavo account, not only orders placed by this bot.
@@ -38,13 +46,14 @@ The non-secret settings are configured directly in `docker-compose.yml`. Change 
 | `LIVE_TRADING` | `false` | Set to `true` to submit real orders. Keep `false` for dry-run logging. |
 | `CHECK_INTERVAL_SECONDS` | `300` | How often to check deposits, balances, and market data. Values below `60` are clamped to `60`. This is a polling interval; purchase timing is calculated separately. |
 | `FEE_BUFFER_PERCENT` | `1` | Percentage of cycle deposits left aside for fees and rounding. |
+| `WITHDRAWALS_ENABLED` | `false` | Set to `true` to enable automatic BTC withdrawals. Requires `LIVE_TRADING: "true"`. |
+| `WITHDRAW_THRESHOLD_QUOTE` | `1000` | Withdraw when the available BTC balance reaches this value in `QUOTE_CURRENCY`. |
+| `WITHDRAW_ADDRESS` | Empty | Destination Bitcoin address. Required when automatic withdrawals are enabled; add and verify it in Bitvavo first. |
+| `WITHDRAW_NETWORK` | `BTC` | Bitvavo network for the withdrawal. |
 | `BITVAVO_API_KEY` | Required | Bitvavo API key. Keep it in the local, untracked `.env` file. |
 | `BITVAVO_API_SECRET` | Required | Bitvavo API secret. Keep it in the local, untracked `.env` file. |
 | `LOG_LEVEL` | `INFO` | Python logging level, such as `INFO`, `WARNING`, or `DEBUG`. |
 
-The state-file path (`/data/state.json`) and order `operatorId` (`1`) are fixed in the code and are not configurable.
-
-`MONTHLY_BUDGET` is not used. The bot derives its budget from completed deposits recorded by Bitvavo.
 
 ### API credentials
 
@@ -61,10 +70,10 @@ Docker Compose reads the `.env` file to fill the credential references in `docke
 1. Enable two-factor authentication (2FA) on your Bitvavo account.
 2. In Bitvavo, open **Settings → API → Add new API key** and give the key a recognizable name.
 3. If your server has a fixed public IP address, add it to the key's IP whitelist.
-4. Enable **View access** and **Trade digital assets**. Leave **Withdraw digital assets** and other permissions disabled.
+4. Enable **View access** and **Trade digital assets**. Enable **Withdraw digital assets** only if you intentionally turn on automatic withdrawals; leave it disabled otherwise.
 5. Confirm with 2FA, then copy the API key and secret into your local `.env` file. Store the secret securely; Bitvavo says it cannot be retrieved later.
 
-See Bitvavo's [API key setup guide](https://docs.bitvavo.com/docs/get-started/) for the current dashboard steps. The API key needs read and trading access for deposit history, balance checks, and order placement. Do not grant withdrawal access: Bitvavo warns that API withdrawals do not require 2FA or email confirmation.
+See Bitvavo's [API key setup guide](https://docs.bitvavo.com/docs/get-started/) for the current dashboard steps. The API key needs read and trading access for deposit history, balance checks, and order placement. Automatic withdrawals also require **Withdraw digital assets**. Bitvavo warns that API withdrawals do not require 2FA or email confirmation, so keep `WITHDRAWALS_ENABLED` set to `false` until you have carefully checked the address and network.
 
 ## Run with Docker Compose
 
