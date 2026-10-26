@@ -12,6 +12,7 @@ import calendar
 import threading
 
 import requests
+from activity import append_activity_records, read_activity_rows, write_dashboard_snapshot
 from exchange import create_exchange
 from reporting import parqet_csv, parqet_rows
 
@@ -67,6 +68,8 @@ def read_state(path, cycle_key):
             fresh["parqet_export"] = state["parqet_export"]
         if state.get("pending_withdrawal"):
             fresh["pending_withdrawal"] = state["pending_withdrawal"]
+        if state.get("pending_withdrawal_context"):
+            fresh["pending_withdrawal_context"] = state["pending_withdrawal_context"]
         if state.get("last_withdrawal"):
             fresh["last_withdrawal"] = state["last_withdrawal"]
         if "withdrawal_armed" in state:
@@ -80,6 +83,77 @@ def save_state(path, state):
     temp = path.with_suffix(".tmp")
     temp.write_text(json.dumps(state, indent=2))
     temp.replace(path)
+
+
+def utc_iso_from_ms(timestamp_ms):
+    return datetime.fromtimestamp(timestamp_ms / 1000, timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def normalized_event_time(value, fallback_ms):
+    if value is None:
+        return utc_iso_from_ms(fallback_ms)
+    if isinstance(value, (int, float)) or str(value).isdigit():
+        numeric = int(value)
+        return utc_iso_from_ms(numeric if numeric > 10**11 else numeric * 1000)
+    parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def persist_bot_withdrawal(api, withdrawal, result, settings, context):
+    quote = settings["quote"]
+    amount = Decimal(str(withdrawal.get("amount", "0")))
+    fee_btc = Decimal(str(withdrawal.get("fee", result.get("fee", "0"))))
+    price = Decimal(str(context.get("price", "0")))
+    if price <= 0:
+        price = api.price(f"BTC-{quote}")
+    timestamp_ms = int(context.get("timestamp_ms", int(time.time() * 1000)))
+    timestamp = normalized_event_time(result.get("createdAt"), timestamp_ms)
+    event_id = result.get("id") or result.get("refid") or withdrawal.get("idempotencyKey") or f"{timestamp_ms}-{amount}"
+    row = {
+        "datetime": timestamp,
+        "type": "TransferOut",
+        "identifier": "BTC",
+        "assetType": "Crypto",
+        "price": format(price, "f"),
+        "shares": format(amount, "f"),
+        "amount": format(amount * price, "f"),
+        "currency": quote,
+        "fee": format(fee_btc * price, "f"),
+        "tax": "0",
+    }
+    return append_activity_records([{"id": f"withdrawal:{event_id}", "row": row}])
+
+
+def update_dashboard_snapshot(settings, quote_balance, price):
+    rows = read_activity_rows()
+    bought = sum(
+        (Decimal(row["shares"]) for row in rows if row.get("type") == "Buy"),
+        Decimal(0),
+    )
+    withdrawn = sum(
+        (Decimal(row["shares"]) for row in rows if row.get("type") == "TransferOut"),
+        Decimal(0),
+    )
+    tracked_btc = bought - withdrawn
+    write_dashboard_snapshot({
+        "exchange": settings["exchange"],
+        "quote": settings["quote"],
+        "trackedBtc": format(tracked_btc, "f"),
+        "price": format(price, "f"),
+        "value": format(tracked_btc * price, "f"),
+        "quoteBalance": format(quote_balance, "f"),
+        "withdrawThreshold": format(settings["withdraw_threshold"], "f"),
+        "updatedAt": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+    })
+
+
+def persist_bot_buy(api, order, settings, event_id, fallback_timestamp_ms):
+    records = api.normalize_bot_buy(
+        order, settings["quote"], settings["base"], event_id, fallback_timestamp_ms
+    )
+    return records, append_activity_records(records)
 
 
 def ceil_to_places(value, places):
