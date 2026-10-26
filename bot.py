@@ -284,7 +284,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
             result = api.get_order(symbol, pending["clientOrderId"], pending.get("exchangeOrderId"))
         except requests.RequestException as exc:
             LOG.error("Previous order %s is unresolved; refusing another order until it can be checked: %s", pending["clientOrderId"], exc)
-            return
+            return check_interval
         event_id = pending["clientOrderId"]
         records, added = persist_bot_buy(
             api, result, settings, event_id, int(pending.get("submittedAt", int(time.time() * 1000)))
@@ -297,7 +297,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
                 LOG.warning("Previous %s order %s ended without a recorded fill (status=%s).", settings["exchange"], event_id, status)
             else:
                 LOG.info("Previous %s order %s has no confirmed fill yet (status=%s); waiting before another purchase.", settings["exchange"], event_id, result.get("status", "unknown"))
-            return
+            return check_interval
         order_quote = Decimal(pending["amountQuote"])
         state["spent"] = str(spent + order_quote)
         state["last_order_at"] = datetime.now(timezone.utc).isoformat()
@@ -326,10 +326,10 @@ def run_once(api, settings, check_interval, schedule_only=False):
             "No available %s balance for DCA purchases (balance=%s, simulated spend=%s).",
             quote, balance, simulated_spent,
         )
-        return
+        return check_interval
     if market.get("status") != "trading":
         LOG.info("Market %s is %s; waiting.", symbol, market.get("status"))
-        return
+        return check_interval
     min_quote = Decimal(market["minOrderInQuoteAsset"])
     min_base = Decimal(market["minOrderInBaseAsset"])
     quantity_decimals = int(market["quantityDecimals"])
@@ -342,7 +342,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
     possible_buys = int(affordable_budget // order_quote)
     if possible_buys < 1:
         LOG.info("Waiting: available balance %s %s; minimum order %s %s.", affordable_budget, quote, order_quote, quote)
-        return
+        return check_interval
 
     seconds_left = max(60, (next_deposit - now).total_seconds())
     interval_seconds = max(60, int(seconds_left / possible_buys))
@@ -384,7 +384,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
     if settings["live"]:
         if available < order_quote:
             LOG.info("Waiting for sufficient available balance: %s %s; minimum order %s %s.", available, quote, order_quote, quote)
-            return
+            return check_interval
         pending = {
             "clientOrderId": str(uuid.uuid4()),
             "amountQuote": str(order_quote),
@@ -403,13 +403,13 @@ def run_once(api, settings, check_interval, schedule_only=False):
             )
         except requests.RequestException:
             LOG.exception("Order was accepted but its fill details could not be fetched; it will be reconciled before another purchase.")
-            return
+            return check_interval
         records, added = persist_bot_buy(
             api, order_details, settings, pending["clientOrderId"], pending["submittedAt"]
         )
         if not records:
             LOG.warning("Order response had no confirmed BTC fill yet (status=%s); keeping it pending for reconciliation.", order_details.get("status", status))
-            return
+            return check_interval
         LOG.info("Order submitted: %s %s (estimated %s %s); status=%s orderId=%s; saved %s bot activity record(s).", order_amount, base, order_quote, quote, status, result.get("orderId"), added)
     else:
         LOG.info("DRY RUN: would market-buy %s %s (estimated %s %s at %s %s/%s); saved as simulated activity.", order_amount, base, order_quote, quote, price, quote, base)
