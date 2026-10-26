@@ -1,6 +1,6 @@
 # Bitcoin DCA Bot for Bitvavo and Kraken
 
-A Docker-based DCA bot for buying Bitcoin with fiat deposits on Bitvavo or Kraken. Choose the exchange, quote currency, purchase amount, and deposit day. The bot recalculates purchase timing from the available balance and the selected exchange's current minimum order rules. A local web UI shows portfolio activity and can generate Parqet-compatible CSV exports.
+A Docker-based DCA bot for buying Bitcoin with fiat deposits on Bitvavo or Kraken. Choose the exchange, quote currency, purchase amount, and deposit day. The bot recalculates purchase timing from the available balance and the selected exchange's current minimum order rules. A local web UI shows activity recorded by the bot and can generate Parqet-compatible CSV exports.
 
 ## What you need
 
@@ -69,7 +69,7 @@ Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings 
 | `TIMEZONE` | `Europe/Berlin` | Time zone used to calculate the deposit-cycle boundary. |
 | `LIVE_TRADING` | `false` | Set to `true` to submit real orders. Keep `false` to run in dry-run mode. |
 | `CHECK_INTERVAL_SECONDS` | `300` | How often the bot checks deposits, balances, and prices. Values below 60 are raised to 60 seconds. |
-| `FEE_BUFFER_PERCENT` | `1` | Share of the available quote balance reserved for trading fees and rounding. |
+| `FEE_BUFFER_PERCENT` | `1` | Percentage of the available quote balance withheld from the purchase budget as a fee and rounding buffer. The logs show the setting and the reserved amount. |
 | `WITHDRAWALS_ENABLED` | `false` | Enables automatic Bitcoin withdrawals. Also requires `LIVE_TRADING=true`. |
 | `WITHDRAW_THRESHOLD_QUOTE` | `1000` | Withdraw when the available BTC balance reaches this value in `QUOTE_CURRENCY`. |
 | `WEB_UI_ENABLED` | `true` | Enables the local portfolio dashboard. |
@@ -141,13 +141,15 @@ Check the destination and network carefully before enabling automatic withdrawal
 
 ## Portfolio web UI
 
-The read-only dashboard uses the exchange selected in `EXCHANGE`. It displays the BTC balance and value, purchases, average purchase price, fees, withdrawals, and net BTC for the selected period.
+The dashboard displays purchases and withdrawals recorded when this bot places them. It reads its activity and latest price snapshot from local files; the web UI does not query Kraken or Bitvavo for transaction history. The displayed BTC amount is the net amount tracked from the bot's recorded purchases and withdrawals, not the full exchange-account balance.
 
-Choose an interval between completed Bitcoin withdrawals or enter custom start and end dates. Download the displayed period as a Parqet-compatible CSV. Set `WEB_UI_ENABLED` to false to disable the dashboard.
+Choose an interval between bot-recorded Bitcoin withdrawals or enter custom start and end dates. Download the displayed period as a Parqet-compatible CSV for import into Parqet. Activity from before local tracking is enabled is not imported automatically. Set `WEB_UI_ENABLED` to false to disable the dashboard.
 
 ## Parqet CSV exports
 
-The bot creates a CSV in the host's ./exports directory after each completed Bitcoin withdrawal, including BTC buys and fees since the previous completed withdrawal. It includes purchases made manually or by other tools on the same exchange account, not only purchases placed by this bot.
+The automatic export creates a CSV in the host's ./exports directory after each completed Bitcoin withdrawal, including BTC buys and fees since the previous completed withdrawal. This automatic export uses the selected exchange's account history and can include manual purchases or purchases made by other tools.
+
+The web UI's on-demand CSV is separate: it includes only purchases and withdrawals recorded from this bot's own orders. Its local activity history starts when this version is deployed; earlier bot orders are not backfilled automatically.
 
 The CSV uses Parqet's semicolon-separated activity format. Trade and withdrawal fees are represented in the configured quote currency; BTC-denominated fees are valued using the trade price or the closing price of the one-minute candle containing the withdrawal timestamp. The underlying withdrawal fee remains denominated in BTC at the exchange.
 
@@ -163,7 +165,7 @@ View the container logs with:
 docker compose logs -f
 ~~~
 
-The logs show startup settings, balance checks, calculated purchase intervals, submitted orders, withdrawal activity, and errors returned by the selected exchange. Do not share logs without checking them for account-specific information.
+The logs show startup settings including `FEE_BUFFER_PERCENT`, its reserved quote-currency amount, balance checks, calculated purchase intervals, submitted orders, withdrawal activity, and errors returned by the selected exchange. Do not share logs without checking them for account-specific information.
 
 ## Project structure and Docker files
 
@@ -178,8 +180,9 @@ The code is separated by responsibility:
 - **bot.py** contains the exchange-independent DCA schedule, state handling, and bot workflow.
 - **exchange.py** selects the configured exchange adapter.
 - **bitvavo.py** and **kraken.py** implement the same exchange interface for their respective APIs.
-- **reporting.py** converts normalized trade and withdrawal history into Parqet CSV rows.
-- **web_ui.py** serves the local dashboard and on-demand CSV download.
+- **reporting.py** converts trade and withdrawal data into Parqet CSV rows.
+- **activity.py** stores bot-recorded activity and dashboard snapshots locally.
+- **web_ui.py** serves the local dashboard and on-demand CSV download from the stored data.
 
 ## GitHub Container Registry
 
