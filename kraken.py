@@ -258,8 +258,33 @@ class Kraken:
             "cursor": "true",
         }
         result = self.private("WithdrawStatus", params)
+        if isinstance(result, dict):
+            # Kraken's paginated response may be wrapped instead of returned as
+            # the plain list shown in the legacy endpoint examples.
+            rows = next(
+                (result[key] for key in ("withdrawals", "items", "data", "results")
+                 if isinstance(result.get(key), list)),
+                None,
+            )
+            if rows is None and result and all(
+                isinstance(value, dict) and "status" in value and "time" in value
+                for value in result.values()
+            ):
+                rows = list(result.values())
+            if rows is None and not result:
+                rows = []
+            if rows is None:
+                keys = ", ".join(sorted(result.keys())[:10])
+                raise KrakenAPIError(
+                    f"Unexpected Kraken withdrawal-history response object "
+                    f"(keys: {keys or 'none'})"
+                )
+            result = rows
         if not isinstance(result, list):
-            raise KrakenAPIError("Unexpected Kraken withdrawal-history response")
+            raise KrakenAPIError(
+                f"Unexpected Kraken withdrawal-history response type: "
+                f"{type(result).__name__}"
+            )
         withdrawals = []
         for item in result:
             status = str(item.get("status", "")).lower()
