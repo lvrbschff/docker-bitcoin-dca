@@ -176,6 +176,8 @@ def read_state(path, cycle_key):
             fresh["pending_withdrawal"] = state["pending_withdrawal"]
         if state.get("last_withdrawal"):
             fresh["last_withdrawal"] = state["last_withdrawal"]
+        if "withdrawal_armed" in state:
+            fresh["withdrawal_armed"] = state["withdrawal_armed"]
         return fresh
     return state
 
@@ -332,9 +334,10 @@ def maybe_withdraw_btc(api, state, settings):
             "amount": pending["amount"],
             "createdAt": result.get("createdAt"),
         }
+        state["withdrawal_armed"] = False
         state.pop("pending_withdrawal", None)
         save_state(Path("/data/state.json"), state)
-        LOG.info("BTC withdrawal submitted: amount=%s BTC, address=%s, withdrawalId=%s", pending["amount"], pending["address"], result.get("id"))
+        LOG.info("BTC withdrawal submitted: amount=%s BTC, withdrawalId=%s", pending["amount"], result.get("id"))
         return
 
     available = api.balance("BTC")
@@ -342,6 +345,14 @@ def maybe_withdraw_btc(api, state, settings):
         return
     price = api.price(f"BTC-{settings['quote']}")
     value = available * price
+    if not state.get("withdrawal_armed", True):
+        if value < settings["withdraw_threshold"]:
+            state["withdrawal_armed"] = True
+            save_state(Path("/data/state.json"), state)
+            LOG.info("BTC balance is below the withdrawal threshold again; automatic withdrawal is re-armed.")
+        else:
+            LOG.info("Waiting for Bitvavo to reflect the previous withdrawal before another automatic withdrawal.")
+        return
     if value < settings["withdraw_threshold"]:
         LOG.info("BTC withdrawal threshold not reached: available value %s %s, threshold %s %s.", value, settings["quote"], settings["withdraw_threshold"], settings["quote"])
         return
@@ -372,7 +383,9 @@ def maybe_withdraw_btc(api, state, settings):
     }
     state.pop("pending_withdrawal", None)
     save_state(Path("/data/state.json"), state)
-    LOG.warning("BTC withdrawal submitted: amount=%s BTC (fee deducted from amount), value at submission=%s %s, destination=%s, withdrawalId=%s", withdrawal["amount"], value, settings["quote"], settings["withdraw_address"], result.get("id"))
+    state["withdrawal_armed"] = False
+    save_state(Path("/data/state.json"), state)
+    LOG.warning("BTC withdrawal submitted: amount=%s BTC (fee deducted from amount), value at submission=%s %s, withdrawalId=%s", withdrawal["amount"], value, settings["quote"], result.get("id"))
 
 
 def run_once(api, settings):
@@ -497,6 +510,8 @@ def main():
             raise ValueError("Automatic withdrawals currently support BASE_ASSET=BTC only")
         if not settings["withdraw_address"]:
             raise ValueError("WITHDRAW_ADDRESS is required when WITHDRAWALS_ENABLED=true")
+        if not settings["withdraw_network"]:
+            raise ValueError("WITHDRAW_NETWORK is required when WITHDRAWALS_ENABLED=true")
         if settings["withdraw_threshold"] <= 0:
             raise ValueError("WITHDRAW_THRESHOLD_QUOTE must be greater than zero")
     interval = max(60, int(os.getenv("CHECK_INTERVAL_SECONDS", "300")))
