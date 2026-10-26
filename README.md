@@ -22,6 +22,14 @@ At each check, the bot values the available BTC balance using the current `BTC-<
 
 This feature needs Bitvavo's **Withdraw digital assets** API permission. API withdrawals do not require 2FA or email confirmation, and an incorrect destination address can result in unrecoverable loss. Verify the address and network carefully before enabling it. See Bitvavo's [crypto withdrawal API](https://docs.bitvavo.com/docs/rest-api/withdraw-crypto-assets/) for required fields and behavior.
 
+## Portfolio web UI
+
+The dashboard is enabled by default and is available at [http://localhost:8080](http://localhost:8080) on the Docker host. Docker Compose binds the port to `127.0.0.1`, so it is not exposed to the home network or the public internet.
+
+It shows the current available BTC balance and quote-currency value, plus purchases, average purchase price, fees, completed withdrawals, and net BTC purchased minus withdrawn for the selected period. Choose a period between two completed BTC withdrawals from the interval selector, or set custom start and end dates. The displayed period can be exported on demand as a Parqet-compatible CSV and downloaded directly from the page.
+
+The UI is read-only. It uses the existing Bitvavo read access and does not expose any trading or withdrawal controls. Set `WEB_UI_ENABLED: "false"` to disable it.
+
 ## Parqet CSV exports
 
 After the first startup, the bot watches Bitvavo for completed BTC withdrawals. Every later completed withdrawal creates a CSV file in `./exports` containing all BTC buy transactions since the previous completed withdrawal and the withdrawal itself. This includes buys made manually or by other tools on the same Bitvavo account, not only orders placed by this bot.
@@ -50,6 +58,8 @@ The non-secret settings are configured directly in `docker-compose.yml`. Change 
 | `WITHDRAW_THRESHOLD_QUOTE` | `1000` | Withdraw when the available BTC balance reaches this value in `QUOTE_CURRENCY`. |
 | `WITHDRAW_ADDRESS` | Empty | Destination Bitcoin address. Required when automatic withdrawals are enabled; add and verify it in Bitvavo first. |
 | `WITHDRAW_NETWORK` | `BTC` | Bitvavo network for the withdrawal. |
+| `WEB_UI_ENABLED` | `true` | Enables the local read-only portfolio dashboard. |
+| `WEB_UI_PORT` | `8080` | Port used by the dashboard inside the container. Compose publishes it on host port `8080`, bound to localhost. |
 | `BITVAVO_API_KEY` | Required | Bitvavo API key. Keep it in the local, untracked `.env` file. |
 | `BITVAVO_API_SECRET` | Required | Bitvavo API secret. Keep it in the local, untracked `.env` file. |
 | `LOG_LEVEL` | `INFO` | Python logging level, such as `INFO`, `WARNING`, or `DEBUG`. |
