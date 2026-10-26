@@ -12,6 +12,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 import calendar
+import csv
 
 import requests
 
@@ -94,6 +95,37 @@ class Bitvavo:
         }
         return self.request("POST", "/order", body=body, private=True)
 
+    def account_history(self, start_ms, end_ms):
+        items = []
+        page = 1
+        while True:
+            result = self.request(
+                "GET", "/account/history",
+                params={"fromDate": start_ms, "toDate": end_ms, "page": page, "maxItems": 100, "type": "buy"},
+                private=True,
+            )
+            items.extend(result.get("items", []))
+            if page >= int(result.get("totalPages", 1)):
+                return items
+            page += 1
+
+    def btc_withdrawals(self, start_ms=0, end_ms=None):
+        params = {"symbol": "BTC", "start": start_ms, "limit": 1000}
+        if end_ms is not None:
+            params["end"] = end_ms
+        return self.request("GET", "/withdrawalHistory", params=params, private=True)
+
+    def historical_price(self, market, timestamp_ms):
+        interval_ms = 60_000
+        start_ms = timestamp_ms - timestamp_ms % interval_ms
+        candles = self.request(
+            "GET", f"/{market}/candles",
+            params={"interval": "1m", "start": start_ms, "end": start_ms + interval_ms, "limit": 2},
+        )
+        if not candles:
+            raise ValueError(f"No historical {market} price available for withdrawal timestamp {timestamp_ms}")
+        return Decimal(candles[0][4])
+
     def get_order(self, symbol, client_order_id):
         return self.request("GET", "/order", params={"market": symbol, "clientOrderId": client_order_id}, private=True)
 
@@ -133,6 +165,8 @@ def read_state(path, cycle_key):
         fresh = {"cycle": cycle_key, "spent": "0"}
         if state.get("pending_order"):
             fresh["pending_order"] = state["pending_order"]
+        if state.get("parqet_export"):
+            fresh["parqet_export"] = state["parqet_export"]
         return fresh
     return state
 
@@ -149,6 +183,122 @@ def ceil_to_places(value, places):
     return value.quantize(quantum, rounding=ROUND_CEILING)
 
 
+
+def csv_decimal(value):
+    return format(value, "f")
+
+
+def export_parqet_cycle(api, state, settings):
+    """Export BTC buys since the previous completed BTC withdrawal."""
+    tracker = state.get("parqet_export")
+    now_ms = int(time.time() * 1000)
+    start_ms = int(tracker.get("last_timestamp", 0)) if tracker else 0
+    withdrawals = api.btc_withdrawals(start_ms=max(0, start_ms), end_ms=now_ms)
+    completed = [
+        item for item in withdrawals
+        if item.get("symbol", "").upper() == "BTC"
+        and item.get("status") == "completed"
+        and item.get("txId")
+    ]
+    if tracker is None:
+        latest = max((int(item["timestamp"]) for item in completed), default=0)
+        state["parqet_export"] = {
+            "initialized": True,
+            "last_timestamp": latest,
+            "exported_ids": [item["txId"] for item in completed],
+        }
+        save_state(Path("/data/state.json"), state)
+        LOG.info("Initialized Parqet export tracking at the latest existing completed BTC withdrawal; future withdrawals will create CSV exports.")
+        return
+
+    exported_ids = set(tracker.get("exported_ids", []))
+    pending = sorted(
+        (item for item in completed if item["txId"] not in exported_ids),
+        key=lambda item: (int(item["timestamp"]), item["txId"]),
+    )
+    for withdrawal in pending:
+        withdrawal_ms = int(withdrawal["timestamp"])
+        buys = api.account_history(start_ms, withdrawal_ms)
+        btc_buys = [
+            item for item in buys
+            if item.get("type") == "buy"
+            and item.get("receivedCurrency", "").upper() == "BTC"
+            and Decimal(item.get("receivedAmount", "0")) > 0
+        ]
+        market = f"BTC-{settings['quote']}"
+        rows = []
+        for trade in sorted(btc_buys, key=lambda item: item.get("executedAt", "")):
+            shares = Decimal(trade["receivedAmount"])
+            gross = Decimal(trade.get("priceAmount", "0"))
+            currency = trade.get("priceCurrency", settings["quote"]).upper()
+            if currency != settings["quote"]:
+                raise ValueError(f"Cannot export BTC trade in {currency}: configured QUOTE_CURRENCY is {settings['quote']}")
+            unit_price = gross / shares
+            fee_currency = trade.get("feesCurrency", currency).upper()
+            fee_amount = Decimal(trade.get("feesAmount", "0"))
+            if fee_currency == currency:
+                fee_quote = fee_amount
+            elif fee_currency == "BTC":
+                fee_quote = fee_amount * unit_price
+            elif fee_amount == 0:
+                fee_quote = Decimal(0)
+            else:
+                raise ValueError(f"Cannot convert trade fee from {fee_currency} to {currency}")
+            rows.append({
+                "datetime": trade["executedAt"],
+                "type": "Buy",
+                "identifier": "BTC",
+                "assetType": "Crypto",
+                "price": csv_decimal(unit_price),
+                "shares": csv_decimal(shares),
+                "amount": csv_decimal(gross),
+                "currency": currency,
+                "fee": csv_decimal(fee_quote),
+                "tax": "0",
+            })
+
+        withdrawal_amount = Decimal(withdrawal["amount"])
+        withdrawal_fee = Decimal(withdrawal.get("fee", "0"))
+        withdrawal_price = api.historical_price(market, withdrawal_ms)
+        gross_out = withdrawal_amount + withdrawal_fee
+        fee_quote = withdrawal_fee * withdrawal_price
+        rows.append({
+            "datetime": datetime.fromtimestamp(withdrawal_ms / 1000, timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+            "type": "TransferOut",
+            "identifier": "BTC",
+            "assetType": "Crypto",
+            "price": csv_decimal(withdrawal_price),
+            "shares": csv_decimal(gross_out),
+            "amount": csv_decimal(gross_out * withdrawal_price),
+            "currency": settings["quote"],
+            "fee": csv_decimal(fee_quote),
+            "tax": "0",
+        })
+
+        export_dir = Path("/exports")
+        export_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.fromtimestamp(withdrawal_ms / 1000, timezone.utc).strftime("%Y%m%dT%H%M%S")
+        safe_id = "".join(char for char in withdrawal["txId"] if char.isalnum())[:16]
+        output = export_dir / f"parqet_btc_{stamp}_{safe_id}.csv"
+        temporary = output.with_suffix(".csv.tmp")
+        with temporary.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(
+                handle,
+                fieldnames=["datetime", "type", "identifier", "assetType", "price", "shares", "amount", "currency", "fee", "tax"],
+                delimiter=";",
+            )
+            writer.writeheader()
+            writer.writerows(rows)
+        temporary.replace(output)
+
+        exported_ids.add(withdrawal["txId"])
+        tracker["exported_ids"] = sorted(exported_ids)
+        tracker["last_timestamp"] = max(int(tracker.get("last_timestamp", 0)), withdrawal_ms)
+        state["parqet_export"] = tracker
+        save_state(Path("/data/state.json"), state)
+        LOG.info("Created Parqet CSV %s with %s BTC buys and the completed withdrawal; trade and withdrawal fees included.", output, len(btc_buys))
+
+
 def run_once(api, settings):
     quote, base = settings["quote"], settings["base"]
     symbol = f"{base}-{quote}"
@@ -157,6 +307,7 @@ def run_once(api, settings):
     cycle_key, cycle_start, next_deposit = cycle_dates(now, settings["deposit_day"])
     state = read_state(state_path, cycle_key)
     state["cycle"] = cycle_key
+    export_parqet_cycle(api, state, settings)
     spent = Decimal(state.get("spent", "0"))
     pending = state.get("pending_order")
     if settings["live"] and pending:
