@@ -1,0 +1,8 @@
+services:
+  bitvavo-dca:
+    build: .
+    container_name: bitvavo-dca
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./state:/data
