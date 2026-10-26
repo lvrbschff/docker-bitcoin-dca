@@ -4,6 +4,7 @@ import hmac
 import json
 import os
 import time
+from datetime import datetime, timezone
 from decimal import Decimal
 from urllib.parse import urlencode
 
@@ -133,3 +134,50 @@ class Bitvavo:
 
     def get_order(self, symbol, client_order_id):
         return self.request("GET", "/order", params={"market": symbol, "clientOrderId": client_order_id}, private=True)
+
+    def normalize_bot_buy(self, order, quote, base, event_id, fallback_timestamp_ms):
+        filled = Decimal(str(order.get("filledAmount", "0")))
+        quote_amount = Decimal(str(order.get("filledAmountQuote", "0")))
+        fills = order.get("fills") or []
+        if quote_amount <= 0 and fills:
+            quote_amount = sum(
+                (Decimal(str(fill.get("amount", "0"))) * Decimal(str(fill.get("price", "0"))) for fill in fills),
+                Decimal(0),
+            )
+        if filled <= 0 and fills:
+            filled = sum((Decimal(str(fill.get("amount", "0"))) for fill in fills), Decimal(0))
+        if filled <= 0 or quote_amount <= 0:
+            return []
+        price = quote_amount / filled
+        fee = Decimal(str(order.get("feePaid", "0")))
+        fee_currency = str(order.get("feeCurrency", quote)).upper()
+        if fee == 0 and fills:
+            fill_fees = [fill for fill in fills if fill.get("fee") is not None]
+            if fill_fees:
+                fee = sum((Decimal(str(fill["fee"])) for fill in fill_fees), Decimal(0))
+                fee_currency = str(fill_fees[0].get("feeCurrency", fee_currency)).upper()
+        if fee_currency == quote:
+            fee_quote = fee
+        elif fee_currency == base:
+            fee_quote = fee * price
+        elif fee == 0:
+            fee_quote = Decimal(0)
+        else:
+            raise ValueError(f"Cannot store Bitvavo trade fee in {fee_currency}; expected {quote} or {base}")
+        timestamp_ms = int(order.get("updated") or order.get("created") or fallback_timestamp_ms)
+        timestamp = datetime.fromtimestamp(timestamp_ms / 1000, timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+        return [{
+            "id": f"buy:{event_id}",
+            "row": {
+                "datetime": timestamp,
+                "type": "Buy",
+                "identifier": base,
+                "assetType": "Crypto",
+                "price": format(price, "f"),
+                "shares": format(filled, "f"),
+                "amount": format(quote_amount, "f"),
+                "currency": quote,
+                "fee": format(fee_quote, "f"),
+                "tax": "0",
+            },
+        }]
