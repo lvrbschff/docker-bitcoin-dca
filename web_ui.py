@@ -106,7 +106,7 @@ async function loadAnalytics(){
  $("buyVolume").textContent=money(d.summary.buyVolume,quote);$("avgPrice").textContent="Average: "+money(d.summary.averagePrice,quote)+"/BTC";
  $("tradeFees").textContent=money(d.summary.tradeFees,quote);$("withdrawBtc").textContent=btc(d.summary.withdrawnBtc);$("withdrawCount").textContent=d.summary.withdrawalCount+" withdrawals";
  $("withdrawFees").textContent=money(d.summary.withdrawalFees,quote);$("netBtc").textContent=btc(d.summary.netBtc);
- $("periodLabel").textContent=new Date(p.start).toLocaleDateString("en-GB")+" – "+new Date(p.end).toLocaleDateString("en-GB");$("updated").textContent=new Date(d.snapshot.updatedAt||Date.now()).toLocaleTimeString("en-GB");
+ $("periodLabel").textContent=new Date(p.start).toLocaleString("en-GB")+" – "+new Date(p.end).toLocaleString("en-GB");$("updated").textContent=new Date(d.snapshot.updatedAt||Date.now()).toLocaleTimeString("en-GB");
  activityRows=d.activities.slice().reverse();currentPage=1;renderActivities();
  }catch(e){showError(e.message)}
 }
