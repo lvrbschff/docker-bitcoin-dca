@@ -6,14 +6,8 @@ from threading import RLock
 
 ACTIVITY_PATH = Path("/webui-data/activity.json")
 SNAPSHOT_PATH = Path("/webui-data/dashboard.json")
-LEGACY_ACTIVITY_PATHS = (
-    Path("/webui-legacy-data/activity.json"),
-    Path("/data/activity.json"),
-)
-LEGACY_SNAPSHOT_PATHS = (
-    Path("/webui-legacy-data/dashboard.json"),
-    Path("/data/dashboard.json"),
-)
+LEGACY_ACTIVITY_PATHS = (Path("/data/activity.json"),)
+LEGACY_SNAPSHOT_PATHS = (Path("/data/dashboard.json"),)
 _ACTIVITY_LOCK = RLock()
 
 
