@@ -45,7 +45,15 @@ cp .env.example .env
 
 Docker Compose reads the `.env` file to fill the credential references in `docker-compose.yml`. `.env` is ignored by Git. Do not put API credentials in the versioned Compose file or commit them to this public repository.
 
-Create a Bitvavo API key with **View access** and **Trade digital assets**. Do not enable **Withdraw digital assets**. If possible, restrict the key to the host's fixed IP address.
+### Create the API key in Bitvavo
+
+1. Enable two-factor authentication (2FA) on your Bitvavo account.
+2. In Bitvavo, open **Settings → API → Add new API key** and give the key a recognizable name.
+3. If your server has a fixed public IP address, add it to the key's IP whitelist.
+4. Enable **View access** and **Trade digital assets**. Leave **Withdraw digital assets** and other permissions disabled.
+5. Confirm with 2FA, then copy the API key and secret into your local `.env` file. Store the secret securely; Bitvavo says it cannot be retrieved later.
+
+See Bitvavo's [API key setup guide](https://docs.bitvavo.com/docs/get-started/) for the current dashboard steps. The API key needs read and trading access for deposit history, balance checks, and order placement. Do not grant withdrawal access: Bitvavo warns that API withdrawals do not require 2FA or email confirmation.
 
 ## Run with Docker Compose
 
