@@ -120,8 +120,8 @@ def cycle_dates(now, deposit_day):
     return start.strftime("%Y-%m-%d"), start, next_deposit
 
 
-def local_now():
-    return datetime.now(ZoneInfo("Europe/Berlin"))
+def local_now(timezone_name):
+    return datetime.now(ZoneInfo(timezone_name))
 
 
 def read_state(path, cycle_key):
@@ -153,7 +153,7 @@ def run_once(api, settings):
     quote, base = settings["quote"], settings["base"]
     symbol = f"{base}-{quote}"
     state_path = Path("/data/state.json")
-    now = local_now()
+    now = local_now(settings["timezone"])
     cycle_key, cycle_start, next_deposit = cycle_dates(now, settings["deposit_day"])
     state = read_state(state_path, cycle_key)
     state["cycle"] = cycle_key
@@ -250,12 +250,13 @@ def main():
         "base": os.getenv("BASE_ASSET", "BTC").upper(),
         "buy_amount": env_decimal("BUY_AMOUNT", 0),
         "deposit_day": deposit_day,
+        "timezone": os.getenv("TIMEZONE", "Europe/Berlin"),
         "live": os.getenv("LIVE_TRADING", "false").lower() == "true",
         "fee_buffer": env_decimal("FEE_BUFFER_PERCENT", 1),
     }
     interval = max(60, int(os.getenv("CHECK_INTERVAL_SECONDS", "300")))
     api = Bitvavo()
-    LOG.info("Starting %s; live trading=%s; quote currency=%s; requested buy amount=%s %s; deposit day=%s; timezone=Europe/Berlin; check interval=%ss", f"{settings['base']}-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], settings["base"], deposit_day, interval)
+    LOG.info("Starting %s; live trading=%s; quote currency=%s; requested buy amount=%s %s; deposit day=%s; timezone=%s; check interval=%ss", f"{settings['base']}-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], settings["base"], deposit_day, settings["timezone"], interval)
     while True:
         try:
             run_once(api, settings)
