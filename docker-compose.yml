@@ -1,7 +1,7 @@
 services:
-  bitvavo-dca:
+  bitcoin-dca:
     build: .
-    container_name: bitvavo-dca
+    container_name: bitcoin-dca
     restart: unless-stopped
     environment:
       EXCHANGE: ${EXCHANGE:-BITVAVO}
