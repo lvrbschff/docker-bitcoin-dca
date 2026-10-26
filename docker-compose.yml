@@ -17,7 +17,6 @@ services:
       WITHDRAW_ADDRESS: ""
       WITHDRAW_NETWORK: BTC
       WEB_UI_ENABLED: "true"
-      WEB_UI_PORT: "8080"
       BITVAVO_API_KEY: ${BITVAVO_API_KEY:?Add BITVAVO_API_KEY to your untracked .env file}
       BITVAVO_API_SECRET: ${BITVAVO_API_SECRET:?Add BITVAVO_API_SECRET to your untracked .env file}
     ports:
