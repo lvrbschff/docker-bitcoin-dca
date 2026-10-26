@@ -9,6 +9,7 @@ services:
       BASE_ASSET: BTC
       BUY_AMOUNT: "0"
       DEPOSIT_DAY: "1"
+      FIRST_BUY_DELAY_SECONDS: "0"
       TIMEZONE: Europe/Berlin
       LIVE_TRADING: "false"
       CHECK_INTERVAL_SECONDS: "300"
