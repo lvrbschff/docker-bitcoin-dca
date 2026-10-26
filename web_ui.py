@@ -6,7 +6,7 @@ from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from activity import read_activity_records, read_dashboard_snapshot
+from activity import delete_activity_record, read_activity_records, read_dashboard_snapshot
 from reporting import parqet_csv
 
 LOG = logging.getLogger("bitvavo-dca.web")
@@ -38,7 +38,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <div class="field"><label for="start">From</label><input id="start" type="datetime-local"></div>
 <div class="field"><label for="end">To</label><input id="end" type="datetime-local"></div>
 <button id="refresh">Load report</button><button class="secondary" id="download">Download Parqet CSV</button>
-</div><div id="error" class="error hidden"></div><div class="notice">Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The CSV is formatted for importing the bot’s recorded BTC activity into Parqet and uses the selected date range. Earlier exchange activity is not imported.</div>
+</div><div id="error" class="error hidden"></div><div class="notice">Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The CSV is formatted for importing real bot-recorded BTC activity into Parqet. Dry-run purchases are shown separately and excluded from the CSV. Delete removes a purchase from local history only; it cannot reverse an exchange order.</div>
 </section>
 <section class="panel"><h2>Balance on <span id="exchangeLabel">the exchange</span></h2><div class="grid">
 <div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
@@ -48,6 +48,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 </div></section>
 <section class="panel"><h2>Selected period summary</h2><div class="grid">
 <div class="card"><label>BTC purchases</label><div class="value" id="buyCount">—</div><div class="small" id="buyBtc"></div></div>
+<div class="card"><label>Simulated purchases (dry run)</label><div class="value" id="simulatedCount">—</div><div class="small" id="simulatedBtc"></div></div>
 <div class="card"><label>Purchase volume</label><div class="value" id="buyVolume">—</div><div class="small" id="avgPrice"></div></div>
 <div class="card"><label>Trading fees</label><div class="value" id="tradeFees">—</div></div>
 <div class="card"><label>Withdrawals</label><div class="value" id="withdrawBtc">—</div><div class="small" id="withdrawCount"></div></div>
@@ -57,7 +58,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <div class="card"><label>Date range</label><div class="value" id="periodLabel">—</div></div>
 <div class="card"><label>Last updated</label><div class="value" id="updated">—</div></div>
 </div></section>
-<section class="panel"><h2>Activity</h2><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th></tr></thead><tbody id="activities"></tbody></table></div></section>
+<section class="panel"><h2>Activity</h2><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th><th>Action</th></tr></thead><tbody id="activities"></tbody></table></div></section>
 </main>
 <script>
 const $=id=>document.getElementById(id);
@@ -82,14 +83,14 @@ async function loadAnalytics(){
  try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end);const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load the report.");quote=d.quote;dataCurrency=quote;const ex=d.exchange==="KRAKEN"?"Kraken":"Bitvavo";$("exchangeName").textContent=ex+" · DCA";$("exchangeLabel").textContent=ex;document.title=ex+" DCA · Portfolio";
  $("balance").textContent=btc(d.snapshot.balance);$("spot").textContent=money(d.snapshot.price,quote)+"/BTC";$("balanceValue").textContent=money(d.snapshot.value,quote);
  $("threshold").textContent=money(d.snapshot.withdrawThreshold,quote);
- $("buyCount").textContent=d.summary.buyCount;$("buyBtc").textContent=btc(d.summary.boughtBtc);
+ $("buyCount").textContent=d.summary.buyCount;$("buyBtc").textContent=btc(d.summary.boughtBtc);$("simulatedCount").textContent=d.summary.simulatedBuyCount;$("simulatedBtc").textContent=btc(d.summary.simulatedBtc);
  $("buyVolume").textContent=money(d.summary.buyVolume,quote);$("avgPrice").textContent="Average: "+money(d.summary.averagePrice,quote)+"/BTC";
  $("tradeFees").textContent=money(d.summary.tradeFees,quote);$("withdrawBtc").textContent=btc(d.summary.withdrawnBtc);$("withdrawCount").textContent=d.summary.withdrawalCount+" withdrawals";
  $("withdrawFees").textContent=money(d.summary.withdrawalFees,quote);$("netBtc").textContent=btc(d.summary.netBtc);
  $("periodLabel").textContent=new Date(p.start).toLocaleDateString("en-GB")+" – "+new Date(p.end).toLocaleDateString("en-GB");$("updated").textContent=new Date(d.snapshot.updatedAt||Date.now()).toLocaleTimeString("en-GB");
  const body=$("activities");body.innerHTML="";
- for(const row of d.activities.slice().reverse()){const tr=document.createElement("tr"),vals=[dateLabel(Date.parse(row.datetime)),row.type,btc(row.shares),money(row.price,quote)+"/BTC",money(row.amount,quote),money(row.fee,quote)];vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i>=2)td.className="num";tr.appendChild(td)});body.appendChild(tr)}
- if(!d.activities.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=6;td.textContent="No BTC activity in this period.";td.className="notice";tr.appendChild(td);body.appendChild(tr)}
+ for(const row of d.activities.slice().reverse()){const tr=document.createElement("tr"),vals=[dateLabel(Date.parse(row.datetime)),row.simulated?"Simulated buy (dry run)":row.type,btc(row.shares),money(row.price,quote)+"/BTC",money(row.amount,quote),money(row.fee,quote)];vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i>=2)td.className="num";tr.appendChild(td)});const action=document.createElement("td");if(row.type==="Buy"){const button=document.createElement("button");button.className="secondary";button.textContent="Delete";button.addEventListener("click",async()=>{if(!confirm("Delete this purchase from local bot history? This does not reverse an exchange order."))return;try{const response=await fetch("/api/activity/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({activityId:row.activityId})});const result=await response.json();if(!response.ok)throw new Error(result.error||"Could not delete purchase.");await loadAnalytics()}catch(e){showError(e.message)}});action.appendChild(button)}action.className="num";tr.appendChild(action);body.appendChild(tr)}
+ if(!d.activities.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=7;td.textContent="No BTC activity in this period.";td.className="notice";tr.appendChild(td);body.appendChild(tr)}
  }catch(e){showError(e.message)}
 }
 $("refresh").addEventListener("click",loadAnalytics);
@@ -130,6 +131,26 @@ class Handler(BaseHTTPRequestHandler):
     def _json(self, status, obj):
         self._send(status, json.dumps(obj, ensure_ascii=False).encode("utf-8"))
 
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        if parsed.path != "/api/activity/delete":
+            self._json(404, {"error": "Not found"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length <= 0 or length > 4096:
+                raise ValueError("Invalid request body")
+            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            activity_id = payload.get("activityId") if isinstance(payload, dict) else None
+            if not isinstance(activity_id, str) or not activity_id:
+                raise ValueError("activityId is required")
+            if not delete_activity_record(activity_id):
+                self._json(404, {"error": "Purchase not found or cannot be deleted"})
+                return
+            self._json(200, {"deleted": True})
+        except (ValueError, json.JSONDecodeError) as exc:
+            self._json(400, {"error": str(exc)})
+
     def do_GET(self):
         parsed = urlparse(self.path)
         if parsed.path == "/":
@@ -152,16 +173,17 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if parsed.path in ("/api/analytics", "/api/export.csv"):
                 start_ms, end_ms = _period(query)
-                rows = [
-                    record["row"] for record in records
+                selected_records = [
+                    record for record in records
                     if start_ms < _row_timestamp_ms(record["row"]) <= end_ms
                 ]
                 if parsed.path == "/api/export.csv":
+                    rows = [record["row"] for record in selected_records if not record.get("simulated")]
                     filename = "parqet_btc_" + str(start_ms) + "_" + str(end_ms) + ".csv"
                     self._send(200, parqet_csv(rows), "text/csv; charset=utf-8", filename)
                 else:
                     result = _analytics_from_rows(
-                        self.settings, rows, read_dashboard_snapshot()
+                        self.settings, selected_records, read_dashboard_snapshot()
                     )
                     self._json(200, result)
                 return
@@ -181,10 +203,13 @@ def _row_timestamp_ms(row):
     return int(value.timestamp() * 1000)
 
 
-def _analytics_from_rows(settings, rows, snapshot):
+def _analytics_from_rows(settings, records, snapshot):
     quote = snapshot.get("quote", settings["quote"])
-    buys = [row for row in rows if row["type"] == "Buy"]
-    withdrawals = [row for row in rows if row["type"] == "TransferOut"]
+    actual_rows = [record["row"] for record in records if not record.get("simulated")]
+    simulated_rows = [record["row"] for record in records if record.get("simulated")]
+    buys = [row for row in actual_rows if row["type"] == "Buy"]
+    simulated_buys = [row for row in simulated_rows if row["type"] == "Buy"]
+    withdrawals = [row for row in actual_rows if row["type"] == "TransferOut"]
     bought_btc = sum((Decimal(row["shares"]) for row in buys), Decimal(0))
     buy_volume = sum((Decimal(row["amount"]) for row in buys), Decimal(0))
     trade_fees = sum((Decimal(row["fee"]) for row in buys), Decimal(0))
@@ -207,6 +232,8 @@ def _analytics_from_rows(settings, rows, snapshot):
         "summary": {
             "buyCount": len(buys),
             "boughtBtc": str(bought_btc),
+            "simulatedBuyCount": len(simulated_buys),
+            "simulatedBtc": str(sum((Decimal(row["shares"]) for row in simulated_buys), Decimal(0))),
             "buyVolume": str(buy_volume),
             "tradeFees": str(trade_fees),
             "averagePrice": str(buy_volume / bought_btc if bought_btc else Decimal(0)),
@@ -215,7 +242,10 @@ def _analytics_from_rows(settings, rows, snapshot):
             "withdrawalFees": str(withdrawal_fees),
             "netBtc": str(bought_btc - withdrawn_btc),
         },
-        "activities": rows,
+        "activities": [
+            {**record["row"], "activityId": record.get("id", ""), "simulated": bool(record.get("simulated"))}
+            for record in records
+        ],
     }
 
 
