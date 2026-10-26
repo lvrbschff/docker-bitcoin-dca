@@ -14,7 +14,6 @@ import threading
 import requests
 from activity import append_activity_records, read_activity_rows, write_dashboard_snapshot
 from exchange import create_exchange
-from reporting import parqet_csv, parqet_rows
 
 LOG = logging.getLogger("bitvavo-dca")
 
@@ -64,8 +63,6 @@ def read_state(path, cycle_key):
         fresh = {"cycle": cycle_key, "spent": "0"}
         if state.get("pending_order"):
             fresh["pending_order"] = state["pending_order"]
-        if state.get("parqet_export"):
-            fresh["parqet_export"] = state["parqet_export"]
         if state.get("pending_withdrawal"):
             fresh["pending_withdrawal"] = state["pending_withdrawal"]
         if state.get("pending_withdrawal_context"):
@@ -162,63 +159,6 @@ def ceil_to_places(value, places):
 
 
 
-def csv_decimal(value):
-    return format(value, "f")
-
-
-def export_parqet_cycle(api, state, settings):
-    """Export BTC buys since the previous completed BTC withdrawal."""
-    tracker = state.get("parqet_export")
-    now_ms = int(time.time() * 1000)
-    start_ms = int(tracker.get("last_timestamp", 0)) if tracker else 0
-    withdrawals = api.btc_withdrawals(start_ms=max(0, start_ms), end_ms=now_ms)
-    completed = [
-        item for item in withdrawals
-        if item.get("symbol", "").upper() == "BTC"
-        and item.get("status") == "completed"
-        and item.get("txId")
-    ]
-    if tracker is None:
-        latest = max((int(item["timestamp"]) for item in completed), default=0)
-        state["parqet_export"] = {
-            "initialized": True,
-            "last_timestamp": latest,
-            "exported_ids": [item["txId"] for item in completed],
-        }
-        save_state(Path("/data/state.json"), state)
-        LOG.info("Initialized Parqet export tracking at the latest existing completed BTC withdrawal; future withdrawals will create CSV exports.")
-        return
-
-    exported_ids = set(tracker.get("exported_ids", []))
-    pending = sorted(
-        (item for item in completed if item["txId"] not in exported_ids),
-        key=lambda item: (int(item["timestamp"]), item["txId"]),
-    )
-    period_start_ms = start_ms
-    for withdrawal in pending:
-        withdrawal_ms = int(withdrawal["timestamp"])
-        rows = parqet_rows(
-            api, period_start_ms, withdrawal_ms, settings["quote"], withdrawals=[withdrawal]
-        )
-        export_dir = Path("/exports")
-        export_dir.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.fromtimestamp(withdrawal_ms / 1000, timezone.utc).strftime("%Y%m%dT%H%M%S")
-        safe_id = "".join(char for char in withdrawal["txId"] if char.isalnum())[:16]
-        output = export_dir / f"parqet_btc_{stamp}_{safe_id}.csv"
-        temporary = output.with_suffix(".csv.tmp")
-        temporary.write_text(parqet_csv(rows), encoding="utf-8")
-        temporary.replace(output)
-
-        exported_ids.add(withdrawal["txId"])
-        tracker["exported_ids"] = sorted(exported_ids)
-        tracker["last_timestamp"] = max(int(tracker.get("last_timestamp", 0)), withdrawal_ms)
-        period_start_ms = withdrawal_ms
-        state["parqet_export"] = tracker
-        save_state(Path("/data/state.json"), state)
-        LOG.info("Created Parqet CSV %s with %s BTC buys and the completed withdrawal; trade and withdrawal fees included.", output, sum(row["type"] == "Buy" for row in rows))
-
-
-
 def maybe_withdraw_btc(api, state, settings):
     if not settings["withdrawals_enabled"]:
         return
@@ -311,13 +251,9 @@ def run_once(api, settings):
     symbol = f"{base}-{quote}"
     state_path = Path("/data/state.json")
     now = local_now(settings["timezone"])
-    cycle_key, cycle_start, next_deposit = cycle_dates(now, settings["deposit_day"])
+    cycle_key, _cycle_start, next_deposit = cycle_dates(now, settings["deposit_day"])
     state = read_state(state_path, cycle_key)
     state["cycle"] = cycle_key
-    try:
-        export_parqet_cycle(api, state, settings)
-    except Exception:
-        LOG.exception("Parqet export failed; continuing with the DCA cycle")
     spent = Decimal(state.get("spent", "0"))
     pending = state.get("pending_order")
     if settings["live"] and pending:
