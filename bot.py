@@ -237,6 +237,8 @@ def maybe_withdraw_btc(api, state, settings):
         except requests.RequestException:
             LOG.exception("Withdrawal outcome is uncertain; the same request will be retried next check.")
             return
+        context = state.get("pending_withdrawal_context", {})
+        persist_bot_withdrawal(api, pending, result, settings, context)
         state["last_withdrawal"] = {
             "id": result.get("id"),
             "amount": pending["amount"],
@@ -244,6 +246,7 @@ def maybe_withdraw_btc(api, state, settings):
         }
         state["withdrawal_armed"] = False
         state.pop("pending_withdrawal", None)
+        state.pop("pending_withdrawal_context", None)
         save_state(Path("/data/state.json"), state)
         LOG.info("BTC withdrawal submitted: amount=%s BTC, withdrawalId=%s", pending["amount"], result.get("id"))
         return
@@ -276,6 +279,10 @@ def maybe_withdraw_btc(api, state, settings):
     idempotency_key = str(uuid.uuid4())
     withdrawal = api.withdrawal_request(amount, idempotency_key, settings)
     state["pending_withdrawal"] = withdrawal
+    state["pending_withdrawal_context"] = {
+        "price": format(price, "f"),
+        "timestamp_ms": int(time.time() * 1000),
+    }
     save_state(Path("/data/state.json"), state)
     try:
         result = api.withdraw_crypto(withdrawal)
@@ -284,12 +291,16 @@ def maybe_withdraw_btc(api, state, settings):
         if not getattr(api, "supports_withdrawal_idempotency", False):
             LOG.error("This exchange does not support idempotent withdrawal retries; the saved request will not be resent automatically.")
         return
+    persist_bot_withdrawal(
+        api, withdrawal, result, settings, state.get("pending_withdrawal_context", {})
+    )
     state["last_withdrawal"] = {
         "id": result.get("id"),
         "amount": withdrawal["amount"],
         "createdAt": result.get("createdAt"),
     }
     state.pop("pending_withdrawal", None)
+    state.pop("pending_withdrawal_context", None)
     state["withdrawal_armed"] = False
     save_state(Path("/data/state.json"), state)
     LOG.warning("BTC withdrawal submitted: amount=%s BTC (fee deducted from amount), value at submission=%s %s, withdrawalId=%s", withdrawal["amount"], value, settings["quote"], result.get("id"))
