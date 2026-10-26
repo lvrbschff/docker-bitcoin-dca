@@ -28,4 +28,9 @@ services:
       - "127.0.0.1:${WEB_UI_PORT:-6890}:${WEB_UI_PORT:-6890}"
     volumes:
       - ./state:/data
-      - ./webui-data:/webui-data
+      - bitcoin_dca_webui_data:/webui-data
+      - ./webui-data:/webui-legacy-data:ro
+
+volumes:
+  bitcoin_dca_webui_data:
+    name: bitcoin-dca-webui-data
