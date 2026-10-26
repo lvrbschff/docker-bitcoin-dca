@@ -12,9 +12,10 @@ from pathlib import Path
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 import calendar
-import csv
+import threading
 
 import requests
+from reporting import parqet_csv, parqet_rows
 
 BASE_URL = "https://api.bitvavo.com/v2"
 LOG = logging.getLogger("bitvavo-dca")
@@ -230,78 +231,16 @@ def export_parqet_cycle(api, state, settings):
     period_start_ms = start_ms
     for withdrawal in pending:
         withdrawal_ms = int(withdrawal["timestamp"])
-        buys = api.account_history(period_start_ms, withdrawal_ms)
-        btc_buys = [
-            item for item in buys
-            if item.get("type") in ("buy", "convert_buy")
-            and item.get("receivedCurrency", "").upper() == "BTC"
-            and Decimal(item.get("receivedAmount", "0")) > 0
-        ]
-        market = f"BTC-{settings['quote']}"
-        rows = []
-        for trade in sorted(btc_buys, key=lambda item: item.get("executedAt", "")):
-            shares = Decimal(trade["receivedAmount"])
-            gross = Decimal(trade.get("priceAmount", "0"))
-            currency = trade.get("priceCurrency", settings["quote"]).upper()
-            if currency != settings["quote"]:
-                raise ValueError(f"Cannot export BTC trade in {currency}: configured QUOTE_CURRENCY is {settings['quote']}")
-            unit_price = gross / shares
-            fee_currency = trade.get("feesCurrency", currency).upper()
-            fee_amount = Decimal(trade.get("feesAmount", "0"))
-            if fee_currency == currency:
-                fee_quote = fee_amount
-            elif fee_currency == "BTC":
-                fee_quote = fee_amount * unit_price
-            elif fee_amount == 0:
-                fee_quote = Decimal(0)
-            else:
-                raise ValueError(f"Cannot convert trade fee from {fee_currency} to {currency}")
-            rows.append({
-                "datetime": trade["executedAt"],
-                "type": "Buy",
-                "identifier": "BTC",
-                "assetType": "Crypto",
-                "price": csv_decimal(unit_price),
-                "shares": csv_decimal(shares),
-                "amount": csv_decimal(gross),
-                "currency": currency,
-                "fee": csv_decimal(fee_quote),
-                "tax": "0",
-            })
-
-        withdrawal_amount = Decimal(withdrawal["amount"])
-        withdrawal_fee = Decimal(withdrawal.get("fee", "0"))
-        withdrawal_price = api.historical_price(market, withdrawal_ms)
-        if withdrawal_price <= 0:
-            raise ValueError(f"Invalid historical {market} price for withdrawal timestamp {withdrawal_ms}")
-        fee_quote = withdrawal_fee * withdrawal_price
-        rows.append({
-            "datetime": datetime.fromtimestamp(withdrawal_ms / 1000, timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-            "type": "TransferOut",
-            "identifier": "BTC",
-            "assetType": "Crypto",
-            "price": csv_decimal(withdrawal_price),
-            "shares": csv_decimal(withdrawal_amount),
-            "amount": csv_decimal(withdrawal_amount * withdrawal_price),
-            "currency": settings["quote"],
-            "fee": csv_decimal(fee_quote),
-            "tax": "0",
-        })
-
+        rows = parqet_rows(
+            api, period_start_ms, withdrawal_ms, settings["quote"], withdrawals=[withdrawal]
+        )
         export_dir = Path("/exports")
         export_dir.mkdir(parents=True, exist_ok=True)
         stamp = datetime.fromtimestamp(withdrawal_ms / 1000, timezone.utc).strftime("%Y%m%dT%H%M%S")
         safe_id = "".join(char for char in withdrawal["txId"] if char.isalnum())[:16]
         output = export_dir / f"parqet_btc_{stamp}_{safe_id}.csv"
         temporary = output.with_suffix(".csv.tmp")
-        with temporary.open("w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(
-                handle,
-                fieldnames=["datetime", "type", "identifier", "assetType", "price", "shares", "amount", "currency", "fee", "tax"],
-                delimiter=";",
-            )
-            writer.writeheader()
-            writer.writerows(rows)
+        temporary.write_text(parqet_csv(rows), encoding="utf-8")
         temporary.replace(output)
 
         exported_ids.add(withdrawal["txId"])
@@ -520,6 +459,7 @@ def main():
     interval = max(60, int(os.getenv("CHECK_INTERVAL_SECONDS", "300")))
     api = Bitvavo()
     LOG.info("Starting %s; live trading=%s; quote currency=%s; requested buy amount=%s %s; deposit day=%s; timezone=%s; check interval=%ss", f"{settings['base']}-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], settings["base"], deposit_day, settings["timezone"], interval)
+def bot_loop(api, settings, interval):
     while True:
         try:
             run_once(api, settings)
@@ -528,6 +468,48 @@ def main():
         except Exception:
             LOG.exception("Cycle failed")
         time.sleep(interval)
+
+
+def main():
+    logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(), format="%(asctime)s %(levelname)s %(message)s")
+    deposit_day = int(os.getenv("DEPOSIT_DAY", "1"))
+    if not 1 <= deposit_day <= 31:
+        raise ValueError("DEPOSIT_DAY must be between 1 and 31")
+    settings = {
+        "quote": os.getenv("QUOTE_CURRENCY", "EUR").upper(),
+        "base": os.getenv("BASE_ASSET", "BTC").upper(),
+        "buy_amount": env_decimal("BUY_AMOUNT", 0),
+        "deposit_day": deposit_day,
+        "timezone": os.getenv("TIMEZONE", "Europe/Berlin"),
+        "live": os.getenv("LIVE_TRADING", "false").lower() == "true",
+        "fee_buffer": env_decimal("FEE_BUFFER_PERCENT", 1),
+        "withdrawals_enabled": os.getenv("WITHDRAWALS_ENABLED", "false").lower() == "true",
+        "withdraw_threshold": env_decimal("WITHDRAW_THRESHOLD_QUOTE", 1000),
+        "withdraw_address": os.getenv("WITHDRAW_ADDRESS", "").strip(),
+        "withdraw_network": os.getenv("WITHDRAW_NETWORK", "BTC").upper(),
+    }
+    if settings["withdrawals_enabled"]:
+        if settings["base"] != "BTC":
+            raise ValueError("Automatic withdrawals currently support BASE_ASSET=BTC only")
+        if not settings["withdraw_address"]:
+            raise ValueError("WITHDRAW_ADDRESS is required when WITHDRAWALS_ENABLED=true")
+        if not settings["withdraw_network"]:
+            raise ValueError("WITHDRAW_NETWORK is required when WITHDRAWALS_ENABLED=true")
+        if settings["withdraw_threshold"] <= 0:
+            raise ValueError("WITHDRAW_THRESHOLD_QUOTE must be greater than zero")
+    interval = max(60, int(os.getenv("CHECK_INTERVAL_SECONDS", "300")))
+    api = Bitvavo()
+    LOG.info("Starting %s; live trading=%s; quote currency=%s; requested buy amount=%s %s; deposit day=%s; timezone=%s; check interval=%ss", f"{settings['base']}-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], settings["base"], deposit_day, settings["timezone"], interval)
+
+    if os.getenv("WEB_UI_ENABLED", "true").lower() == "true":
+        port = int(os.getenv("WEB_UI_PORT", "8080"))
+        if not 1 <= port <= 65535:
+            raise ValueError("WEB_UI_PORT must be between 1 and 65535")
+        threading.Thread(target=bot_loop, args=(api, settings, interval), daemon=True).start()
+        from web_ui import serve
+        serve(settings, port)
+    else:
+        bot_loop(api, settings, interval)
 
 
 if __name__ == "__main__":
