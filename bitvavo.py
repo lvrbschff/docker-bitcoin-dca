@@ -68,6 +68,22 @@ class Bitvavo:
             private=True,
         )
 
+    def validate_withdrawal_settings(self, settings):
+        if not settings.get("withdraw_address"):
+            raise ValueError("WITHDRAW_ADDRESS is required for Bitvavo automatic withdrawals")
+        if not settings.get("withdraw_network"):
+            raise ValueError("WITHDRAW_NETWORK is required for Bitvavo automatic withdrawals")
+
+    def withdrawal_request(self, amount, idempotency_key, settings):
+        return {
+            "symbol": "BTC",
+            "network": settings["withdraw_network"],
+            "address": settings["withdraw_address"],
+            "amount": format(amount, "f"),
+            "deductFeeFromAmount": True,
+            "idempotencyKey": idempotency_key,
+        }
+
     def withdraw_crypto(self, withdrawal):
         return self.request("POST", "/crypto/withdrawal", body=withdrawal, private=True)
 
