@@ -249,7 +249,7 @@ def export_parqet_cycle(api, state, settings):
         period_start_ms = withdrawal_ms
         state["parqet_export"] = tracker
         save_state(Path("/data/state.json"), state)
-        LOG.info("Created Parqet CSV %s with %s BTC buys and the completed withdrawal; trade and withdrawal fees included.", output, len(btc_buys))
+        LOG.info("Created Parqet CSV %s with %s BTC buys and the completed withdrawal; trade and withdrawal fees included.", output, sum(row["type"] == "Buy" for row in rows))
 
 
 
