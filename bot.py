@@ -157,7 +157,7 @@ def persist_bot_buy(api, order, settings, event_id, fallback_timestamp_ms):
     return records, append_activity_records(records)
 
 
-def persist_simulated_buy(settings, amount, price, quote_amount):
+def persist_simulated_buy(api, settings, amount, price, quote_amount):
     timestamp_ms = int(time.time() * 1000)
     event_id = f"dry-run:{uuid.uuid4()}"
     row = {
@@ -169,7 +169,7 @@ def persist_simulated_buy(settings, amount, price, quote_amount):
         "shares": format(amount, "f"),
         "amount": format(quote_amount, "f"),
         "currency": settings["quote"],
-        "fee": "0",
+        "fee": format(api.estimate_taker_fee(f"{settings['base']}-{settings['quote']}", quote_amount), "f"),
         "tax": "0",
     }
     record = {"id": event_id, "simulated": True, "row": row}
@@ -396,7 +396,7 @@ def run_once(api, settings):
         LOG.info("Order submitted: %s %s (estimated %s %s); status=%s orderId=%s; saved %s bot activity record(s).", order_amount, base, order_quote, quote, status, result.get("orderId"), added)
     else:
         LOG.info("DRY RUN: would market-buy %s %s (estimated %s %s at %s %s/%s); saved as simulated activity.", order_amount, base, order_quote, quote, price, quote, base)
-        added = persist_simulated_buy(settings, order_amount, price, order_quote)
+        added = persist_simulated_buy(api, settings, order_amount, price, order_quote)
         LOG.info("Saved %s simulated purchase record(s) for the web UI; excluded from the Parqet CSV export.", added)
 
     settings["first_purchase_done"] = True
