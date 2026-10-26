@@ -4,13 +4,28 @@ import os
 from pathlib import Path
 from threading import RLock
 
-ACTIVITY_PATH = Path("/data/activity.json")
-SNAPSHOT_PATH = Path("/data/dashboard.json")
+ACTIVITY_PATH = Path("/webui-data/activity.json")
+SNAPSHOT_PATH = Path("/webui-data/dashboard.json")
+LEGACY_ACTIVITY_PATH = Path("/data/activity.json")
+LEGACY_SNAPSHOT_PATH = Path("/data/dashboard.json")
 _ACTIVITY_LOCK = RLock()
+
+
+def _migrate_legacy_file(path, legacy_path):
+    if path.exists() or not legacy_path.exists():
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".migration")
+    temporary.write_bytes(legacy_path.read_bytes())
+    if not path.exists():
+        os.replace(temporary, path)
+    else:
+        temporary.unlink(missing_ok=True)
 
 
 def read_activity_records():
     with _ACTIVITY_LOCK:
+        _migrate_legacy_file(ACTIVITY_PATH, LEGACY_ACTIVITY_PATH)
         if not ACTIVITY_PATH.exists():
             return []
         payload = json.loads(ACTIVITY_PATH.read_text(encoding="utf-8"))
@@ -52,6 +67,7 @@ def delete_activity_record(activity_id):
 
 
 def read_dashboard_snapshot():
+    _migrate_legacy_file(SNAPSHOT_PATH, LEGACY_SNAPSHOT_PATH)
     if not SNAPSHOT_PATH.exists():
         return {}
     payload = json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
