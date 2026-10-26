@@ -253,19 +253,18 @@ def run_once(api, settings):
         maybe_withdraw_btc(api, state, settings)
     except requests.RequestException as exc:
         LOG.error("Automatic BTC withdrawal check failed: %s", exc)
-    deposits = api.fiat_deposits(
-        quote,
-        int(cycle_start.timestamp() * 1000),
-        int(now.timestamp() * 1000),
+    # Use the current available quote balance as the DCA budget. This includes
+    # funds already on the exchange, even if they were deposited before this cycle.
+    balance = api.balance(quote)
+    balance_after_simulated_spend = (
+        max(Decimal(0), balance - spent) if not settings["live"] else balance
     )
-    deposited = sum(
-        (Decimal(item.get("amount", "0")) for item in deposits
-         if item.get("symbol", "").upper() == quote and item.get("status") == "completed"),
-        Decimal(0),
-    )
-    remaining = max(Decimal(0), deposited - spent)
-    if remaining <= 0:
-        LOG.info("No unspent completed %s deposit remains in this cycle (deposited=%s, spent=%s).", quote, deposited, spent)
+    if balance_after_simulated_spend <= 0:
+        simulated_spent = spent if not settings["live"] else Decimal(0)
+        LOG.info(
+            "No available %s balance for DCA purchases (balance=%s, simulated spend=%s).",
+            quote, balance, simulated_spent,
+        )
         return
 
     market = api.market(symbol)
@@ -279,13 +278,13 @@ def run_once(api, settings):
     notional_decimals = int(market["notionalDecimals"])
     order_amount = ceil_to_places(max(settings["buy_amount"], min_base, min_quote / price), quantity_decimals)
     order_quote = ceil_to_places(order_amount * price, notional_decimals)
-    reserve = deposited * settings["fee_buffer"] / Decimal(100)
-    spendable = max(Decimal(0), remaining - reserve)
-    available = api.balance(quote) if settings["live"] else spendable
+    reserve = balance_after_simulated_spend * settings["fee_buffer"] / Decimal(100)
+    spendable = max(Decimal(0), balance_after_simulated_spend - reserve)
+    available = balance if settings["live"] else balance_after_simulated_spend
     affordable_budget = min(spendable, available)
     possible_buys = int(affordable_budget // order_quote)
     if possible_buys < 1:
-        LOG.info("Waiting: available monthly funds %s %s; minimum order %s %s.", affordable_budget, quote, order_quote, quote)
+        LOG.info("Waiting: available balance %s %s; minimum order %s %s.", affordable_budget, quote, order_quote, quote)
         return
 
     seconds_left = max(60, (next_deposit - now).total_seconds())
@@ -294,7 +293,7 @@ def run_once(api, settings):
     if last_order:
         elapsed = (now - datetime.fromisoformat(last_order)).total_seconds()
         if elapsed < interval_seconds:
-            LOG.info("Next purchase in about %s minutes (recomputed from %s %s available and %s remaining monthly buys).", int((interval_seconds - elapsed) / 60), affordable_budget, quote, possible_buys)
+            LOG.info("Next purchase in about %s minutes (recomputed from %s %s available and %s possible buys).", int((interval_seconds - elapsed) / 60), affordable_budget, quote, possible_buys)
             return
     else:
         LOG.info("First purchase is due now; next interval will be recalculated from current funds and minimum order.")
