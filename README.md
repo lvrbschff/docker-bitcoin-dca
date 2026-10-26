@@ -48,7 +48,7 @@ This feature needs the additional **Withdraw digital assets** API permission. Ve
 
 ## Portfolio web UI
 
-The dashboard is enabled by default and is available at [http://localhost:8080](http://localhost:8080) on the Docker host. Docker Compose binds the port to `127.0.0.1`, so it is not exposed to the home network or the public internet.
+The dashboard is enabled by default and is available at [http://localhost:8080](http://localhost:8080) on the Docker host by default. Set `WEB_UI_PORT` in `.env` to change both the local host port and the port used inside the container. Docker Compose binds the port to `127.0.0.1`, so it is not exposed to the home network or the public internet.
 
 It shows the current available BTC balance and quote-currency value, plus purchases, average purchase price, fees, completed withdrawals, and net BTC purchased minus withdrawn for the selected period. Choose a period between two completed BTC withdrawals from the interval selector, or set custom start and end dates. The displayed period can be exported on demand as a Parqet-compatible CSV and downloaded directly from the page.
 
@@ -83,6 +83,7 @@ The non-secret settings are configured directly in `docker-compose.yml`. Change 
 | `WITHDRAW_ADDRESS` | Empty | Destination Bitcoin address. Required when automatic withdrawals are enabled; add and verify it in Bitvavo first. |
 | `WITHDRAW_NETWORK` | `BTC` | Bitvavo network for the withdrawal. |
 | `WEB_UI_ENABLED` | `true` | Enables the local read-only portfolio dashboard. |
+| `WEB_UI_PORT` | `8080` | Dashboard port on the host and inside the container. Set it in `.env` to override the default. |
 | `BITVAVO_API_KEY` | Required | Bitvavo API key. Keep it in the local, untracked `.env` file. |
 | `BITVAVO_API_SECRET` | Required | Bitvavo API secret. Keep it in the local, untracked `.env` file. |
 | `LOG_LEVEL` | `INFO` | Python logging level, such as `INFO`, `WARNING`, or `DEBUG`. |
