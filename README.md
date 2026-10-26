@@ -1,6 +1,6 @@
 # Bitcoin DCA Bot for Bitvavo and Kraken
 
-A Docker-based DCA bot for buying Bitcoin with fiat deposits on Bitvavo or Kraken. Choose the exchange, quote currency, purchase amount, and deposit day. The bot calculates purchase timing from completed deposits and the exchange's minimum order rules. A local web UI shows portfolio activity and can generate Parqet-compatible CSV exports.
+A Docker-based DCA bot for buying Bitcoin with fiat deposits on Bitvavo or Kraken. Choose the exchange, quote currency, purchase amount, and deposit day. The bot recalculates purchase timing from the available balance and the selected exchange's current minimum order rules. A local web UI shows portfolio activity and can generate Parqet-compatible CSV exports.
 
 ## What you need
 
@@ -65,11 +65,11 @@ Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings 
 | `QUOTE_CURRENCY` | `EUR` | Fiat or quote currency for deposits and the BTC market, for example `EUR` or `USD`. The selected exchange must support the currency and market. |
 | `BASE_ASSET` | `BTC` | Asset to buy. The market is formed as `BASE_ASSET-QUOTE_CURRENCY`. |
 | `BUY_AMOUNT` | `0` | Desired BTC amount per purchase. `0` uses the smallest amount currently allowed by the selected exchange's market rules; these rules are fetched dynamically on every execution. |
-| `DEPOSIT_DAY` | `1` | Day of the month that starts a new deposit cycle. If a month is shorter, its final day is used. |
+| `DEPOSIT_DAY` | `1` | Day of the month that starts a new DCA scheduling period. If a month is shorter, its final day is used. |
 | `TIMEZONE` | `Europe/Berlin` | Time zone used to calculate the deposit-cycle boundary. |
 | `LIVE_TRADING` | `false` | Set to `true` to submit real orders. Keep `false` to run in dry-run mode. |
 | `CHECK_INTERVAL_SECONDS` | `300` | How often the bot checks deposits, balances, and prices. Values below 60 are raised to 60 seconds. |
-| `FEE_BUFFER_PERCENT` | `1` | Share of deposits reserved for trading fees and rounding. |
+| `FEE_BUFFER_PERCENT` | `1` | Share of the available quote balance reserved for trading fees and rounding. |
 | `WITHDRAWALS_ENABLED` | `false` | Enables automatic Bitcoin withdrawals. Also requires `LIVE_TRADING=true`. |
 | `WITHDRAW_THRESHOLD_QUOTE` | `1000` | Withdraw when the available BTC balance reaches this value in `QUOTE_CURRENCY`. |
 | `WEB_UI_ENABLED` | `true` | Enables the local portfolio dashboard. |
@@ -119,11 +119,11 @@ docker compose up -d --build
 
 ## How the purchase schedule works
 
-- The bot totals completed deposits in `QUOTE_CURRENCY` since the current deposit cycle began. It does not use a fixed monthly budget.
-- In live mode, the available balance on the selected exchange also limits how much can be bought. The configured fee buffer is left unspent.
+- Before each purchase check, the bot reads the current available `QUOTE_CURRENCY` balance on the selected exchange. Existing funds are included, even if they were deposited before the current scheduling period.
+- The configured fee buffer is reserved from that balance. The bot divides the spendable balance by the current minimum order value to estimate how many purchases remain until the next `DEPOSIT_DAY`.
 - `BUY_AMOUNT` sets the desired BTC amount per purchase. If it is zero, the bot fetches the selected market's rules on every execution and calculates the smallest amount that meets its current minimum quantity and order value.
-- The bot recalculates the interval using remaining deposited funds, the minimum order value, the current price, and the time until the next `DEPOSIT_DAY`. The first eligible purchase in a cycle is due immediately.
-- Only completed deposits recorded by the selected exchange are counted. The bot waits for a deposit before buying.
+- The purchase interval is recalculated at every check using the current balance, minimum order value, current price, and time until the next `DEPOSIT_DAY`. The first eligible purchase is due immediately.
+- The schedule does not depend on finding a completed deposit record for the current period. In dry-run mode, previously simulated purchases are subtracted from the balance for scheduling.
 - Market orders do not guarantee an execution price. A configured `BUY_AMOUNT` can cost more or less than estimated as the market price changes.
 
 ## Automatic Bitcoin withdrawals
@@ -163,7 +163,7 @@ View the container logs with:
 docker compose logs -f
 ~~~
 
-The logs show startup settings, deposit and balance checks, calculated purchase intervals, submitted orders, withdrawal activity, and errors returned by the selected exchange. Do not share logs without checking them for account-specific information.
+The logs show startup settings, balance checks, calculated purchase intervals, submitted orders, withdrawal activity, and errors returned by the selected exchange. Do not share logs without checking them for account-specific information.
 
 ## Project structure and Docker files
 
