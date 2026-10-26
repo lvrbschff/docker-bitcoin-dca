@@ -1,4 +1,4 @@
-"""Budget-capped Bitvavo DCA bot. Starts in dry-run mode unless explicitly enabled."""
+"""Exchange-configurable DCA bot. Starts in dry-run mode unless explicitly enabled."""
 import hashlib
 import hmac
 import json
@@ -38,6 +38,8 @@ class Bitvavo:
         if not self.key or not self.secret:
             raise ValueError("Set BITVAVO_API_KEY and BITVAVO_API_SECRET")
         self.session = requests.Session()
+        self.exchange_name = "BITVAVO"
+        self.supports_withdrawal_idempotency = True
 
     def request(self, method, path, params=None, body=None, private=False):
         payload = json.dumps(body, separators=(",", ":")) if body is not None else ""
@@ -134,6 +136,16 @@ class Bitvavo:
 
     def get_order(self, symbol, client_order_id):
         return self.request("GET", "/order", params={"market": symbol, "clientOrderId": client_order_id}, private=True)
+
+
+def create_exchange(settings):
+    exchange = settings["exchange"]
+    if exchange == "BITVAVO":
+        return Bitvavo()
+    if exchange == "KRAKEN":
+        from kraken import Kraken
+        return Kraken(settings["quote"], settings.get("kraken_withdraw_key", ""))
+    raise ValueError("EXCHANGE must be BITVAVO or KRAKEN")
 
 
 def cycle_dates(now, deposit_day):
@@ -262,7 +274,10 @@ def maybe_withdraw_btc(api, state, settings):
 
     pending = state.get("pending_withdrawal")
     if pending:
-        LOG.warning("Retrying unresolved withdrawal with the same Bitvavo idempotency key.")
+        if not getattr(api, "supports_withdrawal_idempotency", False):
+            LOG.error("A previous Kraken withdrawal request has an unknown outcome. It will not be retried automatically; verify it in Kraken and clear pending_withdrawal only after confirming its status.")
+            return
+        LOG.warning("Retrying unresolved withdrawal with the same exchange idempotency key.")
         try:
             result = api.withdraw_crypto(pending)
         except requests.RequestException:
@@ -294,7 +309,7 @@ def maybe_withdraw_btc(api, state, settings):
             save_state(Path("/data/state.json"), state)
             LOG.info("BTC balance is below the withdrawal threshold again; automatic withdrawal is re-armed.")
         else:
-            LOG.info("Waiting for Bitvavo to reflect the previous withdrawal before another automatic withdrawal.")
+            LOG.info("Waiting for %s to reflect the previous withdrawal before another automatic withdrawal.", settings["exchange"])
         return
     if value < settings["withdraw_threshold"]:
         LOG.info("BTC withdrawal threshold not reached: available value %s %s, threshold %s %s.", value, settings["quote"], settings["withdraw_threshold"], settings["quote"])
@@ -304,13 +319,10 @@ def maybe_withdraw_btc(api, state, settings):
     if amount <= 0:
         LOG.info("No withdrawable BTC remains after applying Bitcoin precision.")
         return
-    withdrawal = {
-        "asset": "BTC",
-        "network": settings["withdraw_network"],
-        "address": settings["withdraw_address"],
-        "amount": format(amount, "f"),
-        "deductFeeFromAmount": True,
-        "idempotencyKey": str(uuid.uuid4()),
+    idempotency_key = str(uuid.uuid4())
+    withdrawal = api.withdrawal_request(amount, idempotency_key, settings) if hasattr(api, "withdrawal_request") else {
+        "symbol": "BTC", "network": settings["withdraw_network"], "address": settings["withdraw_address"],
+        "amount": format(amount, "f"), "deductFeeFromAmount": True, "idempotencyKey": idempotency_key,
     }
     state["pending_withdrawal"] = withdrawal
     save_state(Path("/data/state.json"), state)
@@ -356,7 +368,7 @@ def run_once(api, settings):
         state["last_order_quote"] = str(order_quote)
         state.pop("pending_order", None)
         save_state(state_path, state)
-        LOG.info("Reconciled previous Bitvavo order %s; status=%s. Next interval will be recalculated.", pending["clientOrderId"], result.get("status", "found"))
+        LOG.info("Reconciled previous %s order %s; status=%s. Next interval will be recalculated.", settings["exchange"], pending["clientOrderId"], result.get("status", "found"))
         return
     try:
         maybe_withdraw_btc(api, state, settings)
@@ -434,7 +446,7 @@ def bot_loop(api, settings, interval):
         try:
             run_once(api, settings)
         except requests.RequestException as exc:
-            LOG.error("Bitvavo request failed: %s", exc)
+            LOG.error("%s request failed: %s", settings["exchange"], exc)
         except Exception:
             LOG.exception("Cycle failed")
         time.sleep(interval)
@@ -446,6 +458,7 @@ def main():
     if not 1 <= deposit_day <= 31:
         raise ValueError("DEPOSIT_DAY must be between 1 and 31")
     settings = {
+        "exchange": os.getenv("EXCHANGE", "BITVAVO").upper(),
         "quote": os.getenv("QUOTE_CURRENCY", "EUR").upper(),
         "base": os.getenv("BASE_ASSET", "BTC").upper(),
         "buy_amount": env_decimal("BUY_AMOUNT", 0),
@@ -457,19 +470,25 @@ def main():
         "withdraw_threshold": env_decimal("WITHDRAW_THRESHOLD_QUOTE", 1000),
         "withdraw_address": os.getenv("WITHDRAW_ADDRESS", "").strip(),
         "withdraw_network": os.getenv("WITHDRAW_NETWORK", "BTC").upper(),
+        "kraken_withdraw_key": os.getenv("KRAKEN_WITHDRAW_KEY", "").strip(),
     }
+    if settings["exchange"] not in ("BITVAVO", "KRAKEN"):
+        raise ValueError("EXCHANGE must be BITVAVO or KRAKEN")
     if settings["withdrawals_enabled"]:
         if settings["base"] != "BTC":
             raise ValueError("Automatic withdrawals currently support BASE_ASSET=BTC only")
-        if not settings["withdraw_address"]:
-            raise ValueError("WITHDRAW_ADDRESS is required when WITHDRAWALS_ENABLED=true")
-        if not settings["withdraw_network"]:
-            raise ValueError("WITHDRAW_NETWORK is required when WITHDRAWALS_ENABLED=true")
+        if settings["exchange"] == "BITVAVO":
+            if not settings["withdraw_address"]:
+                raise ValueError("WITHDRAW_ADDRESS is required for Bitvavo automatic withdrawals")
+            if not settings["withdraw_network"]:
+                raise ValueError("WITHDRAW_NETWORK is required for Bitvavo automatic withdrawals")
+        elif not settings["kraken_withdraw_key"]:
+            raise ValueError("KRAKEN_WITHDRAW_KEY is required for Kraken automatic withdrawals")
         if settings["withdraw_threshold"] <= 0:
             raise ValueError("WITHDRAW_THRESHOLD_QUOTE must be greater than zero")
     interval = max(60, int(os.getenv("CHECK_INTERVAL_SECONDS", "300")))
-    api = Bitvavo()
-    LOG.info("Starting %s; live trading=%s; quote currency=%s; requested buy amount=%s %s; deposit day=%s; timezone=%s; check interval=%ss", f"{settings['base']}-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], settings["base"], deposit_day, settings["timezone"], interval)
+    api = create_exchange(settings)
+    LOG.info("Starting on %s: %s; live trading=%s; quote currency=%s; requested buy amount=%s %s; deposit day=%s; timezone=%s; check interval=%ss", settings["exchange"], f"{settings['base']}-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], settings["base"], deposit_day, settings["timezone"], interval)
 
     if os.getenv("WEB_UI_ENABLED", "true").lower() == "true":
         port = int(os.getenv("WEB_UI_PORT", "8080"))
