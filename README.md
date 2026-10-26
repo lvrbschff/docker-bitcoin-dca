@@ -69,7 +69,7 @@ Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings 
 | `FIRST_BUY_DELAY_SECONDS` | `60` | Seconds to wait after container startup before the first purchase check. The next interval is recalculated after the first purchase. |
 | `TIMEZONE` | `Europe/Berlin` | Time zone used to calculate the deposit-cycle boundary. |
 | `LIVE_TRADING` | `false` | Set to `true` to submit real orders. Keep `false` to run in dry-run mode. |
-| `CHECK_INTERVAL_SECONDS` | `300` | How often the bot checks deposits, balances, and prices. Values below 60 are raised to 60 seconds. |
+| `CHECK_INTERVAL_SECONDS` | `300` | Retry delay when a purchase cannot proceed, for example because funds are insufficient or the market is unavailable. Values below 60 are raised to 60 seconds. |
 | `WITHDRAWALS_ENABLED` | `false` | Enables automatic Bitcoin withdrawals. Also requires `LIVE_TRADING=true`. |
 | `WITHDRAW_THRESHOLD_QUOTE` | `1000` | Withdraw when the available BTC balance reaches this value in `QUOTE_CURRENCY`. |
 | `WEB_UI_ENABLED` | `true` | Enables the local portfolio dashboard. |
@@ -122,7 +122,7 @@ docker compose up -d --build
 - Before each purchase check, the bot reads the current available `QUOTE_CURRENCY` balance on the selected exchange. Existing funds are included, even if they were deposited before the current scheduling period.
 - The bot divides the available balance by the current minimum order value to estimate how many purchases remain until the next `DEPOSIT_DAY`.
 - `BUY_AMOUNT` sets the desired BTC amount per purchase. If it is zero, the bot fetches the selected market's rules on every execution and calculates the smallest amount that meets its current minimum quantity and order value.
-- At every check, the bot fetches the current available balance and BTC price, then recalculates the purchase interval from the affordable order count and time until the next `DEPOSIT_DAY`. The first eligible purchase check runs after `FIRST_BUY_DELAY_SECONDS`; subsequent purchases follow the recalculated interval. The log entry `Recalculated DCA schedule` shows the values used.
+- The first purchase check runs after `FIRST_BUY_DELAY_SECONDS`. After each completed purchase, the bot records the activity, refreshes the balance and BTC price, recalculates the interval to the next purchase, and waits until its estimated local purchase time. When that time arrives, it refreshes the balance and price before placing the next order. The log entry `Recalculated DCA schedule` shows the values used. `CHECK_INTERVAL_SECONDS` is used for retries when a purchase cannot proceed.
 - The schedule does not depend on finding a completed deposit record for the current period. In dry-run mode, simulated purchases appear in the web UI, are marked as simulated, and are subtracted from the balance for scheduling. Their fee is estimated from the selected exchange's current taker fee tier; simulated records are excluded from Parqet CSV exports.
 - Market orders do not guarantee an execution price. A configured `BUY_AMOUNT` can cost more or less than estimated as the market price changes.
 
