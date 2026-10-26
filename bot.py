@@ -472,12 +472,9 @@ def main():
     LOG.info("Starting %s; live trading=%s; quote currency=%s; requested buy amount=%s %s; deposit day=%s; timezone=%s; check interval=%ss", f"{settings['base']}-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], settings["base"], deposit_day, settings["timezone"], interval)
 
     if os.getenv("WEB_UI_ENABLED", "true").lower() == "true":
-        port = int(os.getenv("WEB_UI_PORT", "8080"))
-        if not 1 <= port <= 65535:
-            raise ValueError("WEB_UI_PORT must be between 1 and 65535")
         threading.Thread(target=bot_loop, args=(api, settings, interval), daemon=True).start()
         from web_ui import serve
-        serve(settings, port)
+        serve(settings, 8080)
     else:
         bot_loop(api, settings, interval)
 
