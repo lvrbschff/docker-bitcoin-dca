@@ -111,40 +111,6 @@ def _period(query):
     return start_ms, end_ms
 
 
-def _analytics(api, settings, start_ms, end_ms):
-    quote = settings["quote"]
-    rows = parqet_rows(api, start_ms, end_ms, quote)
-    buys = [row for row in rows if row["type"] == "Buy"]
-    withdrawals = [row for row in rows if row["type"] == "TransferOut"]
-    bought_btc = sum((Decimal(row["shares"]) for row in buys), Decimal(0))
-    buy_volume = sum((Decimal(row["amount"]) for row in buys), Decimal(0))
-    trade_fees = sum((Decimal(row["fee"]) for row in buys), Decimal(0))
-    withdrawn_btc = sum((Decimal(row["shares"]) for row in withdrawals), Decimal(0))
-    withdrawal_fees = sum((Decimal(row["fee"]) for row in withdrawals), Decimal(0))
-    price = api.price("BTC-" + quote)
-    balance = api.balance("BTC")
-    return {
-        "quote": quote,
-        "snapshot": {
-            "balance": str(balance),
-            "price": str(price),
-            "value": str(balance * price),
-            "withdrawThreshold": str(settings["withdraw_threshold"]),
-        },
-        "summary": {
-            "buyCount": len(buys),
-            "boughtBtc": str(bought_btc),
-            "buyVolume": str(buy_volume),
-            "tradeFees": str(trade_fees),
-            "averagePrice": str(buy_volume / bought_btc if bought_btc else Decimal(0)),
-            "withdrawalCount": len(withdrawals),
-            "withdrawnBtc": str(withdrawn_btc),
-            "withdrawalFees": str(withdrawal_fees),
-            "netBtc": str(bought_btc - withdrawn_btc),
-        },
-        "activities": rows,
-    }
-
 
 class Handler(BaseHTTPRequestHandler):
     settings = None
