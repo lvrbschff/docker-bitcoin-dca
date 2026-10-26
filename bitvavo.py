@@ -55,6 +55,11 @@ class Bitvavo:
         ticker = self.request("GET", f"/{symbol}/ticker/price")
         return Decimal(ticker["price"])
 
+    def estimate_taker_fee(self, symbol, quote_amount):
+        account = self.request("GET", "/account", private=True)
+        rate = Decimal(str(account["fees"]["taker"]))
+        return Decimal(str(quote_amount)) * rate
+
     def balance(self, currency):
         accounts = self.request("GET", "/balance", private=True)
         for account in accounts:
