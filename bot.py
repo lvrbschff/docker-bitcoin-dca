@@ -76,6 +76,13 @@ class Bitvavo:
                 return Decimal(account.get("available", "0"))
         return Decimal("0")
 
+    def fiat_deposits(self, currency, start_ms, end_ms):
+        return self.request(
+            "GET", "/depositHistory",
+            params={"symbol": currency, "start": start_ms, "end": end_ms, "limit": 1000},
+            private=True,
+        )
+
     def buy_base(self, symbol, amount, client_order_id):
         body = {
             "market": symbol,
@@ -110,7 +117,7 @@ def cycle_dates(now, deposit_day):
         else:
             start = deposit_date(now.year, now.month - 1)
         next_deposit = this_month
-    return start.strftime("%Y-%m-%d"), next_deposit
+    return start.strftime("%Y-%m-%d"), start, next_deposit
 
 
 def local_now(settings):
@@ -143,11 +150,11 @@ def ceil_to_places(value, places):
 
 
 def run_once(api, settings):
-    budget, quote, base = settings["budget"], settings["quote"], settings["base"]
+    quote, base = settings["quote"], settings["base"]
     symbol = f"{base}-{quote}"
     state_path = Path(settings["state_file"])
     now = local_now(settings)
-    cycle_key, next_deposit = cycle_dates(now, settings["deposit_day"])
+    cycle_key, cycle_start, next_deposit = cycle_dates(now, settings["deposit_day"])
     state = read_state(state_path, cycle_key)
     state["cycle"] = cycle_key
     spent = Decimal(state.get("spent", "0"))
@@ -166,9 +173,19 @@ def run_once(api, settings):
         save_state(state_path, state)
         LOG.info("Reconciled previous Bitvavo order %s; status=%s. Next interval will be recalculated.", pending["clientOrderId"], result.get("status", "found"))
         return
-    remaining = max(Decimal(0), budget - spent)
+    deposits = api.fiat_deposits(
+        quote,
+        int(cycle_start.timestamp() * 1000),
+        int(now.timestamp() * 1000),
+    )
+    deposited = sum(
+        (Decimal(item.get("amount", "0")) for item in deposits
+         if item.get("symbol", "").upper() == quote and item.get("status") == "completed"),
+        Decimal(0),
+    )
+    remaining = max(Decimal(0), deposited - spent)
     if remaining <= 0:
-        LOG.info("Monthly budget exhausted (%s %s).", spent, quote)
+        LOG.info("No unspent completed %s deposit remains in this cycle (deposited=%s, spent=%s).", quote, deposited, spent)
         return
 
     market = api.market(symbol)
@@ -182,7 +199,7 @@ def run_once(api, settings):
     notional_decimals = int(market["notionalDecimals"])
     order_amount = ceil_to_places(max(settings["buy_amount"], min_base, min_quote / price), quantity_decimals)
     order_quote = ceil_to_places(order_amount * price, notional_decimals)
-    reserve = budget * settings["fee_buffer"] / Decimal(100)
+    reserve = deposited * settings["fee_buffer"] / Decimal(100)
     spendable = max(Decimal(0), remaining - reserve)
     available = api.balance(quote) if settings["live"] else spendable
     affordable_budget = min(spendable, available)
@@ -229,7 +246,6 @@ def main():
     if not 1 <= deposit_day <= 31:
         raise ValueError("DEPOSIT_DAY must be between 1 and 31")
     settings = {
-        "budget": env_decimal("MONTHLY_BUDGET"),
         "quote": os.getenv("QUOTE_CURRENCY", "EUR").upper(),
         "base": os.getenv("BASE_ASSET", "BTC").upper(),
         "buy_amount": env_decimal("BUY_AMOUNT", 0),
@@ -241,7 +257,7 @@ def main():
     }
     interval = max(60, int(os.getenv("CHECK_INTERVAL_SECONDS", "300")))
     api = Bitvavo()
-    LOG.info("Starting %s; live trading=%s; monthly budget=%s %s; requested buy amount=%s %s; deposit day=%s; timezone=%s; check interval=%ss", f"{settings['base']}-{settings['quote']}", settings["live"], settings["budget"], settings["quote"], settings["buy_amount"], settings["base"], deposit_day, settings["timezone"], interval)
+    LOG.info("Starting %s; live trading=%s; quote currency=%s; requested buy amount=%s %s; deposit day=%s; timezone=%s; check interval=%ss", f"{settings['base']}-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], settings["base"], deposit_day, settings["timezone"], interval)
     while True:
         try:
             run_once(api, settings)
