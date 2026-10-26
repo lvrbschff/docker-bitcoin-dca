@@ -60,7 +60,7 @@ def read_state(path, cycle_key):
         return {"cycle": cycle_key, "spent": "0"}
     state = json.loads(path.read_text())
     if state.get("cycle") != cycle_key:
-        # A new configured deposit cycle starts a fresh allowance.
+        # Reset dry-run simulated spending at the configured monthly boundary.
         fresh = {"cycle": cycle_key, "spent": "0"}
         if state.get("pending_order"):
             fresh["pending_order"] = state["pending_order"]
