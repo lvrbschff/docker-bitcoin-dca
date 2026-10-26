@@ -59,7 +59,6 @@ The non-secret settings are configured directly in `docker-compose.yml`. Change 
 | `WITHDRAW_ADDRESS` | Empty | Destination Bitcoin address. Required when automatic withdrawals are enabled; add and verify it in Bitvavo first. |
 | `WITHDRAW_NETWORK` | `BTC` | Bitvavo network for the withdrawal. |
 | `WEB_UI_ENABLED` | `true` | Enables the local read-only portfolio dashboard. |
-| `WEB_UI_PORT` | `8080` | Port used by the dashboard inside the container. Compose publishes it on host port `8080`, bound to localhost. |
 | `BITVAVO_API_KEY` | Required | Bitvavo API key. Keep it in the local, untracked `.env` file. |
 | `BITVAVO_API_SECRET` | Required | Bitvavo API secret. Keep it in the local, untracked `.env` file. |
 | `LOG_LEVEL` | `INFO` | Python logging level, such as `INFO`, `WARNING`, or `DEBUG`. |
