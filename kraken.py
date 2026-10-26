@@ -354,8 +354,13 @@ class Kraken:
         # Compatibility for pending orders saved before the Kraken txid was persisted.
         userref = int(client_order_id.replace("-", "")[-8:], 16) % 2_147_483_647
         matches = []
-        for method, bucket in (("OpenOrders", "open"), ("ClosedOrders", "closed")):
-            result = self.private(method, {"userref": userref})
+        for method, bucket in (("ClosedOrders", "closed"), ("OpenOrders", "open")):
+            try:
+                result = self.private(method, {"userref": userref})
+            except KrakenAPIError as exc:
+                if "Permission denied" in str(exc):
+                    continue
+                raise
             orders = result.get(bucket, {})
             if isinstance(orders, dict):
                 matches.extend(
