@@ -137,7 +137,7 @@ class Bitvavo:
             raise ValueError(f"No historical {market} price available for withdrawal timestamp {timestamp_ms}")
         return Decimal(candles[0][4])
 
-    def get_order(self, symbol, client_order_id):
+    def get_order(self, symbol, client_order_id, exchange_order_id=None):
         return self.request("GET", "/order", params={"market": symbol, "clientOrderId": client_order_id}, private=True)
 
     def normalize_bot_buy(self, order, quote, base, event_id, fallback_timestamp_ms):
