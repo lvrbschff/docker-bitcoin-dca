@@ -16,3 +16,4 @@ services:
       BITVAVO_API_SECRET: ${BITVAVO_API_SECRET:?Add BITVAVO_API_SECRET to your untracked .env file}
     volumes:
       - ./state:/data
+      - ./exports:/exports
