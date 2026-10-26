@@ -66,6 +66,7 @@ Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings 
 | `BASE_ASSET` | `BTC` | Asset to buy. The market is formed as `BASE_ASSET-QUOTE_CURRENCY`. |
 | `BUY_AMOUNT` | `0` | Desired BTC amount per purchase. `0` uses the smallest amount currently allowed by the selected exchange's market rules; these rules are fetched dynamically on every execution. |
 | `DEPOSIT_DAY` | `1` | Day of the month that starts a new DCA scheduling period. If a month is shorter, its final day is used. |
+| `FIRST_BUY_DELAY_SECONDS` | `0` | Seconds to wait after container startup before the first purchase check. The next interval is recalculated after the first purchase. |
 | `TIMEZONE` | `Europe/Berlin` | Time zone used to calculate the deposit-cycle boundary. |
 | `LIVE_TRADING` | `false` | Set to `true` to submit real orders. Keep `false` to run in dry-run mode. |
 | `CHECK_INTERVAL_SECONDS` | `300` | How often the bot checks deposits, balances, and prices. Values below 60 are raised to 60 seconds. |
@@ -121,8 +122,8 @@ docker compose up -d --build
 - Before each purchase check, the bot reads the current available `QUOTE_CURRENCY` balance on the selected exchange. Existing funds are included, even if they were deposited before the current scheduling period.
 - The bot divides the available balance by the current minimum order value to estimate how many purchases remain until the next `DEPOSIT_DAY`.
 - `BUY_AMOUNT` sets the desired BTC amount per purchase. If it is zero, the bot fetches the selected market's rules on every execution and calculates the smallest amount that meets its current minimum quantity and order value.
-- At every check, the bot fetches the current available balance and BTC price, then recalculates the purchase interval from the affordable order count and time until the next `DEPOSIT_DAY`. The first eligible purchase is due immediately. The log entry `Recalculated DCA schedule` shows the values used.
-- The schedule does not depend on finding a completed deposit record for the current period. In dry-run mode, previously simulated purchases are subtracted from the balance for scheduling.
+- At every check, the bot fetches the current available balance and BTC price, then recalculates the purchase interval from the affordable order count and time until the next `DEPOSIT_DAY`. The first eligible purchase check runs after `FIRST_BUY_DELAY_SECONDS`; subsequent purchases follow the recalculated interval. The log entry `Recalculated DCA schedule` shows the values used.
+- The schedule does not depend on finding a completed deposit record for the current period. In dry-run mode, simulated purchases appear in the web UI, are marked as simulated, and are subtracted from the balance for scheduling. They are excluded from Parqet CSV exports.
 - Market orders do not guarantee an execution price. A configured `BUY_AMOUNT` can cost more or less than estimated as the market price changes.
 
 ## Automatic Bitcoin withdrawals
@@ -142,7 +143,7 @@ Check the destination and network carefully before enabling automatic withdrawal
 
 The dashboard displays purchases and withdrawals recorded when this bot places them. It reads its activity and latest price snapshot from local files; the web UI does not query Kraken or Bitvavo for transaction history. The displayed BTC amount is the net amount tracked from the bot's recorded purchases and withdrawals, not the full exchange-account balance.
 
-Choose an interval between bot-recorded Bitcoin withdrawals or enter custom start and end dates. Download the displayed period as a Parqet-compatible CSV for import into Parqet. Activity from before local tracking is enabled is not imported automatically. Set `WEB_UI_ENABLED` to false to disable the dashboard.
+Choose an interval between bot-recorded Bitcoin withdrawals or enter custom start and end dates. The activity table distinguishes simulated dry-run purchases from real purchases. Use **Delete** to remove an individual purchase from the local activity history; this does not reverse an order on the exchange. Download the selected period as a Parqet-compatible CSV for import into Parqet. Simulated purchases are excluded. Activity from before local tracking is enabled is not imported automatically. Set `WEB_UI_ENABLED` to false to disable the dashboard.
 
 ## Parqet CSV exports
 
