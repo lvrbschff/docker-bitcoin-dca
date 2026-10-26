@@ -341,12 +341,34 @@ class Kraken:
         ids = result.get("txid", [])
         return {"status": "submitted", "orderId": ids[0] if ids else None, "userref": userref}
 
-    def get_order(self, symbol, client_order_id):
+    def get_order(self, symbol, client_order_id, exchange_order_id=None):
+        if exchange_order_id:
+            result = self.private("QueryOrders", {"txid": exchange_order_id})
+            order = result.get(exchange_order_id)
+            if order is not None:
+                return order
+            if len(result) == 1:
+                return next(iter(result.values()))
+            raise KrakenAPIError(f"Kraken could not find order {exchange_order_id}")
+
+        # Compatibility for pending orders saved before the Kraken txid was persisted.
         userref = int(client_order_id.replace("-", "")[-8:], 16) % 2_147_483_647
-        result = self.private("QueryOrders", {"userref": userref})
-        if not result:
-            raise KrakenAPIError("Kraken could not find the order with the saved user reference")
-        return next(iter(result.values()))
+        matches = []
+        for method, bucket in (("OpenOrders", "open"), ("ClosedOrders", "closed")):
+            result = self.private(method, {"userref": userref})
+            orders = result.get(bucket, {})
+            if isinstance(orders, dict):
+                matches.extend(
+                    order for order in orders.values()
+                    if str(order.get("userref")) == str(userref)
+                )
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            raise KrakenAPIError(
+                "Multiple Kraken orders share the saved user reference; refusing to guess which order to record"
+            )
+        raise KrakenAPIError("Kraken could not find the order with the saved user reference")
 
     def normalize_bot_buy(self, order, quote, base, event_id, fallback_timestamp_ms):
         filled = Decimal(str(order.get("vol_exec", "0")))
