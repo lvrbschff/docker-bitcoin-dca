@@ -12,7 +12,7 @@ import calendar
 import threading
 
 import requests
-from activity import append_activity_records, read_activity_rows, write_dashboard_snapshot
+from activity import append_activity_records, read_activity_records, write_dashboard_snapshot
 from exchange import create_exchange
 
 LOG = logging.getLogger("bitvavo-dca")
@@ -124,7 +124,11 @@ def persist_bot_withdrawal(api, withdrawal, result, settings, context):
 
 
 def update_dashboard_snapshot(settings, quote_balance, price):
-    rows = read_activity_rows()
+    records = read_activity_records()
+    rows = [
+        record["row"] for record in records
+        if not record.get("simulated")
+    ]
     bought = sum(
         (Decimal(row["shares"]) for row in rows if row.get("type") == "Buy"),
         Decimal(0),
@@ -151,6 +155,25 @@ def persist_bot_buy(api, order, settings, event_id, fallback_timestamp_ms):
         order, settings["quote"], settings["base"], event_id, fallback_timestamp_ms
     )
     return records, append_activity_records(records)
+
+
+def persist_simulated_buy(settings, amount, price, quote_amount):
+    timestamp_ms = int(time.time() * 1000)
+    event_id = f"dry-run:{uuid.uuid4()}"
+    row = {
+        "datetime": utc_iso_from_ms(timestamp_ms),
+        "type": "Buy",
+        "identifier": settings["base"],
+        "assetType": "Crypto",
+        "price": format(price, "f"),
+        "shares": format(amount, "f"),
+        "amount": format(quote_amount, "f"),
+        "currency": settings["quote"],
+        "fee": "0",
+        "tax": "0",
+    }
+    record = {"id": event_id, "simulated": True, "row": row}
+    return append_activity_records([record])
 
 
 def ceil_to_places(value, places):
@@ -281,6 +304,7 @@ def run_once(api, settings):
         state["last_order_quote"] = str(order_quote)
         state.pop("pending_order", None)
         save_state(state_path, state)
+        settings["first_purchase_done"] = True
         LOG.info("Reconciled previous %s order %s; status=%s; saved %s bot activity record(s). Next interval will be recalculated.", settings["exchange"], event_id, result.get("status", "found"), added)
         return
     try:
@@ -330,14 +354,19 @@ def run_once(api, settings):
         order_amount, base, order_quote, quote, possible_buys,
         next_deposit.isoformat(), int(interval_seconds / 60),
     )
-    last_order = state.get("last_order_at")
-    if last_order:
-        elapsed = (now - datetime.fromisoformat(last_order)).total_seconds()
-        if elapsed < interval_seconds:
-            LOG.info("Next purchase in about %s minutes (recomputed from %s %s available and %s possible buys).", int((interval_seconds - elapsed) / 60), affordable_budget, quote, possible_buys)
-            return
+    if not settings["first_purchase_done"]:
+        LOG.info(
+            "First purchase is due after the configured startup delay of %s seconds; "
+            "the next interval will be recalculated after that purchase.",
+            settings["first_buy_delay_seconds"],
+        )
     else:
-        LOG.info("First purchase is due now; next interval will be recalculated from current funds and minimum order.")
+        last_order = state.get("last_order_at")
+        if last_order:
+            elapsed = (now - datetime.fromisoformat(last_order)).total_seconds()
+            if elapsed < interval_seconds:
+                LOG.info("Next purchase in about %s minutes (recomputed from %s %s available and %s possible buys).", int((interval_seconds - elapsed) / 60), affordable_budget, quote, possible_buys)
+                return
 
     if settings["live"]:
         if available < order_quote:
@@ -366,8 +395,11 @@ def run_once(api, settings):
             return
         LOG.info("Order submitted: %s %s (estimated %s %s); status=%s orderId=%s; saved %s bot activity record(s).", order_amount, base, order_quote, quote, status, result.get("orderId"), added)
     else:
-        LOG.info("DRY RUN: would market-buy %s %s (estimated %s %s at %s %s/%s).", order_amount, base, order_quote, quote, price, quote, base)
+        LOG.info("DRY RUN: would market-buy %s %s (estimated %s %s at %s %s/%s); saved as simulated activity.", order_amount, base, order_quote, quote, price, quote, base)
+        added = persist_simulated_buy(settings, order_amount, price, order_quote)
+        LOG.info("Saved %s simulated purchase record(s) for the web UI; excluded from the Parqet CSV export.", added)
 
+    settings["first_purchase_done"] = True
     # Debit budget for dry-run too, to make its monthly schedule representative.
     state["spent"] = str(spent + order_quote)
     state["last_order_at"] = datetime.now(timezone.utc).isoformat()
@@ -377,6 +409,12 @@ def run_once(api, settings):
 
 
 def bot_loop(api, settings, interval):
+    if settings["first_buy_delay_seconds"] > 0:
+        LOG.info(
+            "Waiting %s seconds after container startup before the first purchase check.",
+            settings["first_buy_delay_seconds"],
+        )
+        time.sleep(settings["first_buy_delay_seconds"])
     while True:
         try:
             run_once(api, settings)
@@ -398,6 +436,8 @@ def main():
         "base": os.getenv("BASE_ASSET", "BTC").upper(),
         "buy_amount": env_decimal("BUY_AMOUNT", 0),
         "deposit_day": deposit_day,
+        "first_buy_delay_seconds": int(os.getenv("FIRST_BUY_DELAY_SECONDS", "0")),
+        "first_purchase_done": False,
         "timezone": os.getenv("TIMEZONE", "Europe/Berlin"),
         "live": os.getenv("LIVE_TRADING", "false").lower() == "true",
         "withdrawals_enabled": os.getenv("WITHDRAWALS_ENABLED", "false").lower() == "true",
@@ -406,6 +446,8 @@ def main():
         "withdraw_network": os.getenv("WITHDRAW_NETWORK", "BTC").upper(),
         "kraken_withdraw_key": os.getenv("KRAKEN_WITHDRAW_KEY", "").strip(),
     }
+    if settings["first_buy_delay_seconds"] < 0:
+        raise ValueError("FIRST_BUY_DELAY_SECONDS must be zero or greater")
     api = create_exchange(settings)
     if settings["withdrawals_enabled"]:
         if settings["base"] != "BTC":
@@ -414,7 +456,7 @@ def main():
         if settings["withdraw_threshold"] <= 0:
             raise ValueError("WITHDRAW_THRESHOLD_QUOTE must be greater than zero")
     interval = max(60, int(os.getenv("CHECK_INTERVAL_SECONDS", "300")))
-    LOG.info("Starting on %s: %s; live trading=%s; quote currency=%s; requested buy amount=%s %s; deposit day=%s; timezone=%s; check interval=%ss", settings["exchange"], f"{settings['base']}-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], settings["base"], deposit_day, settings["timezone"], interval)
+    LOG.info("Starting on %s: %s; live trading=%s; quote currency=%s; requested buy amount=%s %s; deposit day=%s; first-buy delay=%ss; timezone=%s; check interval=%ss", settings["exchange"], f"{settings['base']}-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], settings["base"], deposit_day, settings["first_buy_delay_seconds"], settings["timezone"], interval)
 
     if os.getenv("WEB_UI_ENABLED", "true").lower() == "true":
         port = int(os.getenv("WEB_UI_PORT", "8080"))
