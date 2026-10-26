@@ -28,3 +28,4 @@ services:
       - "127.0.0.1:${WEB_UI_PORT:-6890}:${WEB_UI_PORT:-6890}"
     volumes:
       - ./state:/data
+      - ./webui-data:/webui-data
