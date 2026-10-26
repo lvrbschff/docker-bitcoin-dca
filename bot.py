@@ -312,8 +312,7 @@ def run_once(api, settings):
     notional_decimals = int(market["notionalDecimals"])
     order_amount = ceil_to_places(max(settings["buy_amount"], min_base, min_quote / price), quantity_decimals)
     order_quote = ceil_to_places(order_amount * price, notional_decimals)
-    reserve = balance_after_simulated_spend * settings["fee_buffer"] / Decimal(100)
-    spendable = max(Decimal(0), balance_after_simulated_spend - reserve)
+    spendable = balance_after_simulated_spend
     available = balance if settings["live"] else balance_after_simulated_spend
     affordable_budget = min(spendable, available)
     possible_buys = int(affordable_budget // order_quote)
@@ -324,11 +323,10 @@ def run_once(api, settings):
     seconds_left = max(60, (next_deposit - now).total_seconds())
     interval_seconds = max(60, int(seconds_left / possible_buys))
     LOG.info(
-        "Recalculated DCA schedule: balance=%s %s; fee buffer=%s%% (reserved=%s %s); "
-        "spendable=%s %s; price=%s %s/%s; estimated order=%s %s (%s %s); "
+        "Recalculated DCA schedule: balance=%s %s; spendable=%s %s; "
+        "price=%s %s/%s; estimated order=%s %s (%s %s); "
         "possible buys=%s; next deposit day=%s; purchase interval=%s minutes.",
-        balance, quote, settings["fee_buffer"], reserve, quote,
-        affordable_budget, quote, price, quote, base,
+        balance, quote, affordable_budget, quote, price, quote, base,
         order_amount, base, order_quote, quote, possible_buys,
         next_deposit.isoformat(), int(interval_seconds / 60),
     )
@@ -402,7 +400,6 @@ def main():
         "deposit_day": deposit_day,
         "timezone": os.getenv("TIMEZONE", "Europe/Berlin"),
         "live": os.getenv("LIVE_TRADING", "false").lower() == "true",
-        "fee_buffer": env_decimal("FEE_BUFFER_PERCENT", 1),
         "withdrawals_enabled": os.getenv("WITHDRAWALS_ENABLED", "false").lower() == "true",
         "withdraw_threshold": env_decimal("WITHDRAW_THRESHOLD_QUOTE", 1000),
         "withdraw_address": os.getenv("WITHDRAW_ADDRESS", "").strip(),
@@ -418,7 +415,6 @@ def main():
             raise ValueError("WITHDRAW_THRESHOLD_QUOTE must be greater than zero")
     interval = max(60, int(os.getenv("CHECK_INTERVAL_SECONDS", "300")))
     LOG.info("Starting on %s: %s; live trading=%s; quote currency=%s; requested buy amount=%s %s; deposit day=%s; timezone=%s; check interval=%ss", settings["exchange"], f"{settings['base']}-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], settings["base"], deposit_day, settings["timezone"], interval)
-    LOG.info("FEE_BUFFER_PERCENT=%s%%; applied to the current quote balance and excluded from the spendable purchase budget.", settings["fee_buffer"])
 
     if os.getenv("WEB_UI_ENABLED", "true").lower() == "true":
         port = int(os.getenv("WEB_UI_PORT", "8080"))
