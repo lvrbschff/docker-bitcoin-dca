@@ -20,9 +20,11 @@ Ein kleiner Docker-Dienst, der ein konfigurierbares Asset (standardmäßig BTC) 
 cp .env.example .env
 ```
 
-Trage in `.env` `DEPOSIT_DAY`, `BUY_AMOUNT` (Menge pro Kauf in `BASE_ASSET`), `QUOTE_CURRENCY` (z. B. `EUR` oder `USD`), `BASE_ASSET` (z. B. `BTC`) sowie Bitvavo-API-Zugangsdaten ein. Ein separates Monatsbudget ist nicht nötig: Es wird aus den abgeschlossenen Einzahlungen ermittelt. Mit `BUY_AMOUNT=0` wird die jeweils minimale erlaubte Menge gekauft. Starte zunächst mit `LIVE_TRADING=false` und prüfe die Container-Logs.
+Die nicht geheimen Einstellungen trägst du direkt in `docker-compose.yml` ein: `QUOTE_CURRENCY`, `BASE_ASSET`, `BUY_AMOUNT`, `DEPOSIT_DAY`, `TIMEZONE`, `LIVE_TRADING`, `CHECK_INTERVAL_SECONDS` und `FEE_BUFFER_PERCENT`. Ein separates Monatsbudget ist nicht nötig: Es wird aus den abgeschlossenen Einzahlungen ermittelt. Mit `BUY_AMOUNT: "0"` wird die jeweils minimale erlaubte Menge gekauft. Starte zunächst mit `LIVE_TRADING: "false"` und prüfe die Container-Logs.
 
-Für echte Käufe muss `LIVE_TRADING=true` gesetzt werden. Erstelle dafür einen Bitvavo-API-Key mit **View access** und **Trade digital assets**. **Withdraw digital assets darf nicht aktiviert sein.** Wenn möglich, begrenze den Schlüssel in Bitvavo auf die feste IP-Adresse des Hosts. API-Key und Secret nur als Umgebungsvariablen/Secrets bereitstellen und niemals committen.
+Für die Zugangsdaten kopiere `.env.example` nach `.env` und trage dort `BITVAVO_API_KEY` und `BITVAVO_API_SECRET` ein. Compose liest diese Variablen für die Platzhalter in `docker-compose.yml` ein. `.env` wird von Git ignoriert. API-Zugangsdaten direkt in die versionierte Compose-Datei einzutragen würde sie im öffentlichen GitHub-Repository veröffentlichen.
+
+Für echte Käufe ändere `LIVE_TRADING` in `docker-compose.yml` auf `"true"`. Erstelle dafür einen Bitvavo-API-Key mit **View access** und **Trade digital assets**. **Withdraw digital assets darf nicht aktiviert sein.** Wenn möglich, begrenze den Schlüssel in Bitvavo auf die feste IP-Adresse des Hosts.
 
 ```sh
 docker compose up -d --build

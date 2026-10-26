@@ -3,6 +3,16 @@ services:
     build: .
     container_name: bitvavo-dca
     restart: unless-stopped
-    env_file: .env
+    environment:
+      QUOTE_CURRENCY: EUR
+      BASE_ASSET: BTC
+      BUY_AMOUNT: "0"
+      DEPOSIT_DAY: "1"
+      TIMEZONE: Europe/Berlin
+      LIVE_TRADING: "false"
+      CHECK_INTERVAL_SECONDS: "300"
+      FEE_BUFFER_PERCENT: "1"
+      BITVAVO_API_KEY: ${BITVAVO_API_KEY:?Add BITVAVO_API_KEY to your untracked .env file}
+      BITVAVO_API_SECRET: ${BITVAVO_API_SECRET:?Add BITVAVO_API_SECRET to your untracked .env file}
     volumes:
       - ./state:/data
