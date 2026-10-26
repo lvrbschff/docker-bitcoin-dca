@@ -12,11 +12,11 @@ from reporting import parqet_csv, parqet_rows
 LOG = logging.getLogger("bitvavo-dca.web")
 
 HTML = """<!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bitvavo DCA · Portfolio</title>
+<title>Bitcoin DCA · Portfolio</title>
 <style>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#26324a;--text:#edf2ff;--muted:#9ba9c4;--accent:#8bafff;--green:#61d7ae;--red:#ff8f9e}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#1b2a49 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
@@ -31,69 +31,69 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 </style>
 </head>
 <body><main>
-<header class="top"><div><div class="eyebrow" id="exchangeName">Exchange · DCA</div><h1>Bitcoin-Übersicht</h1><p class="sub">Käufe, Gebühren, Auszahlungen und Parqet-Export</p></div><div class="badge">Nur lokal erreichbar</div></header>
+<header class="top"><div><div class="eyebrow" id="exchangeName">Exchange · DCA</div><h1>Bitcoin Portfolio</h1><p class="sub">Purchases, fees, withdrawals and Parqet exports</p></div><div class="badge">Local access only</div></header>
 <section class="panel">
 <div class="controls">
-<div class="field"><label for="interval">Auszahlungsintervall</label><select id="interval"></select></div>
-<div class="field"><label for="start">Von</label><input id="start" type="datetime-local"></div>
-<div class="field"><label for="end">Bis</label><input id="end" type="datetime-local"></div>
-<button id="refresh">Auswertung laden</button><button class="secondary" id="download">CSV herunterladen</button>
-</div><div id="error" class="error hidden"></div><div class="notice">Wähle ein Intervall zwischen zwei abgeschlossenen BTC-Auszahlungen oder lege den Zeitraum manuell fest.</div>
+<div class="field"><label for="interval">Withdrawal interval</label><select id="interval"></select></div>
+<div class="field"><label for="start">From</label><input id="start" type="datetime-local"></div>
+<div class="field"><label for="end">To</label><input id="end" type="datetime-local"></div>
+<button id="refresh">Load report</button><button class="secondary" id="download">Download Parqet CSV</button>
+</div><div id="error" class="error hidden"></div><div class="notice">Choose an interval between completed BTC withdrawals or set a custom date range. The CSV download is formatted for importing BTC activity into Parqet and uses the selected date range.</div>
 </section>
-<section class="panel"><h2>Bestand auf <span id="exchangeLabel">der Börse</span></h2><div class="grid">
-<div class="card"><label>Verfügbarer BTC-Bestand</label><div class="value" id="balance">—</div></div>
-<div class="card"><label>Aktueller BTC-Kurs</label><div class="value" id="spot">—</div></div>
-<div class="card"><label>Gegenwert des Bestands</label><div class="value" id="balanceValue">—</div></div>
-<div class="card"><label>Auszahlungsziel</label><div class="value" id="threshold">—</div><div class="small">Schwelle aus Compose</div></div>
+<section class="panel"><h2>Balance on <span id="exchangeLabel">the exchange</span></h2><div class="grid">
+<div class="card"><label>Available BTC balance</label><div class="value" id="balance">—</div></div>
+<div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div></div>
+<div class="card"><label>Balance value</label><div class="value" id="balanceValue">—</div></div>
+<div class="card"><label>Withdrawal threshold</label><div class="value" id="threshold">—</div><div class="small">Configured in Docker Compose</div></div>
 </div></section>
-<section class="panel"><h2>Auswertung des gewählten Zeitraums</h2><div class="grid">
-<div class="card"><label>BTC-Käufe</label><div class="value" id="buyCount">—</div><div class="small" id="buyBtc"></div></div>
-<div class="card"><label>Kaufvolumen</label><div class="value" id="buyVolume">—</div><div class="small" id="avgPrice"></div></div>
-<div class="card"><label>Handelsgebühren</label><div class="value" id="tradeFees">—</div></div>
-<div class="card"><label>Auszahlungen</label><div class="value" id="withdrawBtc">—</div><div class="small" id="withdrawCount"></div></div>
+<section class="panel"><h2>Selected period summary</h2><div class="grid">
+<div class="card"><label>BTC purchases</label><div class="value" id="buyCount">—</div><div class="small" id="buyBtc"></div></div>
+<div class="card"><label>Purchase volume</label><div class="value" id="buyVolume">—</div><div class="small" id="avgPrice"></div></div>
+<div class="card"><label>Trading fees</label><div class="value" id="tradeFees">—</div></div>
+<div class="card"><label>Withdrawals</label><div class="value" id="withdrawBtc">—</div><div class="small" id="withdrawCount"></div></div>
 </div><div class="grid" style="margin-top:14px">
-<div class="card"><label>Auszahlungsgebühren</label><div class="value" id="withdrawFees">—</div></div>
-<div class="card"><label>Netto-BTC im Zeitraum</label><div class="value" id="netBtc">—</div><div class="small">Käufe minus Auszahlungen</div></div>
-<div class="card"><label>Zeitraum</label><div class="value" id="periodLabel">—</div></div>
-<div class="card"><label>Aktualisiert</label><div class="value" id="updated">—</div></div>
+<div class="card"><label>Withdrawal fees</label><div class="value" id="withdrawFees">—</div></div>
+<div class="card"><label>Net BTC in period</label><div class="value" id="netBtc">—</div><div class="small">Purchases minus withdrawals</div></div>
+<div class="card"><label>Date range</label><div class="value" id="periodLabel">—</div></div>
+<div class="card"><label>Last updated</label><div class="value" id="updated">—</div></div>
 </div></section>
-<section class="panel"><h2>Aktivitäten</h2><div class="tablewrap"><table><thead><tr><th>Datum</th><th>Typ</th><th>BTC</th><th>Kurs</th><th>Wert</th><th>Gebühr</th></tr></thead><tbody id="activities"></tbody></table></div></section>
+<section class="panel"><h2>Activity</h2><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th></tr></thead><tbody id="activities"></tbody></table></div></section>
 </main>
 <script>
 const $=id=>document.getElementById(id);
 let quote="EUR", dataCurrency="EUR";
 function localInput(ms){const d=new Date(ms);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
 function parseInput(el){return new Date(el.value).getTime()}
-function money(v,c){try{return new Intl.NumberFormat("de-DE",{style:"currency",currency:c,maximumFractionDigits:2}).format(Number(v||0))}catch(e){return Number(v||0).toFixed(2)+" "+c}}
-function btc(v){return Number(v||0).toLocaleString("de-DE",{minimumFractionDigits:0,maximumFractionDigits:8})+" BTC"}
-function dateLabel(ms){return new Date(ms).toLocaleString("de-DE")}
+function money(v,c){try{return new Intl.NumberFormat("en-GB",{style:"currency",currency:c,maximumFractionDigits:2}).format(Number(v||0))}catch(e){return Number(v||0).toFixed(2)+" "+c}}
+function btc(v){return Number(v||0).toLocaleString("en-GB",{minimumFractionDigits:0,maximumFractionDigits:8})+" BTC"}
+function dateLabel(ms){return new Date(ms).toLocaleString("en-GB")}
 function showError(message){$("error").textContent=message||"";$("error").classList.toggle("hidden",!message)}
-function selectedPeriod(){const start=parseInput($("start")),end=parseInput($("end"));if(!Number.isFinite(start)||!Number.isFinite(end)||start>=end)throw new Error("Bitte einen gültigen Zeitraum wählen.");return {start:start,end:end}}
+function selectedPeriod(){const start=parseInput($("start")),end=parseInput($("end"));if(!Number.isFinite(start)||!Number.isFinite(end)||start>=end)throw new Error("Please choose a valid date range.");return {start:start,end:end}}
 async function loadIntervals(){
- const response=await fetch("/api/withdrawals");if(!response.ok)throw new Error("Auszahlungsverlauf konnte nicht geladen werden.");
+ const response=await fetch("/api/withdrawals");if(!response.ok)throw new Error("Could not load withdrawal history.");
  const withdrawals=await response.json();const select=$("interval");select.innerHTML="";
- const custom=document.createElement("option");custom.value="";custom.textContent="Manueller Zeitraum";select.appendChild(custom);
+ const custom=document.createElement("option");custom.value="";custom.textContent="Custom date range";select.appendChild(custom);
  for(let i=1;i<withdrawals.length;i++){const a=withdrawals[i-1],b=withdrawals[i],o=document.createElement("option");o.value=a.timestamp+","+b.timestamp;o.textContent=dateLabel(a.timestamp)+" → "+dateLabel(b.timestamp);select.appendChild(o)}
  const now=Date.now();if(withdrawals.length>=2){select.value=withdrawals[withdrawals.length-2].timestamp+","+withdrawals[withdrawals.length-1].timestamp}
  else {select.value="";$("start").value=localInput(withdrawals.length===1?withdrawals[0].timestamp:now-90*86400000);$("end").value=localInput(now)}
 }
 $("interval").addEventListener("change",()=>{if(!$("interval").value)return;const p=$("interval").value.split(",").map(Number);$("start").value=localInput(p[0]);$("end").value=localInput(p[1]);loadAnalytics()});
 async function loadAnalytics(){
- try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end);const d=await response.json();if(!response.ok)throw new Error(d.error||"Auswertung fehlgeschlagen.");quote=d.quote;dataCurrency=quote;const ex=d.exchange==="KRAKEN"?"Kraken":"Bitvavo";$("exchangeName").textContent=ex+" · DCA";$("exchangeLabel").textContent=ex;document.title=ex+" DCA · Portfolio";
+ try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end);const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load the report.");quote=d.quote;dataCurrency=quote;const ex=d.exchange==="KRAKEN"?"Kraken":"Bitvavo";$("exchangeName").textContent=ex+" · DCA";$("exchangeLabel").textContent=ex;document.title=ex+" DCA · Portfolio";
  $("balance").textContent=btc(d.snapshot.balance);$("spot").textContent=money(d.snapshot.price,quote)+"/BTC";$("balanceValue").textContent=money(d.snapshot.value,quote);
  $("threshold").textContent=money(d.snapshot.withdrawThreshold,quote);
  $("buyCount").textContent=d.summary.buyCount;$("buyBtc").textContent=btc(d.summary.boughtBtc);
- $("buyVolume").textContent=money(d.summary.buyVolume,quote);$("avgPrice").textContent="Durchschnitt: "+money(d.summary.averagePrice,quote)+"/BTC";
- $("tradeFees").textContent=money(d.summary.tradeFees,quote);$("withdrawBtc").textContent=btc(d.summary.withdrawnBtc);$("withdrawCount").textContent=d.summary.withdrawalCount+" abgeschlossene Auszahlungen";
+ $("buyVolume").textContent=money(d.summary.buyVolume,quote);$("avgPrice").textContent="Average: "+money(d.summary.averagePrice,quote)+"/BTC";
+ $("tradeFees").textContent=money(d.summary.tradeFees,quote);$("withdrawBtc").textContent=btc(d.summary.withdrawnBtc);$("withdrawCount").textContent=d.summary.withdrawalCount+" completed withdrawals";
  $("withdrawFees").textContent=money(d.summary.withdrawalFees,quote);$("netBtc").textContent=btc(d.summary.netBtc);
- $("periodLabel").textContent=new Date(p.start).toLocaleDateString("de-DE")+" – "+new Date(p.end).toLocaleDateString("de-DE");$("updated").textContent=new Date().toLocaleTimeString("de-DE");
+ $("periodLabel").textContent=new Date(p.start).toLocaleDateString("en-GB")+" – "+new Date(p.end).toLocaleDateString("en-GB");$("updated").textContent=new Date().toLocaleTimeString("en-GB");
  const body=$("activities");body.innerHTML="";
  for(const row of d.activities.slice().reverse()){const tr=document.createElement("tr"),vals=[dateLabel(Date.parse(row.datetime)),row.type,btc(row.shares),money(row.price,quote)+"/BTC",money(row.amount,quote),money(row.fee,quote)];vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i>=2)td.className="num";tr.appendChild(td)});body.appendChild(tr)}
- if(!d.activities.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=6;td.textContent="Keine BTC-Aktivitäten in diesem Zeitraum.";td.className="notice";tr.appendChild(td);body.appendChild(tr)}
+ if(!d.activities.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=6;td.textContent="No BTC activity in this period.";td.className="notice";tr.appendChild(td);body.appendChild(tr)}
  }catch(e){showError(e.message)}
 }
 $("refresh").addEventListener("click",loadAnalytics);
-$("download").addEventListener("click",async()=>{try{showError("");const p=selectedPeriod();const response=await fetch("/api/export.csv?start="+p.start+"&end="+p.end);if(!response.ok){const d=await response.json();throw new Error(d.error||"CSV-Export fehlgeschlagen.")}const blob=await response.blob(),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="parqet_btc_"+new Date(p.start).toISOString().slice(0,10)+"_"+new Date(p.end).toISOString().slice(0,10)+".csv";a.click();URL.revokeObjectURL(url)}catch(e){showError(e.message)}});
+$("download").addEventListener("click",async()=>{try{showError("");const p=selectedPeriod();const response=await fetch("/api/export.csv?start="+p.start+"&end="+p.end);if(!response.ok){const d=await response.json();throw new Error(d.error||"Could not generate the CSV export.")}const blob=await response.blob(),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="parqet_btc_"+new Date(p.start).toISOString().slice(0,10)+"_"+new Date(p.end).toISOString().slice(0,10)+".csv";a.click();URL.revokeObjectURL(url)}catch(e){showError(e.message)}});
 (async()=>{try{await loadIntervals();await loadAnalytics()}catch(e){showError(e.message)}})();
 </script></body></html>
 """
