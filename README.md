@@ -85,24 +85,24 @@ Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings 
 
 ### Bitvavo settings
 
-These variables are used only when `EXCHANGE=BITVAVO`. Put the API key and secret in .env. Set the withdrawal address and network in docker-compose.yml only if Bitvavo withdrawals are enabled.
+These variables are used only when `EXCHANGE=BITVAVO`. Put the API key and secret in .env. Set the withdrawal address and network in docker-compose.yml when `WITHDRAWALS_ENABLED=true` and `EXCHANGE=BITVAVO`.
 
 | Variable | Required when | Description |
 | --- | --- | --- |
 | `BITVAVO_API_KEY` | `EXCHANGE=BITVAVO` | Bitvavo API key in .env. |
 | `BITVAVO_API_SECRET` | `EXCHANGE=BITVAVO` | Bitvavo API secret in .env. |
-| `WITHDRAW_ADDRESS` | Bitvavo withdrawals enabled | Verified Bitvavo Bitcoin destination address in docker-compose.yml. |
-| `WITHDRAW_NETWORK` | Bitvavo withdrawals enabled | Bitvavo withdrawal network in docker-compose.yml. |
+| `WITHDRAW_ADDRESS` | `WITHDRAWALS_ENABLED=true` and `EXCHANGE=BITVAVO` | Verified Bitvavo Bitcoin destination address in docker-compose.yml. |
+| `WITHDRAW_NETWORK` | `WITHDRAWALS_ENABLED=true` and `EXCHANGE=BITVAVO` | Bitvavo withdrawal network in docker-compose.yml. |
 
 ### Kraken settings
 
-These variables are used only when `EXCHANGE=KRAKEN`. Put the API key and secret in .env. The withdrawal method name is required only if Kraken withdrawals are enabled.
+These variables are used only when `EXCHANGE=KRAKEN`. Put the API key and secret in .env. The withdrawal method name is required when `WITHDRAWALS_ENABLED=true` and `EXCHANGE=KRAKEN`.
 
 | Variable | Required when | Description |
 | --- | --- | --- |
 | `KRAKEN_API_KEY` | `EXCHANGE=KRAKEN` | Kraken API key in .env. |
 | `KRAKEN_API_SECRET` | `EXCHANGE=KRAKEN` | Kraken API secret in .env. |
-| `KRAKEN_WITHDRAW_KEY` | Kraken withdrawals enabled | Name of the saved Bitcoin withdrawal method in Kraken; set it in .env. |
+| `KRAKEN_WITHDRAW_KEY` | `WITHDRAWALS_ENABLED=true` and `EXCHANGE=KRAKEN` | Name of the saved Bitcoin withdrawal method in Kraken; set it in .env. |
 
 ### Web UI port
 
