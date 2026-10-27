@@ -228,3 +228,10 @@ The workflow in .github/workflows/publish.yml builds and publishes the image to 
 This software is provided “as is” and “as available”, without warranties. It is not investment, tax, or legal advice. You are responsible for reviewing the code and configuration, protecting API credentials, monitoring the bot, and verifying orders, withdrawals, fees, and exports.
 
 To the fullest extent permitted by applicable law, the maintainer assumes no liability for financial losses, missed or unexpected trades, fees, withdrawal errors, exchange or API outages, data loss, or other damages arising from use of, or inability to use, this software. Nothing in this statement excludes liability that cannot legally be excluded.
+
+## Support the project
+
+If you enjoy using this bot and would like to support its development, you can buy me a coffee:
+
+- PayPal: [paypal.me/bischoffoliver](https://paypal.me/bischoffoliver)
+- Bitcoin (BTC): `bc1qg7crlvea9rsacfgnujhrjy6judvjnkjz9crvvq`
