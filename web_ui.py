@@ -41,7 +41,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <div class="field"><label for="start">From</label><input id="start" type="datetime-local"></div>
 <div class="field"><label for="end">To</label><input id="end" type="datetime-local"></div>
 <button id="refresh">Load report</button>
-</div><div id="error" class="error hidden"></div><div class="notice">Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The CSV is formatted for importing real bot-recorded BTC activity into Parqet. Dry-run purchases are shown separately with an estimated taker fee based on your current exchange fee tier, and are excluded from the CSV. Delete removes a purchase from local history only; it cannot reverse an exchange order.</div>
+</div><div id="error" class="error hidden"></div><div class="notice">Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The Parqet CSV consolidates the period into one purchase: all real purchase costs and trading fees in EUR, and net BTC received at withdrawals after network fees. The period must contain purchases and a bot-recorded withdrawal. Dry-run purchases are shown separately and excluded from the CSV. Delete removes a purchase from local history only; it cannot reverse an exchange order.</div>
 </section>
 <section class="panel"><h2>Bot-tracked portfolio</h2><div class="grid">
 <div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
@@ -154,7 +154,7 @@ async function loadAnalytics(){
  }catch(e){showError(e.message)}
 }
 $("refresh").addEventListener("click",loadAnalytics);
-$("download").addEventListener("click",async()=>{try{showError("");const p=selectedPeriod();const response=await fetch("/api/export.csv?start="+p.start+"&end="+p.end);if(!response.ok){const d=await response.json();throw new Error(d.error||"Could not generate the CSV export.")}const blob=await response.blob(),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="parqet_btc_"+new Date(p.start).toISOString().slice(0,10)+"_"+new Date(p.end).toISOString().slice(0,10)+".csv";a.click();URL.revokeObjectURL(url)}catch(e){showError(e.message)}});
+$("download").addEventListener("click",async()=>{try{showError("");const p=selectedPeriod();const response=await fetch("/api/export.csv?start="+p.start+"&end="+p.end);if(!response.ok){const d=await response.json();throw new Error(d.error||"Could not generate the CSV export.")}const blob=await response.blob(),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="parqet_crypto_"+new Date(p.start).toISOString().slice(0,10)+"_"+new Date(p.end).toISOString().slice(0,10)+".csv";a.click();URL.revokeObjectURL(url)}catch(e){showError(e.message)}});
 (async()=>{try{await loadIntervals();await loadAnalytics()}catch(e){showError(e.message)}})();
 </script></body></html>
 """
