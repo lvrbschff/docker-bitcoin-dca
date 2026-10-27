@@ -1,6 +1,7 @@
 """Local read-only portfolio dashboard and on-demand Parqet export."""
 import base64
 import hmac
+import html
 import json
 import logging
 import os
@@ -9,8 +10,12 @@ import requests
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
+from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
+from secrets import token_urlsafe
+from threading import RLock
+import time
 
 from activity import delete_activity_record, read_activity_records, read_dashboard_snapshot
 from reporting import parqet_aggregate_rows, parqet_csv
@@ -163,6 +168,47 @@ $("download").addEventListener("click",async()=>{try{showError("");const p=selec
 """
 
 
+LOGIN_HTML = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · DCA Crypto Bot</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#26324a;--text:#edf2ff;--muted:#9ba9c4;--accent:#8bafff;--red:#ff8f9e}
+*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:22px;background:radial-gradient(ellipse at 15% 0%,#1b2a49 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+.card{width:min(100%,420px);padding:32px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,rgba(21,31,52,.98),rgba(15,22,39,.98));box-shadow:0 18px 48px #0005}
+.eyebrow{color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}h1{font-size:27px;margin:6px 0 4px}.sub{color:var(--muted);margin:0 0 24px}
+label{display:block;color:var(--muted);font-size:12px;margin:15px 0 6px}input{width:100%;padding:12px 13px;color:var(--text);background:#0c1425;border:1px solid var(--line);border-radius:10px;font:inherit;outline:none}input:focus{border-color:var(--accent);box-shadow:0 0 0 3px #8bafff22}
+button{width:100%;margin-top:22px;padding:12px;border:1px solid var(--accent);border-radius:10px;background:var(--accent);color:#081122;font:inherit;font-weight:700;cursor:pointer}button:hover{filter:brightness(1.08)}
+.error{min-height:20px;margin:12px 0 0;color:var(--red);font-size:13px}.foot{margin-top:20px;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body><main class="card">
+<div class="eyebrow">Local access only</div>
+<h1>DCA Crypto Bot</h1>
+<p class="sub">Sign in to view your portfolio and activity.</p>
+<form method="post" action="/login">
+<label for="username">Username</label>
+<input id="username" name="username" type="text" autocomplete="username" required autofocus>
+<label for="password">Password</label>
+<input id="password" name="password" type="password" autocomplete="current-password" required>
+<button type="submit">Sign in</button>
+</form>
+<p class="error">{{ERROR}}</p>
+<p class="foot">Your dashboard is available only on the Docker host.</p>
+</main></body></html>
+"""
+
+SESSION_TTL_SECONDS = 12 * 60 * 60
+_SESSION_LOCK = RLock()
+_SESSIONS = {}
+
+
+def _login_page(error=""):
+    return LOGIN_HTML.replace("{{ERROR}}", html.escape(error))
+
+
 class _PageTextParser(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -258,37 +304,94 @@ class Handler(BaseHTTPRequestHandler):
     def _json(self, status, obj):
         self._send(status, json.dumps(obj, ensure_ascii=False).encode("utf-8"))
 
-    def _require_authentication(self):
-        header = self.headers.get("Authorization", "")
+    def _has_valid_session(self):
         try:
-            scheme, separator, encoded = header.partition(" ")
-            if not separator or scheme.lower() != "basic":
-                raise ValueError("Missing Basic authentication")
-            decoded = base64.b64decode(encoded, validate=True).decode("utf-8")
-            username, separator, password = decoded.partition(":")
-            if not separator:
-                raise ValueError("Malformed Basic authentication")
+            cookies = SimpleCookie(self.headers.get("Cookie", ""))
+            morsel = cookies.get("dca_session")
+        except CookieError:
+            return False
+        if morsel is None:
+            return False
+        token = morsel.value
+        now = time.monotonic()
+        with _SESSION_LOCK:
+            expires_at = _SESSIONS.get(token)
+            if expires_at is None:
+                return False
+            if expires_at <= now:
+                _SESSIONS.pop(token, None)
+                return False
+            return True
+
+    def _require_authentication(self):
+        if self._has_valid_session():
+            return True
+        self._json(401, {"error": "Authentication required"})
+        return False
+
+    def _handle_login(self):
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length <= 0 or length > 4096:
+                raise ValueError("Invalid login request")
+            form = parse_qs(self.rfile.read(length).decode("utf-8"), keep_blank_values=True)
+            username = form.get("username", [""])[0]
+            password = form.get("password", [""])[0]
         except (ValueError, UnicodeDecodeError):
-            username, password = "", ""
+            self._send(400, _login_page("Please enter your username and password."), "text/html; charset=utf-8")
+            return
 
         expected_username = (os.getenv("WEB_UI_USERNAME", "admin") or "admin").encode("utf-8")
         expected_password = (os.getenv("WEB_UI_PASSWORD", "admin") or "admin").encode("utf-8")
         username_matches = hmac.compare_digest(username.encode("utf-8"), expected_username)
         password_matches = hmac.compare_digest(password.encode("utf-8"), expected_password)
-        if username_matches and password_matches:
-            return True
+        if not (username_matches and password_matches):
+            self._send(401, _login_page("The username or password is incorrect."), "text/html; charset=utf-8")
+            return
 
-        self.send_response(401)
-        self.send_header("WWW-Authenticate", 'Basic realm="DCA Crypto Bot", charset="UTF-8"')
-        self.send_header("Content-Length", "0")
+        token = token_urlsafe(32)
+        now = time.monotonic()
+        with _SESSION_LOCK:
+            expired = [key for key, expiry in _SESSIONS.items() if expiry <= now]
+            for key in expired:
+                _SESSIONS.pop(key, None)
+            _SESSIONS[token] = now + SESSION_TTL_SECONDS
+        self.send_response(303)
+        self.send_header(
+            "Set-Cookie",
+            f"dca_session={token}; Path=/; Max-Age={SESSION_TTL_SECONDS}; HttpOnly; SameSite=Strict",
+        )
+        self.send_header("Location", "/")
         self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", "0")
         self.end_headers()
-        return False
+
+    def _handle_logout(self):
+        try:
+            cookies = SimpleCookie(self.headers.get("Cookie", ""))
+            morsel = cookies.get("dca_session")
+        except CookieError:
+            morsel = None
+        if morsel is not None:
+            with _SESSION_LOCK:
+                _SESSIONS.pop(morsel.value, None)
+        self.send_response(303)
+        self.send_header("Set-Cookie", "dca_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict")
+        self.send_header("Location", "/")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def do_POST(self):
+        parsed = urlparse(self.path)
+        if parsed.path == "/login":
+            self._handle_login()
+            return
+        if parsed.path == "/logout":
+            self._handle_logout()
+            return
         if not self._require_authentication():
             return
-        parsed = urlparse(self.path)
         if parsed.path != "/api/activity/delete":
             self._json(404, {"error": "Not found"})
             return
@@ -308,9 +411,12 @@ class Handler(BaseHTTPRequestHandler):
             self._json(400, {"error": str(exc)})
 
     def do_GET(self):
+        parsed = urlparse(self.path)
+        if parsed.path == "/" and not self._has_valid_session():
+            self._send(200, _login_page(), "text/html; charset=utf-8")
+            return
         if not self._require_authentication():
             return
-        parsed = urlparse(self.path)
         if parsed.path == "/":
             self._send(200, HTML, "text/html; charset=utf-8")
             return
