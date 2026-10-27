@@ -6,7 +6,7 @@ A Docker-based DCA bot for buying Bitcoin with fiat deposits on Bitvavo or Krake
 
 The image below is an illustrative screenshot with fictional values; it does not show real balances or activity.
 
-![Bitcoin DCA web UI example using fictional data](docs/web-ui-example.svg)
+![Bitcoin DCA web UI example using fictional data](docs/web-ui-example-current.svg)
 
 ## What you need
 
