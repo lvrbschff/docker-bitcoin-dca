@@ -52,10 +52,10 @@
  <rect x="84" y="394" width="400" height="106" rx="14" class="card"/>
  <text x="104" y="423" class="label">Bot-tracked BTC</text><text x="104" y="466" class="value">0.01543210 BTC</text>
  <rect x="520" y="394" width="400" height="106" rx="14" class="card"/>
- <text x="540" y="423" class="label">Current BTC price</text><text x="540" y="466" class="value">€67,250.10 / BTC</text>
+ <text x="540" y="423" class="label">Current BTC price</text><text x="540" y="466" class="value">€67,595.00 / BTC</text>
  <text x="540" y="488" class="small">Kraken public price page · fetched 14:20</text>
  <rect x="956" y="394" width="400" height="106" rx="14" class="card"/>
- <text x="976" y="423" class="label">Value in fiat currency</text><text x="976" y="466" class="value">€1,037.81</text>
+ <text x="976" y="423" class="label">Value in fiat currency</text><text x="976" y="466" class="value">€1,043.29</text>
 </g>
 <!-- Settings -->
 <rect x="60" y="548" width="1320" height="252" rx="18" class="panel"/>
@@ -79,7 +79,7 @@
  <rect x="340" y="872" width="240" height="110" rx="12" class="card"/><text x="356" y="898" class="label">Purchase volume</text><text x="356" y="932" class="value" font-size="20">€28.25</text><text x="356" y="957" class="small">Average: €67,261 / BTC</text>
  <rect x="596" y="872" width="240" height="110" rx="12" class="card"/><text x="612" y="898" class="label">Trading fees</text><text x="612" y="932" class="value" font-size="20">€0.08</text>
  <rect x="852" y="872" width="240" height="110" rx="12" class="card"/><text x="868" y="898" class="label">Withdrawals</text><text x="868" y="932" class="value" font-size="20">0.00000000 BTC</text><text x="868" y="957" class="small">0 withdrawals</text>
- <rect x="1108" y="872" width="248" height="110" rx="12" class="card"/><text x="1124" y="898" class="label">Profit / loss</text><text x="1124" y="932" class="value green" font-size="20">+€0.14</text><text x="1124" y="957" class="small">Period purchases, current price</text>
+ <rect x="1108" y="872" width="248" height="110" rx="12" class="card"/><text x="1124" y="898" class="label">Profit / loss</text><text x="1124" y="932" class="value green" font-size="20">+€0.06</text><text x="1124" y="957" class="small">Period purchases, current price</text>
 </g>
 <!-- Activity -->
 <rect x="60" y="1026" width="1320" height="218" rx="18" class="panel"/>
