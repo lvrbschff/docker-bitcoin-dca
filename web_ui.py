@@ -53,7 +53,8 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <h2>Bot settings</h2>
 <div class="grid">
 <div class="card"><label>Exchange</label><div class="value" id="settingExchange">—</div></div>
-<div class="card"><label>Cryptocurrency (BASE_ASSET)</label><div class="value" id="baseAsset">—</div></div>\n<div class="card"><label>Quote currency (QUOTE_CURRENCY)</label><div class="value" id="settingQuoteCurrency">—</div></div>
+<div class="card"><label>Cryptocurrency (BASE_ASSET)</label><div class="value" id="baseAsset">—</div></div>
+<div class="card"><label>Quote currency (QUOTE_CURRENCY)</label><div class="value" id="settingQuoteCurrency">—</div></div>
 <div class="card"><label>Trading mode (LIVE_TRADING)</label><div class="value" id="tradingMode">—</div></div>
 <div class="card"><label>Purchase amount (BUY_AMOUNT)</label><div class="value" id="buyAmount">—</div></div>
 <div class="card"><label>Deposit day (DEPOSIT_DAY)</label><div class="value" id="depositDay">—</div></div>
@@ -359,7 +360,8 @@ def _analytics_from_rows(settings, records, snapshot):
         "exchange": settings["exchange"],
         "configuration": {
             "liveTrading": bool(settings["live"]),
-            "buyAmount": str(settings["buy_amount"]),\n            "baseAsset": settings["base"],
+            "buyAmount": str(settings["buy_amount"]),
+            "baseAsset": settings["base"],
             "depositDay": int(settings["deposit_day"]),
             "withdrawalsEnabled": bool(settings["withdrawals_enabled"]),
             "withdrawalThreshold": str(settings["withdraw_threshold"]),
