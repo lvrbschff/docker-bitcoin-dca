@@ -43,7 +43,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 </section>
 <section class="panel"><h2>Bot-tracked portfolio</h2><div class="grid">
 <div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
-<div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Public CoinGecko page</div></div>
+<div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public ticker</div></div>
 <div class="card"><label>Value in fiat currency</label><div class="value" id="balanceValue">—</div></div>
 </div></section>
 <section class="panel">
@@ -114,10 +114,19 @@ async function loadAnalytics(){
  try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end);const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load the report.");quote=d.quote;
  if(!displayCurrency){const saved=localStorage.getItem("bitcoinDcaDisplayCurrency");displayCurrency=["EUR","USD"].includes(saved)?saved:(["EUR","USD"].includes(quote)?quote:"EUR")}
  $("displayCurrency").value=displayCurrency;
- const priceResponse=await fetch("/api/market-price?currency="+displayCurrency);const market=await priceResponse.json();if(!priceResponse.ok)throw new Error(market.error||"Could not load current BTC price.");
- fxRate=Number(market.conversionRate);const livePrice=Number(market.price);const ex=d.exchange==="KRAKEN"?"Kraken":"Bitvavo";$("exchangeName").textContent=ex+" · DCA";document.title=ex+" DCA · Portfolio";
- $("balance").textContent=btc(d.snapshot.balance);$("spot").textContent=money(livePrice,displayCurrency)+"/BTC";$("spotUpdated").textContent="Public CoinGecko page · fetched "+new Date(Number(market.updatedAt)*1000).toLocaleTimeString("en-GB");
- $("balanceValue").textContent=money(Number(d.snapshot.balance)*livePrice,displayCurrency);
+ const ex=d.exchange==="KRAKEN"?"Kraken":"Bitvavo";$("exchangeName").textContent=ex+" · DCA";document.title=ex+" DCA · Portfolio";
+ let livePrice=Number((d.snapshot||{}).price||0);
+ try{
+  const priceResponse=await fetch("/api/market-price?currency="+displayCurrency);const market=await priceResponse.json();if(!priceResponse.ok)throw new Error(market.error||"Could not load current BTC price.");
+  fxRate=Number(market.conversionRate);livePrice=Number(market.price);
+  $("spotUpdated").textContent="Kraken public ticker · fetched "+new Date(Number(market.updatedAt)*1000).toLocaleTimeString("en-GB");
+ }catch(priceError){
+  displayCurrency=quote;fxRate=1;$("displayCurrency").value=quote;
+  $("spotUpdated").textContent=livePrice>0?"Last price saved by the bot":"Live price unavailable";
+  showError("Could not fetch a live BTC price. Showing saved activity and values in "+quote+" where available.");
+ }
+ $("balance").textContent=btc(d.snapshot.balance);$("spot").textContent=livePrice>0?money(livePrice,displayCurrency)+"/BTC":"—";
+ $("balanceValue").textContent=livePrice>0?money(Number(d.snapshot.balance)*livePrice,displayCurrency):"—";
  $("settingExchange").textContent=ex;$("settingQuoteCurrency").textContent=quote;$("tradingMode").textContent=d.configuration.liveTrading?"Live":"Dry run";
  $("buyAmount").textContent=Number(d.configuration.buyAmount)===0?"Exchange minimum":btc(d.configuration.buyAmount);
  $("depositDay").textContent=String(d.configuration.depositDay);$("withdrawEnabled").textContent=d.configuration.withdrawalsEnabled?"Enabled":"Disabled";
