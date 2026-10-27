@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from activity import delete_activity_record, read_activity_records, read_dashboard_snapshot
-from reporting import parqet_csv
+from reporting import parqet_aggregate_rows, parqet_csv
 
 LOG = logging.getLogger("bitvavo-dca.web")
 
@@ -315,8 +315,15 @@ class Handler(BaseHTTPRequestHandler):
                     if start_ms < _row_timestamp_ms(record["row"]) <= end_ms
                 ]
                 if parsed.path == "/api/export.csv":
-                    rows = [record["row"] for record in selected_records if not record.get("simulated")]
-                    filename = "parqet_btc_" + str(start_ms) + "_" + str(end_ms) + ".csv"
+                    rows = parqet_aggregate_rows(
+                        selected_records, self.settings["exchange"], self.settings["base"]
+                    )
+                    if not rows:
+                        raise ValueError(
+                            "The selected period must contain at least one real purchase "
+                            "and one bot-recorded BTC withdrawal."
+                        )
+                    filename = "parqet_" + self.settings["base"].lower() + "_" + str(start_ms) + "_" + str(end_ms) + ".csv"
                     self._send(200, parqet_csv(rows), "text/csv; charset=utf-8", filename)
                 else:
                     result = _analytics_from_rows(
