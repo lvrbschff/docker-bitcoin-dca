@@ -10,7 +10,7 @@ The image below is an illustrative screenshot with fictional values; it does not
 
 ## What you need
 
-- Docker Engine and the Docker Compose plugin
+- An always-on server or host (for example, a VPS, home server, or NAS) running Docker Engine and the Docker Compose plugin
 - An account at Bitvavo or Kraken
 - API credentials for the exchange you select
 - For automatic withdrawals: a verified Bitvavo withdrawal address, or a saved Bitcoin withdrawal method on Kraken
