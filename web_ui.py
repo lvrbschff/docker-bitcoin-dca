@@ -51,6 +51,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <div class="settings-heading"><h2>Bot settings</h2><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div>
 <div class="grid">
 <div class="card"><label>Exchange</label><div class="value" id="settingExchange">—</div></div>
+<div class="card"><label>Quote currency (QUOTE_CURRENCY)</label><div class="value" id="settingQuoteCurrency">—</div></div>
 <div class="card"><label>Trading mode (LIVE_TRADING)</label><div class="value" id="tradingMode">—</div></div>
 <div class="card"><label>Purchase amount (BUY_AMOUNT)</label><div class="value" id="buyAmount">—</div></div>
 <div class="card"><label>Deposit day (DEPOSIT_DAY)</label><div class="value" id="depositDay">—</div></div>
@@ -119,7 +120,7 @@ async function loadAnalytics(){
  fxRate=Number(market.conversionRate);const livePrice=Number(market.price);const ex=d.exchange==="KRAKEN"?"Kraken":"Bitvavo";$("exchangeName").textContent=ex+" · DCA";document.title=ex+" DCA · Portfolio";
  $("balance").textContent=btc(d.snapshot.balance);$("spot").textContent=money(livePrice,displayCurrency)+"/BTC";$("spotUpdated").textContent="CoinGecko · "+new Date(Number(market.updatedAt)*1000).toLocaleTimeString("en-GB");
  $("balanceValue").textContent=money(Number(d.snapshot.balance)*livePrice,displayCurrency);
- $("settingExchange").textContent=ex;$("tradingMode").textContent=d.configuration.liveTrading?"Live":"Dry run";
+ $("settingExchange").textContent=ex;$("settingQuoteCurrency").textContent=quote;$("tradingMode").textContent=d.configuration.liveTrading?"Live":"Dry run";
  $("buyAmount").textContent=Number(d.configuration.buyAmount)===0?"Exchange minimum":btc(d.configuration.buyAmount);
  $("depositDay").textContent=String(d.configuration.depositDay);$("withdrawEnabled").textContent=d.configuration.withdrawalsEnabled?"Enabled":"Disabled";
  $("threshold").textContent=money(Number(d.configuration.withdrawalThreshold)*fxRate,displayCurrency);
@@ -292,7 +293,7 @@ def _row_timestamp_ms(row):
 
 
 def _analytics_from_rows(settings, records, snapshot):
-    quote = snapshot.get("quote", settings["quote"])
+    quote = settings["quote"]
     actual_rows = [record["row"] for record in records if not record.get("simulated")]
     simulated_rows = [record["row"] for record in records if record.get("simulated")]
     buys = [row for row in actual_rows if row["type"] == "Buy"]
@@ -308,7 +309,7 @@ def _analytics_from_rows(settings, records, snapshot):
     value = Decimal(str(snapshot.get("value", balance * price)))
     return {
         "quote": quote,
-        "exchange": snapshot.get("exchange", settings["exchange"]),
+        "exchange": settings["exchange"],
         "configuration": {
             "liveTrading": bool(settings["live"]),
             "buyAmount": str(settings["buy_amount"]),
