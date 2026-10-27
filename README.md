@@ -161,13 +161,28 @@ The local activity history starts when this version is deployed; earlier bot ord
 
 ## Logs
 
-View the container logs with:
+The bot writes logs to the container's standard output and error streams. Each entry includes a timestamp, severity level, and message. The default level is `INFO`; change it with `LOG_LEVEL` in `docker-compose.yml`.
+
+View live logs or inspect recent entries with:
 
 ~~~sh
 docker compose logs -f
+docker compose logs --tail=200
 ~~~
 
-The logs show startup settings, balance checks, calculated purchase intervals, submitted orders, withdrawal activity, and errors returned by the selected exchange. Do not share logs without checking them for account-specific information.
+The logs include:
+
+- **Startup configuration:** selected exchange and market, live or dry-run mode, quote currency, configured `BUY_AMOUNT` and whether the exchange minimum will be used, deposit day, startup delay, timezone, and retry interval.
+- **Startup and purchase timing:** the wait for `FIRST_BUY_DELAY_SECONDS`, whether a previous real purchase was found in persistent activity, recalculated purchase interval, and estimated next purchase time in local time.
+- **Schedule inputs:** available and spendable quote balance, current BTC price, effective order size and estimated quote cost, estimated number of possible buys, and next deposit date. These appear in the `Recalculated DCA schedule` entry.
+- **Orders:** dry-run messages say what the bot would buy and confirm the simulated activity record. Live-order messages include the submitted amount, estimated cost, order status and exchange order ID, plus the number of activity records saved.
+- **Withdrawals:** threshold checks, submitted BTC amount, estimated value, withdrawal ID, and warnings when a request's outcome needs checking.
+- **Waiting and errors:** reasons a purchase cannot proceed, such as insufficient balance or a market that is not trading, along with exchange/API errors and reconciliation messages for unresolved orders.
+- **Web UI requests:** HTTP requests to the local dashboard and its API endpoints.
+
+For example, a `Recalculated DCA schedule` line tells you the balance and current market price used for the calculation, the estimated order size and cost, how many buys the balance could cover, and the calculated interval. A following `Next purchase` or restart-alignment line reports the wait and estimated local purchase time.
+
+Logs may contain account balances, trade amounts, prices, and exchange order or withdrawal IDs. Review them before sharing publicly.
 
 ## Project structure and Docker files
 
