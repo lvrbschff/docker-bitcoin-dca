@@ -45,7 +45,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 </section>
 <section class="panel"><h2>Bot-tracked portfolio</h2><div class="grid">
 <div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
-<div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">CoinGecko</div></div>
+<div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Public CoinGecko page</div></div>
 <div class="card"><label>Value in fiat currency</label><div class="value" id="balanceValue">—</div></div>
 </div></section>
 <section class="panel">
@@ -58,7 +58,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <div class="card"><label>Deposit day (DEPOSIT_DAY)</label><div class="value" id="depositDay">—</div></div>
 <div class="card"><label>Automatic withdrawals (WITHDRAWALS_ENABLED)</label><div class="value" id="withdrawEnabled">—</div></div>
 <div class="card"><label>Withdrawal threshold (WITHDRAW_THRESHOLD_QUOTE)</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured environment variable</div></div>
-</div><div class="notice">Fiat values are converted to the selected display currency. The market price is fetched from CoinGecko when the report loads. Parqet CSV exports retain the currency in which each transaction was recorded.</div>
+</div><div class="notice">Fiat values are converted to the selected display currency. The current market price is fetched from CoinGecko’s public BTC/EUR and BTC/USD pages when the report loads. Parqet CSV exports retain the currency in which each transaction was recorded.</div>
 </section>
 <section class="panel"><h2>Selected period summary</h2><div class="grid">
 <div class="card"><label>BTC purchases</label><div class="value" id="buyCount">—</div><div class="small" id="buyBtc"></div></div>
