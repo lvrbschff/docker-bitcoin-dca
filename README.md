@@ -155,9 +155,9 @@ Choose an interval between bot-recorded Bitcoin withdrawals or enter custom star
 
 ## Parqet CSV exports
 
-The bot does not create Parqet CSV files automatically. To export, select a period in the web UI and click **Download Parqet CSV**. The file contains only purchases and withdrawals recorded from this bot, uses Parqet's semicolon-separated activity format, and can be imported with Parqet's [CSV activity import](https://faq.parqet.com/de/articles/870989-csv-import-aktivitaten-aus-einer-eigenen-csv-datei-importieren).
+The bot does not create Parqet CSV files automatically. To export, select a period in the web UI and click **Download Parqet CSV**. The selected period is condensed into exactly one Parqet **Buy** row: its total purchase cost is the sum of all real bot purchases plus their trading fees, converted to EUR using the historical daily USD/EUR reference rate when a purchase was made in USD. Its BTC quantity is the sum of the net BTC amounts recorded as received at bot-recorded withdrawals, after network fees. The row is dated at the latest withdrawal in the selected period. A period must contain at least one real purchase and one bot-recorded BTC withdrawal to produce a row. Simulated purchases are excluded. The CSV uses Parqet's semicolon-separated activity format and can be imported with Parqet's [CSV activity import](https://faq.parqet.com/de/articles/870989-csv-import-aktivitaten-aus-einer-eigenen-csv-datei-importieren).
 
-The local activity history starts when this version is deployed; earlier bot orders are not backfilled automatically. The export uses the saved transaction amounts, prices, and fees, so generating it does not query Kraken or Bitvavo for transaction history.
+The local activity history starts when this version is deployed; earlier bot orders are not backfilled automatically. Purchase amounts and fees come from stored bot activity. When USD purchases need conversion, export fetches the required historical daily rates from the public Frankfurter API; generating the export does not query Kraken or Bitvavo for transaction history.
 
 ## Logs
 
