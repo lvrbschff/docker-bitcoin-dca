@@ -1,9 +1,7 @@
 """Local read-only portfolio dashboard and on-demand Parqet export."""
 import json
 import logging
-import re
 import requests
-from html.parser import HTMLParser
 from datetime import datetime, timezone
 from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -58,7 +56,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <div class="card"><label>Deposit day (DEPOSIT_DAY)</label><div class="value" id="depositDay">—</div></div>
 <div class="card"><label>Automatic withdrawals (WITHDRAWALS_ENABLED)</label><div class="value" id="withdrawEnabled">—</div></div>
 <div class="card"><label>Withdrawal threshold (WITHDRAW_THRESHOLD_QUOTE)</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured environment variable</div></div>
-</div><div class="notice">Fiat values are converted to the selected display currency. The current market price is fetched from CoinGecko’s public BTC/EUR and BTC/USD pages when the report loads. Parqet CSV exports retain the currency in which each transaction was recorded.</div>
+</div><div class="notice">Fiat values are converted to the selected display currency. The current BTC price is fetched from Kraken’s public market ticker when the report loads. Parqet CSV exports retain the currency in which each transaction was recorded.</div>
 </section>
 <section class="panel"><h2>Selected period summary</h2><div class="grid">
 <div class="card"><label>BTC purchases</label><div class="value" id="buyCount">—</div><div class="small" id="buyBtc"></div></div>
@@ -139,46 +137,32 @@ $("download").addEventListener("click",async()=>{try{showError("");const p=selec
 """
 
 
-class _PageTextParser(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.parts = []
-
-    def handle_data(self, data):
-        if data and data.strip():
-            self.parts.append(data.strip())
-
-
-def _public_page_btc_price(currency):
+def _kraken_public_btc_price(currency):
     currency = currency.upper()
     if currency not in ("EUR", "USD"):
         raise ValueError("Display currency and QUOTE_CURRENCY must be EUR or USD")
-    url = f"https://www.coingecko.com/en/coins/bitcoin/{currency.lower()}"
     response = requests.get(
-        url,
-        headers={
-            "User-Agent": "Mozilla/5.0 (compatible; BitcoinDCA/1.0)",
-            "Accept": "text/html,application/xhtml+xml",
-        },
-        timeout=15,
+        "https://api.kraken.com/0/public/Ticker",
+        params={"pair": f"XBT{currency}"},
+        headers={"Accept": "application/json", "User-Agent": "BitcoinDCA/1.0"},
+        timeout=10,
     )
     response.raise_for_status()
-    parser = _PageTextParser()
-    parser.feed(response.text)
-    page_text = " ".join(" ".join(parser.parts).split())
-    number = r"([0-9][0-9,]*(?:\.[0-9]+)?)"
-    patterns = (
-        rf"current BTC to {currency} conversion rate is\s*[^0-9]*{number}",
-        rf"price of converting 1 Bitcoin \(BTC\) to {currency} is\s*[^0-9]*{number}",
-        rf"BTC\s*/\s*{currency}\s*#1\s*[^0-9]*{number}",
-    )
-    for pattern in patterns:
-        match = re.search(pattern, page_text, flags=re.IGNORECASE)
-        if match:
-            price = Decimal(match.group(1).replace(",", ""))
-            if price > 0:
-                return price
-    raise ValueError(f"Could not find the BTC/{currency} price in the public CoinGecko page")
+    payload = response.json()
+    errors = payload.get("error") or []
+    if errors:
+        raise RuntimeError("Kraken public ticker error: " + "; ".join(errors))
+    result = payload.get("result") or {}
+    if not result:
+        raise RuntimeError(f"Kraken returned no BTC/{currency} ticker data")
+    try:
+        ticker = next(iter(result.values()))
+        price = Decimal(str(ticker["c"][0]))
+    except (KeyError, IndexError, TypeError, ValueError, StopIteration) as exc:
+        raise RuntimeError(f"Kraken returned an unexpected BTC/{currency} ticker response") from exc
+    if not price.is_finite() or price <= 0:
+        raise RuntimeError(f"Kraken returned an invalid BTC/{currency} price")
+    return price
 
 
 def _public_market_price(display_currency, quote_currency):
@@ -187,7 +171,7 @@ def _public_market_price(display_currency, quote_currency):
     if display_currency not in ("EUR", "USD") or quote_currency not in ("EUR", "USD"):
         raise ValueError("Display currency and QUOTE_CURRENCY must be EUR or USD")
     prices = {
-        currency: _public_page_btc_price(currency)
+        currency: _kraken_public_btc_price(currency)
         for currency in ("EUR", "USD")
     }
     conversion = prices[display_currency] / prices[quote_currency]
@@ -196,6 +180,7 @@ def _public_market_price(display_currency, quote_currency):
         "quoteCurrency": quote_currency,
         "price": str(prices[display_currency]),
         "conversionRate": str(conversion),
+        "source": "Kraken public ticker",
         "updatedAt": int(datetime.now(timezone.utc).timestamp()),
     }
 
@@ -267,8 +252,8 @@ class Handler(BaseHTTPRequestHandler):
             except RuntimeError as exc:
                 self._json(503, {"error": str(exc)})
             except Exception:
-                LOG.exception("Public CoinGecko page fetch failed")
-                self._json(502, {"error": "Could not fetch the current BTC price from CoinGecko’s public page. Check container internet access."})
+                LOG.exception("Kraken public market ticker fetch failed")
+                self._json(502, {"error": "Could not fetch the current BTC price from Kraken’s public market ticker. Check container internet access."})
             return
         try:
             records = read_activity_records()
