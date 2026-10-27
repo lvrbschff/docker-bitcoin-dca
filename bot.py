@@ -474,21 +474,26 @@ def run_once(api, settings, check_interval, schedule_only=False):
 
 
 def bot_loop(api, settings, interval):
+    if settings["first_buy_delay_seconds"] > 0:
+        LOG.info(
+            "Waiting %s seconds after container startup before checking purchase history or calculating the first order.",
+            settings["first_buy_delay_seconds"],
+        )
+        time.sleep(settings["first_buy_delay_seconds"])
+
     last_buy = latest_recorded_buy_time(settings["base"])
-    if last_buy is None:
-        if settings["first_buy_delay_seconds"] > 0:
-            LOG.info(
-                "No previous real %s purchase is recorded in persistent activity; "
-                "waiting %s seconds before the first purchase.",
-                settings["base"], settings["first_buy_delay_seconds"],
-            )
-            time.sleep(settings["first_buy_delay_seconds"])
-    else:
+    if last_buy is not None:
         settings["startup_last_buy_at"] = last_buy
         LOG.info(
             "Found previous real %s purchase in persistent activity at %s; "
             "the first purchase after startup will be aligned to the recalculated DCA interval.",
             settings["base"], last_buy.isoformat(timespec="seconds"),
+        )
+    else:
+        LOG.info(
+            "No previous real %s purchase is recorded in persistent activity; "
+            "the first purchase will be checked now.",
+            settings["base"],
         )
     while True:
         next_wait = interval
