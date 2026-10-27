@@ -34,7 +34,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 </style>
 </head>
 <body><main>
-<header class="top"><div><div class="eyebrow" id="exchangeName">Exchange · DCA</div><h1>Bitcoin Portfolio</h1><p class="sub">Purchases, fees, withdrawals and Parqet exports recorded by the bot</p></div><div class="top-actions"><div class="badge">Local access only</div><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
+<header class="top"><div><div class="eyebrow" id="exchangeName">Exchange · DCA</div><h1>DCA Crypto Bot</h1><p class="sub">Portfolio overview and activity analysis, with optional Parqet CSV export</p></div><div class="top-actions"><div class="badge">Local access only</div><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
 <section class="panel">
 <div class="controls">
 <div class="field"><label for="interval">Withdrawal interval</label><select id="interval"></select></div>
@@ -53,7 +53,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <h2>Bot settings</h2>
 <div class="grid">
 <div class="card"><label>Exchange</label><div class="value" id="settingExchange">—</div></div>
-<div class="card"><label>Quote currency (QUOTE_CURRENCY)</label><div class="value" id="settingQuoteCurrency">—</div></div>
+<div class="card"><label>Cryptocurrency (BASE_ASSET)</label><div class="value" id="baseAsset">—</div></div>\n<div class="card"><label>Quote currency (QUOTE_CURRENCY)</label><div class="value" id="settingQuoteCurrency">—</div></div>
 <div class="card"><label>Trading mode (LIVE_TRADING)</label><div class="value" id="tradingMode">—</div></div>
 <div class="card"><label>Purchase amount (BUY_AMOUNT)</label><div class="value" id="buyAmount">—</div></div>
 <div class="card"><label>Deposit day (DEPOSIT_DAY)</label><div class="value" id="depositDay">—</div></div>
@@ -119,7 +119,7 @@ async function loadAnalytics(){
  try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end);const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load the report.");quote=d.quote;
  if(!displayCurrency){const saved=localStorage.getItem("bitcoinDcaDisplayCurrency");displayCurrency=["EUR","USD"].includes(saved)?saved:(["EUR","USD"].includes(quote)?quote:"EUR")}
  $("displayCurrency").value=displayCurrency;
- const ex=d.exchange==="KRAKEN"?"Kraken":"Bitvavo";$("exchangeName").textContent=ex+" · DCA";document.title=ex+" DCA · Portfolio";
+ const ex=d.exchange==="KRAKEN"?"Kraken":d.exchange==="BITVAVO"?"Bitvavo":d.exchange;$("exchangeName").textContent=ex+" · DCA";document.title=ex+" DCA · Crypto Bot";
  let livePrice=Number((d.snapshot||{}).price||0);
  try{
   const priceResponse=await fetch("/api/market-price?currency="+displayCurrency);const market=await priceResponse.json();if(!priceResponse.ok)throw new Error(market.error||"Could not load current BTC price.");
@@ -140,7 +140,7 @@ async function loadAnalytics(){
   $("profitLoss").textContent=money(profitLoss,displayCurrency);
   $("profitLoss").className="value "+(profitLoss>=0?"positive":"negative");
  }else{$("profitLoss").textContent="—";$("profitLoss").className="value"}
- $("settingExchange").textContent=ex;$("settingQuoteCurrency").textContent=quote;$("tradingMode").textContent=d.configuration.liveTrading?"Live":"Dry run";
+ $("settingExchange").textContent=ex;$("baseAsset").textContent=d.configuration.baseAsset;$("settingQuoteCurrency").textContent=quote;$("tradingMode").textContent=d.configuration.liveTrading?"Live":"Dry run";
  $("buyAmount").textContent=Number(d.configuration.buyAmount)===0?"Exchange minimum":btc(d.configuration.buyAmount);
  $("depositDay").textContent=String(d.configuration.depositDay);$("withdrawEnabled").textContent=d.configuration.withdrawalsEnabled?"Enabled":"Disabled";
  $("threshold").textContent=money(Number(d.configuration.withdrawalThreshold)*fxRate,displayCurrency);$("thresholdNote").textContent="Environment variable value in "+quote+", shown in "+displayCurrency;
@@ -359,7 +359,7 @@ def _analytics_from_rows(settings, records, snapshot):
         "exchange": settings["exchange"],
         "configuration": {
             "liveTrading": bool(settings["live"]),
-            "buyAmount": str(settings["buy_amount"]),
+            "buyAmount": str(settings["buy_amount"]),\n            "baseAsset": settings["base"],
             "depositDay": int(settings["deposit_day"]),
             "withdrawalsEnabled": bool(settings["withdrawals_enabled"]),
             "withdrawalThreshold": str(settings["withdraw_threshold"]),
