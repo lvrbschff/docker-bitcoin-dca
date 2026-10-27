@@ -1,6 +1,6 @@
-# Bitcoin DCA Bot for Bitvavo and Kraken
+# DCA Crypto Bot for Bitvavo and Kraken
 
-A Docker-based DCA bot for buying Bitcoin with fiat deposits on Bitvavo or Kraken. Choose the exchange, quote currency, purchase amount, and deposit day. The bot recalculates purchase timing from the available balance and the selected exchange's current minimum order rules. A local web UI shows activity recorded by the bot and can generate Parqet-compatible CSV exports.
+A Docker-based DCA bot for buying a configurable crypto asset with a selectable quote currency on Bitvavo or Kraken. Choose the exchange, crypto asset, quote currency, purchase amount, and deposit day. The bot recalculates purchase timing from the available balance and the selected exchange's current minimum order rules. A local web UI provides an activity and portfolio overview and can generate Parqet-compatible CSV exports.
 
 ### Example web UI (fictional data)
 
