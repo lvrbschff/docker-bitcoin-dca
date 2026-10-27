@@ -1,9 +1,11 @@
 """Local read-only portfolio dashboard and on-demand Parqet export."""
 import json
 import logging
+import re
 import requests
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
+from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -43,7 +45,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 </section>
 <section class="panel"><h2>Bot-tracked portfolio</h2><div class="grid">
 <div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
-<div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public ticker</div></div>
+<div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
 <div class="card"><label>Value in fiat currency</label><div class="value" id="balanceValue">—</div></div>
 </div></section>
 <section class="panel">
@@ -56,7 +58,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <div class="card"><label>Deposit day (DEPOSIT_DAY)</label><div class="value" id="depositDay">—</div></div>
 <div class="card"><label>Automatic withdrawals (WITHDRAWALS_ENABLED)</label><div class="value" id="withdrawEnabled">—</div></div>
 <div class="card"><label>Withdrawal threshold (WITHDRAW_THRESHOLD_QUOTE)</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured environment variable</div></div>
-</div><div class="notice">Fiat values are converted to the selected display currency. The current BTC price is fetched from Kraken’s public market ticker when the report loads. Parqet CSV exports retain the currency in which each transaction was recorded.</div>
+</div><div class="notice">Fiat values are converted to the selected display currency. The current BTC price is fetched from Kraken’s public BTC-to-fiat pages when the report loads. Parqet CSV exports retain the currency in which each transaction was recorded.</div>
 </section>
 <section class="panel"><h2>Selected period summary</h2><div class="grid">
 <div class="card"><label>BTC purchases</label><div class="value" id="buyCount">—</div><div class="small" id="buyBtc"></div></div>
@@ -119,7 +121,7 @@ async function loadAnalytics(){
  try{
   const priceResponse=await fetch("/api/market-price?currency="+displayCurrency);const market=await priceResponse.json();if(!priceResponse.ok)throw new Error(market.error||"Could not load current BTC price.");
   fxRate=Number(market.conversionRate);livePrice=Number(market.price);
-  $("spotUpdated").textContent="Kraken public ticker · fetched "+new Date(Number(market.updatedAt)*1000).toLocaleTimeString("en-GB");
+  $("spotUpdated").textContent="Kraken public price page · fetched "+new Date(Number(market.updatedAt)*1000).toLocaleTimeString("en-GB");
  }catch(priceError){
   displayCurrency=quote;fxRate=1;$("displayCurrency").value=quote;
   $("spotUpdated").textContent=livePrice>0?"Last price saved by the bot":"Live price unavailable";
@@ -146,32 +148,48 @@ $("download").addEventListener("click",async()=>{try{showError("");const p=selec
 """
 
 
+class _PageTextParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.parts = []
+
+    def handle_data(self, data):
+        if data and data.strip():
+            self.parts.append(data.strip())
+
+
 def _kraken_public_btc_price(currency):
     currency = currency.upper()
     if currency not in ("EUR", "USD"):
         raise ValueError("Display currency and QUOTE_CURRENCY must be EUR or USD")
+    url = f"https://www.kraken.com/convert/btc/{currency.lower()}"
     response = requests.get(
-        "https://api.kraken.com/0/public/Ticker",
-        params={"pair": f"XBT{currency}"},
-        headers={"Accept": "application/json", "User-Agent": "BitcoinDCA/1.0"},
-        timeout=10,
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0 (compatible; BitcoinDCA/1.0)",
+            "Accept": "text/html,application/xhtml+xml",
+        },
+        timeout=15,
     )
     response.raise_for_status()
-    payload = response.json()
-    errors = payload.get("error") or []
-    if errors:
-        raise RuntimeError("Kraken public ticker error: " + "; ".join(errors))
-    result = payload.get("result") or {}
-    if not result:
-        raise RuntimeError(f"Kraken returned no BTC/{currency} ticker data")
-    try:
-        ticker = next(iter(result.values()))
-        price = Decimal(str(ticker["c"][0]))
-    except (KeyError, IndexError, TypeError, ValueError, InvalidOperation, StopIteration) as exc:
-        raise RuntimeError(f"Kraken returned an unexpected BTC/{currency} ticker response") from exc
-    if not price.is_finite() or price <= 0:
-        raise RuntimeError(f"Kraken returned an invalid BTC/{currency} price")
-    return price
+    parser = _PageTextParser()
+    parser.feed(response.text)
+    page_text = " ".join(" ".join(parser.parts).split())
+    number = r"([0-9][0-9,]*(?:\\.[0-9]+)?)"
+    patterns = (
+        rf"1\\s*BTC\\s*=\\s*{number}\\s*{currency}\\b",
+        rf"1(?:\\.00)?\\s*BTC\\s*=\\s*[$€]\\s*{number}",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, page_text, flags=re.IGNORECASE)
+        if match:
+            try:
+                price = Decimal(match.group(1).replace(",", ""))
+            except InvalidOperation:
+                continue
+            if price.is_finite() and price > 0:
+                return price
+    raise RuntimeError(f"Could not find the BTC/{currency} price on Kraken’s public converter page")
 
 
 def _public_market_price(display_currency, quote_currency):
@@ -261,8 +279,8 @@ class Handler(BaseHTTPRequestHandler):
             except RuntimeError as exc:
                 self._json(503, {"error": str(exc)})
             except Exception:
-                LOG.exception("Kraken public market ticker fetch failed")
-                self._json(502, {"error": "Could not fetch the current BTC price from Kraken’s public market ticker. Check container internet access."})
+                LOG.exception("Kraken public price page fetch failed")
+                self._json(502, {"error": "Could not fetch the current BTC price from Kraken’s public page. Check container internet access."})
             return
         try:
             records = read_activity_records()
