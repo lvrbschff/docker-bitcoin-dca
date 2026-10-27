@@ -3,7 +3,7 @@ import json
 import logging
 import requests
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -167,7 +167,7 @@ def _kraken_public_btc_price(currency):
     try:
         ticker = next(iter(result.values()))
         price = Decimal(str(ticker["c"][0]))
-    except (KeyError, IndexError, TypeError, ValueError, StopIteration) as exc:
+    except (KeyError, IndexError, TypeError, ValueError, InvalidOperation, StopIteration) as exc:
         raise RuntimeError(f"Kraken returned an unexpected BTC/{currency} ticker response") from exc
     if not price.is_finite() or price <= 0:
         raise RuntimeError(f"Kraken returned an invalid BTC/{currency} price")
