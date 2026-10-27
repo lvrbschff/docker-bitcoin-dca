@@ -1,6 +1,9 @@
 """Local read-only portfolio dashboard and on-demand Parqet export."""
+import base64
+import hmac
 import json
 import logging
+import os
 import re
 import requests
 from datetime import datetime, timezone
@@ -255,7 +258,36 @@ class Handler(BaseHTTPRequestHandler):
     def _json(self, status, obj):
         self._send(status, json.dumps(obj, ensure_ascii=False).encode("utf-8"))
 
+    def _require_authentication(self):
+        header = self.headers.get("Authorization", "")
+        try:
+            scheme, separator, encoded = header.partition(" ")
+            if not separator or scheme.lower() != "basic":
+                raise ValueError("Missing Basic authentication")
+            decoded = base64.b64decode(encoded, validate=True).decode("utf-8")
+            username, separator, password = decoded.partition(":")
+            if not separator:
+                raise ValueError("Malformed Basic authentication")
+        except (ValueError, UnicodeDecodeError):
+            username, password = "", ""
+
+        expected_username = (os.getenv("WEB_UI_USERNAME", "admin") or "admin").encode("utf-8")
+        expected_password = (os.getenv("WEB_UI_PASSWORD", "admin") or "admin").encode("utf-8")
+        username_matches = hmac.compare_digest(username.encode("utf-8"), expected_username)
+        password_matches = hmac.compare_digest(password.encode("utf-8"), expected_password)
+        if username_matches and password_matches:
+            return True
+
+        self.send_response(401)
+        self.send_header("WWW-Authenticate", 'Basic realm="DCA Crypto Bot", charset="UTF-8"')
+        self.send_header("Content-Length", "0")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        return False
+
     def do_POST(self):
+        if not self._require_authentication():
+            return
         parsed = urlparse(self.path)
         if parsed.path != "/api/activity/delete":
             self._json(404, {"error": "Not found"})
@@ -276,6 +308,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(400, {"error": str(exc)})
 
     def do_GET(self):
+        if not self._require_authentication():
+            return
         parsed = urlparse(self.path)
         if parsed.path == "/":
             self._send(200, HTML, "text/html; charset=utf-8")
