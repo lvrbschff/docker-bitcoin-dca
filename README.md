@@ -57,7 +57,7 @@ The web UI reads current prices from Kraken’s public [BTC/EUR](https://www.kra
 
 For Bitvavo, fill in `BITVAVO_API_KEY` and `BITVAVO_API_SECRET`. For Kraken, fill in `KRAKEN_API_KEY` and `KRAKEN_API_SECRET`. Leave the other exchange's credentials empty. Never commit .env or API credentials to the repository.
 
-`WEB_UI_PORT`, exchange API credentials, and (for Kraken withdrawals) `KRAKEN_WITHDRAW_KEY` are set in .env. The other bot settings are configured directly in docker-compose.yml, including Bitvavo's `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK`.
+`WEB_UI_PORT`, `WEB_UI_USERNAME`, `WEB_UI_PASSWORD`, exchange API credentials, and (for Kraken withdrawals) `KRAKEN_WITHDRAW_KEY` are set in .env. The other bot settings are configured directly in docker-compose.yml, including Bitvavo's `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK`.
 
 ## 3. Configure the bot
 
@@ -104,9 +104,15 @@ These variables are used only when `EXCHANGE=KRAKEN`. Put the API key and secret
 | `KRAKEN_API_SECRET` | `EXCHANGE=KRAKEN` | Kraken API secret in .env. |
 | `KRAKEN_WITHDRAW_KEY` | `WITHDRAWALS_ENABLED=true` and `EXCHANGE=KRAKEN` | Name of the saved Bitcoin withdrawal method in Kraken; set it in .env. |
 
-### Web UI port
+### Web UI access
 
-Set `WEB_UI_PORT` in .env to change the default port from 6890. Compose uses it for both the host and container port. The dashboard remains bound to the local host only.
+| .env variable | Default | Description |
+| --- | --- | --- |
+| `WEB_UI_PORT` | `6890` | Host and container port for the dashboard. |
+| `WEB_UI_USERNAME` | `admin` | Username for HTTP Basic Authentication. |
+| `WEB_UI_PASSWORD` | `admin` | Password for HTTP Basic Authentication. |
+
+Change `WEB_UI_PASSWORD` before running the bot. The dashboard challenges for these credentials before serving the page or any API route. By default, the port is bound to the Docker host's loopback address; Basic Authentication over HTTP does not encrypt credentials, so do not expose the port directly to a network or the internet.
 
 ## 4. Start with dry-run mode
 
@@ -117,7 +123,7 @@ docker compose up -d --build
 docker compose logs -f
 ~~~
 
-The dashboard is available at [http://localhost:6890](http://localhost:6890) by default. It is bound to the Docker host's loopback address, so it is not exposed to the home network or the public internet. If you set `WEB_UI_PORT` in .env, use that port in the address.
+The dashboard is available at [http://localhost:6890](http://localhost:6890) by default and prompts for `WEB_UI_USERNAME` and `WEB_UI_PASSWORD`. The default credentials are `admin` / `admin`; replace the password in .env before starting. It is bound to the Docker host's loopback address, so it is not exposed to the home network or the public internet. If you set `WEB_UI_PORT` in .env, use that port in the address.
 
 When you are ready to place real orders, set `LIVE_TRADING` to true in docker-compose.yml and recreate the container:
 
@@ -149,7 +155,7 @@ Check the destination and network carefully before enabling automatic withdrawal
 
 ## Portfolio web UI
 
-The dashboard displays purchases and withdrawals recorded when this bot places them. Select EUR or USD as the display currency; the page fetches current BTC prices in EUR and USD from Kraken’s public converter pages on load and converts historical fiat totals and fees using the same current price ratio. The displayed portfolio value is bot-tracked BTC multiplied by the selected live price. Its activity history is stored in `activity.json` and the dashboard snapshot in `dashboard.json` on the Docker-managed named volume `bitcoin-dca-webui-data`. Docker Compose creates and reattaches this same volume on redeploy. On first startup after updating, previously stored activity files under `./state` are copied into the named volume. Keep the volume when updating; `docker compose down -v` deletes it. The dashboard reads its activity and latest price snapshot from these local files; the web UI does not query Kraken or Bitvavo for transaction history. The displayed BTC amount is the net amount tracked from the bot's recorded purchases and withdrawals, not the full exchange-account balance.
+The dashboard is protected with HTTP Basic Authentication using `WEB_UI_USERNAME` and `WEB_UI_PASSWORD` from .env (defaults: `admin` / `admin`). Change the default password before running it. Authentication covers the dashboard and its API routes. The dashboard displays purchases and withdrawals recorded when this bot places them. Select EUR or USD as the display currency; the page fetches current BTC prices in EUR and USD from Kraken’s public converter pages on load and converts historical fiat totals and fees using the same current price ratio. The displayed portfolio value is bot-tracked BTC multiplied by the selected live price. Its activity history is stored in `activity.json` and the dashboard snapshot in `dashboard.json` on the Docker-managed named volume `bitcoin-dca-webui-data`. Docker Compose creates and reattaches this same volume on redeploy. On first startup after updating, previously stored activity files under `./state` are copied into the named volume. Keep the volume when updating; `docker compose down -v` deletes it. The dashboard reads its activity and latest price snapshot from these local files; the web UI does not query Kraken or Bitvavo for transaction history. The displayed BTC amount is the net amount tracked from the bot's recorded purchases and withdrawals, not the full exchange-account balance.
 
 Choose an interval between bot-recorded Bitcoin withdrawals or enter custom start and end dates. The activity table distinguishes simulated dry-run purchases from real purchases. Simulated fees are estimates based on your current exchange taker fee tier and are prefixed with `~`. Use **Delete** to remove an individual purchase from the local activity history; this does not reverse an order on the exchange. Download the selected period as a Parqet-compatible CSV for import into Parqet. Simulated purchases are excluded. Activity from before local tracking is enabled is not imported automatically. Set `WEB_UI_ENABLED` to false to disable the dashboard.
 
@@ -190,7 +196,7 @@ The Docker and configuration files have different jobs:
 
 - **Dockerfile** is the image build recipe. It installs Python dependencies and copies the bot and adapter code into the image.
 - **docker-compose.yml** builds and runs that image, sets the bot's runtime options, and publishes the local web UI port.
-- **.env.example** is a template for a local .env file. Use it for exchange API credentials, WEB_UI_PORT, and KRAKEN_WITHDRAW_KEY when needed. It is not a second Docker build file, and it contains no actual credentials by default.
+- **.env.example** is a template for a local .env file. Use it for exchange API credentials, WEB_UI_PORT, WEB_UI_USERNAME, WEB_UI_PASSWORD, and KRAKEN_WITHDRAW_KEY when needed. It is not a second Docker build file, and it contains no actual credentials by default.
 
 The code is separated by responsibility:
 
