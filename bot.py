@@ -387,10 +387,11 @@ def run_once(api, settings, check_interval, schedule_only=False):
     LOG.info(
         "Recalculated DCA schedule: balance=%s %s; spendable=%s %s; "
         "price=%s %s/%s; estimated order=%s %s (%s %s); "
-        "possible buys=%s; next deposit day=%s; purchase interval=%s minutes.",
+        "next deposit day=%s; amount of possible buys until next deposit=%s; "
+        "purchase interval=%s minutes.",
         balance, quote, affordable_budget, quote, price, quote, base,
-        order_amount, base, order_quote, quote, possible_buys,
-        next_deposit.isoformat(), int(interval_seconds / 60),
+        order_amount, base, order_quote, quote, next_deposit.isoformat(),
+        possible_buys, int(interval_seconds / 60),
     )
     startup_last_buy = settings.get("startup_last_buy_at")
     if startup_last_buy:
