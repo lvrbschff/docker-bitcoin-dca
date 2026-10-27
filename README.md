@@ -142,8 +142,8 @@ The bot checks the available BTC balance and its value in `QUOTE_CURRENCY`. When
 
 | Exchange | Withdrawal setup |
 | --- | --- |
-| Bitvavo | Set `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK`. The address must already be added and verified in your Bitvavo account. The API key also needs Withdraw digital assets permission. |
-| Kraken | Add a Bitcoin withdrawal method in Kraken and set its saved method name as `KRAKEN_WITHDRAW_KEY`. The API key needs Withdraw Funds permission. |
+| Bitvavo | Set `WITHDRAWALS_ENABLED=true`, `WITHDRAW_ADDRESS`, and `WITHDRAW_NETWORK`. The address must already be added and verified in your Bitvavo account. The API key also needs Withdraw digital assets permission. |
+| Kraken | Set `WITHDRAWALS_ENABLED=true`, then add a Bitcoin withdrawal method in Kraken and set its saved method name as `KRAKEN_WITHDRAW_KEY`. The API key needs Withdraw Funds permission. |
 
 Check the destination and network carefully before enabling automatic withdrawals. If a Kraken withdrawal request has an ambiguous response, the bot does not send it again automatically. Check the withdrawal status in Kraken before taking further action.
 
