@@ -124,6 +124,14 @@ def persist_bot_withdrawal(api, withdrawal, result, settings, context):
     quote = settings["quote"]
     amount = Decimal(str(withdrawal.get("amount", "0")))
     fee_btc = Decimal(str(withdrawal.get("fee", result.get("fee", "0"))))
+    # Kraken's request amount is already net of its fee; Bitvavo's request amount
+    # is the gross debit and its fee is deducted from that amount before sending.
+    if settings["exchange"] == "BITVAVO":
+        net_amount = max(amount - fee_btc, Decimal(0))
+        gross_amount = amount
+    else:
+        net_amount = amount
+        gross_amount = amount + fee_btc
     price = Decimal(str(context.get("price", "0")))
     if price <= 0:
         price = api.price(f"BTC-{quote}")
@@ -136,13 +144,20 @@ def persist_bot_withdrawal(api, withdrawal, result, settings, context):
         "identifier": "BTC",
         "assetType": "Crypto",
         "price": format(price, "f"),
-        "shares": format(amount, "f"),
-        "amount": format(amount * price, "f"),
+        "shares": format(net_amount, "f"),
+        "amount": format(net_amount * price, "f"),
         "currency": quote,
         "fee": format(fee_btc * price, "f"),
         "tax": "0",
     }
-    return append_activity_records([{"id": f"withdrawal:{event_id}", "row": row}])
+    record = {
+        "id": f"withdrawal:{event_id}",
+        "row": row,
+        "netWithdrawalAmount": True,
+        "networkFeeBtc": format(fee_btc, "f"),
+        "grossWithdrawalAmountBtc": format(gross_amount, "f"),
+    }
+    return append_activity_records([record])
 
 
 def update_dashboard_snapshot(settings, quote_balance, price):
