@@ -1,8 +1,9 @@
 """Local read-only portfolio dashboard and on-demand Parqet export."""
 import json
 import logging
-import os
+import re
 import requests
+from html.parser import HTMLParser
 from datetime import datetime, timezone
 from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -118,7 +119,7 @@ async function loadAnalytics(){
  $("displayCurrency").value=displayCurrency;
  const priceResponse=await fetch("/api/market-price?currency="+displayCurrency);const market=await priceResponse.json();if(!priceResponse.ok)throw new Error(market.error||"Could not load current BTC price.");
  fxRate=Number(market.conversionRate);const livePrice=Number(market.price);const ex=d.exchange==="KRAKEN"?"Kraken":"Bitvavo";$("exchangeName").textContent=ex+" · DCA";document.title=ex+" DCA · Portfolio";
- $("balance").textContent=btc(d.snapshot.balance);$("spot").textContent=money(livePrice,displayCurrency)+"/BTC";$("spotUpdated").textContent="CoinGecko · "+new Date(Number(market.updatedAt)*1000).toLocaleTimeString("en-GB");
+ $("balance").textContent=btc(d.snapshot.balance);$("spot").textContent=money(livePrice,displayCurrency)+"/BTC";$("spotUpdated").textContent="Public CoinGecko page · fetched "+new Date(Number(market.updatedAt)*1000).toLocaleTimeString("en-GB");
  $("balanceValue").textContent=money(Number(d.snapshot.balance)*livePrice,displayCurrency);
  $("settingExchange").textContent=ex;$("settingQuoteCurrency").textContent=quote;$("tradingMode").textContent=d.configuration.liveTrading?"Live":"Dry run";
  $("buyAmount").textContent=Number(d.configuration.buyAmount)===0?"Exchange minimum":btc(d.configuration.buyAmount);
@@ -139,40 +140,64 @@ $("download").addEventListener("click",async()=>{try{showError("");const p=selec
 """
 
 
-def _coingecko_market_price(display_currency, quote_currency):
+class _PageTextParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.parts = []
+
+    def handle_data(self, data):
+        if data and data.strip():
+            self.parts.append(data.strip())
+
+
+def _public_page_btc_price(currency):
+    currency = currency.upper()
+    if currency not in ("EUR", "USD"):
+        raise ValueError("Display currency and QUOTE_CURRENCY must be EUR or USD")
+    url = f"https://www.coingecko.com/en/coins/bitcoin/{currency.lower()}"
+    response = requests.get(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0 (compatible; BitcoinDCA/1.0)",
+            "Accept": "text/html,application/xhtml+xml",
+        },
+        timeout=15,
+    )
+    response.raise_for_status()
+    parser = _PageTextParser()
+    parser.feed(response.text)
+    page_text = " ".join(" ".join(parser.parts).split())
+    number = r"([0-9][0-9,]*(?:\\.[0-9]+)?)"
+    patterns = (
+        rf"current BTC to {currency} conversion rate is\\s*[^0-9]*{number}",
+        rf"price of converting 1 Bitcoin \\(BTC\\) to {currency} is\\s*[^0-9]*{number}",
+        rf"BTC\\s*/\\s*{currency}\\s*#1\\s*[^0-9]*{number}",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, page_text, flags=re.IGNORECASE)
+        if match:
+            price = Decimal(match.group(1).replace(",", ""))
+            if price > 0:
+                return price
+    raise ValueError(f"Could not find the BTC/{currency} price in the public CoinGecko page")
+
+
+def _public_market_price(display_currency, quote_currency):
     display_currency = display_currency.upper()
     quote_currency = quote_currency.upper()
     if display_currency not in ("EUR", "USD") or quote_currency not in ("EUR", "USD"):
         raise ValueError("Display currency and QUOTE_CURRENCY must be EUR or USD")
-    api_key = os.getenv("COINGECKO_DEMO_API_KEY", "").strip()
-    if not api_key:
-        raise RuntimeError("Set COINGECKO_DEMO_API_KEY in .env to load live BTC prices")
-    response = requests.get(
-        "https://api.coingecko.com/api/v3/simple/price",
-        params={
-            "ids": "bitcoin",
-            "vs_currencies": "eur,usd",
-            "include_last_updated_at": "true",
-            "precision": "full",
-        },
-        headers={"x-cg-demo-api-key": api_key},
-        timeout=15,
-    )
-    response.raise_for_status()
-    btc_prices = response.json()["bitcoin"]
     prices = {
-        currency: Decimal(str(btc_prices[currency.lower()]))
+        currency: _public_page_btc_price(currency)
         for currency in ("EUR", "USD")
     }
-    if prices[quote_currency] <= 0 or prices[display_currency] <= 0:
-        raise ValueError("CoinGecko returned an invalid BTC price")
     conversion = prices[display_currency] / prices[quote_currency]
     return {
         "currency": display_currency,
         "quoteCurrency": quote_currency,
         "price": str(prices[display_currency]),
         "conversionRate": str(conversion),
-        "updatedAt": int(btc_prices.get("last_updated_at") or datetime.now(timezone.utc).timestamp()),
+        "updatedAt": int(datetime.now(timezone.utc).timestamp()),
     }
 
 
@@ -236,15 +261,15 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/market-price":
             currency = query.get("currency", ["EUR"])[0].upper()
             try:
-                market = _coingecko_market_price(currency, self.settings["quote"])
+                market = _public_market_price(currency, self.settings["quote"])
                 self._json(200, market)
             except ValueError as exc:
                 self._json(400, {"error": str(exc)})
             except RuntimeError as exc:
                 self._json(503, {"error": str(exc)})
             except Exception:
-                LOG.exception("CoinGecko market price request failed")
-                self._json(502, {"error": "Could not fetch a current BTC price from CoinGecko. Check the API key and container internet access."})
+                LOG.exception("Public CoinGecko page fetch failed")
+                self._json(502, {"error": "Could not fetch the current BTC price from CoinGecko’s public page. Check container internet access."})
             return
         try:
             records = read_activity_records()
