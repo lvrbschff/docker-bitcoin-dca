@@ -167,11 +167,11 @@ def _public_page_btc_price(currency):
     parser = _PageTextParser()
     parser.feed(response.text)
     page_text = " ".join(" ".join(parser.parts).split())
-    number = r"([0-9][0-9,]*(?:\\.[0-9]+)?)"
+    number = r"([0-9][0-9,]*(?:\.[0-9]+)?)"
     patterns = (
-        rf"current BTC to {currency} conversion rate is\\s*[^0-9]*{number}",
-        rf"price of converting 1 Bitcoin \\(BTC\\) to {currency} is\\s*[^0-9]*{number}",
-        rf"BTC\\s*/\\s*{currency}\\s*#1\\s*[^0-9]*{number}",
+        rf"current BTC to {currency} conversion rate is\s*[^0-9]*{number}",
+        rf"price of converting 1 Bitcoin \(BTC\) to {currency} is\s*[^0-9]*{number}",
+        rf"BTC\s*/\s*{currency}\s*#1\s*[^0-9]*{number}",
     )
     for pattern in patterns:
         match = re.search(pattern, page_text, flags=re.IGNORECASE)
