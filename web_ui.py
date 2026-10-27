@@ -56,7 +56,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <div class="card"><label>Purchase amount (BUY_AMOUNT)</label><div class="value" id="buyAmount">—</div></div>
 <div class="card"><label>Deposit day (DEPOSIT_DAY)</label><div class="value" id="depositDay">—</div></div>
 <div class="card"><label>Automatic withdrawals (WITHDRAWALS_ENABLED)</label><div class="value" id="withdrawEnabled">—</div></div>
-<div class="card"><label>Withdrawal threshold (WITHDRAW_THRESHOLD_QUOTE)</label><div class="value" id="threshold">—</div><div class="small">Configured environment variable</div></div>
+<div class="card"><label>Withdrawal threshold (WITHDRAW_THRESHOLD_QUOTE)</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured environment variable</div></div>
 </div><div class="notice">Fiat values are converted to the selected display currency. The market price is fetched from CoinGecko when the report loads. Parqet CSV exports retain the currency in which each transaction was recorded.</div>
 </section>
 <section class="panel"><h2>Selected period summary</h2><div class="grid">
@@ -123,7 +123,7 @@ async function loadAnalytics(){
  $("settingExchange").textContent=ex;$("settingQuoteCurrency").textContent=quote;$("tradingMode").textContent=d.configuration.liveTrading?"Live":"Dry run";
  $("buyAmount").textContent=Number(d.configuration.buyAmount)===0?"Exchange minimum":btc(d.configuration.buyAmount);
  $("depositDay").textContent=String(d.configuration.depositDay);$("withdrawEnabled").textContent=d.configuration.withdrawalsEnabled?"Enabled":"Disabled";
- $("threshold").textContent=money(Number(d.configuration.withdrawalThreshold)*fxRate,displayCurrency);
+ $("threshold").textContent=money(Number(d.configuration.withdrawalThreshold)*fxRate,displayCurrency);$("thresholdNote").textContent="Environment variable value in "+quote+", shown in "+displayCurrency;
  $("buyCount").textContent=d.summary.buyCount;$("buyBtc").textContent=btc(d.summary.boughtBtc);$("simulatedCount").textContent=d.summary.simulatedBuyCount;$("simulatedBtc").textContent=btc(d.summary.simulatedBtc);
  $("buyVolume").textContent=money(Number(d.summary.buyVolume)*fxRate,displayCurrency);$("avgPrice").textContent="Average: "+money(Number(d.summary.averagePrice)*fxRate,displayCurrency)+"/BTC";
  $("tradeFees").textContent=money(Number(d.summary.tradeFees)*fxRate,displayCurrency);$("withdrawBtc").textContent=btc(d.summary.withdrawnBtc);$("withdrawCount").textContent=d.summary.withdrawalCount+" withdrawals";
