@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1300" viewBox="0 0 1440 1300" role="img" aria-labelledby="title desc">
-<title id="title">Bitcoin DCA portfolio dashboard example</title>
+<title id="title">DCA Crypto Bot dashboard example</title>
 <desc id="desc">Illustrative dark dashboard with fictional Bitcoin purchases, fees, portfolio values, settings, and activity records.</desc>
 <defs>
   <linearGradient id="bg" x2="0" y2="1"><stop stop-color="#111a2d"/><stop offset="1" stop-color="#0b1020"/></linearGradient>
@@ -23,8 +23,8 @@
 <rect x="24" y="24" width="1392" height="1252" rx="22" fill="#0b1020"/>
 <!-- Header -->
 <text x="68" y="70" class="eyebrow accent">KRAKEN · DCA</text>
-<text x="68" y="116" class="title">Bitcoin Portfolio</text>
-<text x="68" y="146" class="sub muted">Purchases, fees, withdrawals and Parqet exports recorded by the bot</text>
+<text x="68" y="116" class="title">DCA Crypto Bot</text>
+<text x="68" y="146" class="sub muted">Portfolio overview and activity analysis, with optional Parqet CSV export</text>
 <rect x="1190" y="53" width="160" height="34" rx="17" fill="#10182a" stroke="#26324a"/>
 <text x="1270" y="75" text-anchor="middle" class="small">Local access only</text>
 <text x="1190" y="112" class="label">Display currency</text>
@@ -68,7 +68,7 @@
  <rect x="84" y="687" width="300" height="72" rx="12" class="card"/><text x="100" y="712" class="label">Deposit day</text><text x="100" y="739" class="value" font-size="19">1</text>
  <rect x="404" y="687" width="300" height="72" rx="12" class="card"/><text x="420" y="712" class="label">Automatic withdrawals</text><text x="420" y="739" class="value" font-size="19">Enabled</text>
  <rect x="724" y="687" width="300" height="72" rx="12" class="card"/><text x="740" y="712" class="label">Withdrawal threshold</text><text x="740" y="739" class="value" font-size="19">€1,000.00</text>
- <text x="1044" y="721" class="small">Fictional example values</text>
+ <rect x="1044" y="687" width="312" height="72" rx="12" class="card"/><text x="1060" y="712" class="label">Cryptocurrency (BASE_ASSET)</text><text x="1060" y="739" class="value" font-size="19">BTC</text>
 </g>
 <text x="84" y="782" class="small">Live prices shown for illustration only. All values below are fictional.</text>
 <!-- Period -->
