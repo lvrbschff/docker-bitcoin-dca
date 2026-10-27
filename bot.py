@@ -486,7 +486,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
     save_state(state_path, state)
     # Refresh balance, market minimum and price after recording the purchase,
     # then return the newly calculated delay to the bot loop.
-    return run_once(api, settings, interval, schedule_only=True)
+    return run_once(api, settings, check_interval, schedule_only=True)
 
 
 def bot_loop(api, settings, interval):
