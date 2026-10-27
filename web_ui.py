@@ -207,7 +207,7 @@ def _public_market_price(display_currency, quote_currency):
         "quoteCurrency": quote_currency,
         "price": str(prices[display_currency]),
         "conversionRate": str(conversion),
-        "source": "Kraken public ticker",
+        "source": "Kraken public conversion page",
         "updatedAt": int(datetime.now(timezone.utc).timestamp()),
     }
 
