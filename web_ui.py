@@ -1,6 +1,8 @@
 """Local read-only portfolio dashboard and on-demand Parqet export."""
 import json
 import logging
+import os
+import requests
 from datetime import datetime, timezone
 from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -25,9 +27,9 @@ main{max-width:1180px;margin:0 auto;padding:36px 22px 64px}.top{display:flex;jus
 .panel{background:linear-gradient(145deg,rgba(21,31,52,.96),rgba(15,22,39,.96));border:1px solid var(--line);border-radius:18px;padding:20px;margin:18px 0;box-shadow:0 14px 40px #0002}
 .controls{display:grid;grid-template-columns:2fr 1fr 1fr auto auto;gap:12px;align-items:end}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}select,input,button{font:inherit;color:var(--text);background:#0c1425;border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%}button{width:auto;cursor:pointer;background:var(--accent);border-color:var(--accent);color:#081122;font-weight:700}button.secondary{background:transparent;color:var(--text);border-color:var(--line)}button:hover{filter:brightness(1.08)}
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card{padding:17px;border:1px solid var(--line);border-radius:14px;background:#0c1425a8}.card label{display:block;color:var(--muted);font-size:12px;margin-bottom:9px}.value{font-size:22px;font-weight:700;letter-spacing:-.02em}.small{font-size:12px;color:var(--muted);margin-top:4px}
-h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:740px}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}td.num{text-align:right;font-variant-numeric:tabular-nums}.positive{color:var(--green)}.negative{color:var(--red)}.notice{color:var(--muted);font-size:13px;margin-top:12px}.error{color:var(--red);margin:12px 0}.hidden{display:none}.activity-heading,.pagination{display:flex;align-items:center;justify-content:space-between;gap:12px}.activity-heading h2{margin:0}.page-size{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}.page-size select{width:auto;padding:7px 10px}.pagination{margin-top:12px}.pagination button{padding:8px 12px}.pagination .notice{margin:0;text-align:center}
+h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:740px}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}td.num{text-align:right;font-variant-numeric:tabular-nums}.positive{color:var(--green)}.negative{color:var(--red)}.notice{color:var(--muted);font-size:13px;margin-top:12px}.error{color:var(--red);margin:12px 0}.hidden{display:none}.activity-heading,.pagination,.settings-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.settings-heading h2{margin:0}.settings-heading .field{min-width:160px}.activity-heading h2{margin:0}.page-size{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}.page-size select{width:auto;padding:7px 10px}.pagination{margin-top:12px}.pagination button{padding:8px 12px}.pagination .notice{margin:0;text-align:center}
 @media(max-width:850px){.controls{grid-template-columns:1fr 1fr}.controls .field:first-child{grid-column:span 2}.grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:520px){main{padding:24px 14px}.top{align-items:flex-start;flex-direction:column}h1{font-size:25px}.controls{grid-template-columns:1fr}.controls .field:first-child{grid-column:auto}.grid{gap:9px}.card{padding:13px}.value{font-size:18px}.activity-heading{align-items:flex-start;flex-direction:column}.pagination{gap:8px}.pagination button{padding:8px}.pagination .notice{font-size:11px}}
+@media(max-width:520px){main{padding:24px 14px}.top{align-items:flex-start;flex-direction:column}h1{font-size:25px}.controls{grid-template-columns:1fr}.controls .field:first-child{grid-column:auto}.grid{gap:9px}.card{padding:13px}.value{font-size:18px}.activity-heading,.settings-heading{align-items:flex-start;flex-direction:column}.pagination{gap:8px}.pagination button{padding:8px}.pagination .notice{font-size:11px}}
 </style>
 </head>
 <body><main>
@@ -40,12 +42,22 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <button id="refresh">Load report</button><button class="secondary" id="download">Download Parqet CSV</button>
 </div><div id="error" class="error hidden"></div><div class="notice">Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The CSV is formatted for importing real bot-recorded BTC activity into Parqet. Dry-run purchases are shown separately with an estimated taker fee based on your current exchange fee tier, and are excluded from the CSV. Delete removes a purchase from local history only; it cannot reverse an exchange order.</div>
 </section>
-<section class="panel"><h2>Balance on <span id="exchangeLabel">the exchange</span></h2><div class="grid">
+<section class="panel"><h2>Bot-tracked portfolio</h2><div class="grid">
 <div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
-<div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div></div>
-<div class="card"><label>Estimated bot-tracked value</label><div class="value" id="balanceValue">—</div></div>
-<div class="card"><label>Withdrawal threshold</label><div class="value" id="threshold">—</div><div class="small">Configured in Docker Compose</div></div>
+<div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">CoinGecko</div></div>
+<div class="card"><label>Value in fiat currency</label><div class="value" id="balanceValue">—</div></div>
 </div></section>
+<section class="panel">
+<div class="settings-heading"><h2>Bot settings</h2><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div>
+<div class="grid">
+<div class="card"><label>Exchange</label><div class="value" id="settingExchange">—</div></div>
+<div class="card"><label>Trading mode (LIVE_TRADING)</label><div class="value" id="tradingMode">—</div></div>
+<div class="card"><label>Purchase amount (BUY_AMOUNT)</label><div class="value" id="buyAmount">—</div></div>
+<div class="card"><label>Deposit day (DEPOSIT_DAY)</label><div class="value" id="depositDay">—</div></div>
+<div class="card"><label>Automatic withdrawals (WITHDRAWALS_ENABLED)</label><div class="value" id="withdrawEnabled">—</div></div>
+<div class="card"><label>Withdrawal threshold (WITHDRAW_THRESHOLD_QUOTE)</label><div class="value" id="threshold">—</div><div class="small">Configured environment variable</div></div>
+</div><div class="notice">Fiat values are converted to the selected display currency. The market price is fetched from CoinGecko when the report loads. Parqet CSV exports retain the currency in which each transaction was recorded.</div>
+</section>
 <section class="panel"><h2>Selected period summary</h2><div class="grid">
 <div class="card"><label>BTC purchases</label><div class="value" id="buyCount">—</div><div class="small" id="buyBtc"></div></div>
 <div class="card"><label>Simulated purchases (dry run)</label><div class="value" id="simulatedCount">—</div><div class="small" id="simulatedBtc"></div></div>
@@ -62,7 +74,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 </main>
 <script>
 const $=id=>document.getElementById(id);
-let quote="EUR", dataCurrency="EUR", activityRows=[], currentPage=1;
+let quote="EUR", displayCurrency="", fxRate=1, activityRows=[], currentPage=1;
 function localInput(ms){const d=new Date(ms);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
 function parseInput(el){return new Date(el.value).getTime()}
 function money(v,c){try{return new Intl.NumberFormat("en-GB",{style:"currency",currency:c,maximumFractionDigits:2}).format(Number(v||0))}catch(e){return Number(v||0).toFixed(2)+" "+c}}
@@ -85,7 +97,7 @@ function renderActivities(){
  currentPage=Math.min(Math.max(1,currentPage),totalPages);
  const start=(currentPage-1)*pageSize,end=Math.min(start+pageSize,total);
  for(const row of activityRows.slice(start,end)){
-  const tr=document.createElement("tr"),type=row.simulated?"Simulated buy (dry run)":(row.type==="TransferOut"?"Withdrawal":row.type),vals=[dateLabel(Date.parse(row.datetime)),type,btc(row.shares),money(row.price,quote)+"/BTC",money(row.amount,quote),(row.simulated?"~":"")+money(row.fee,quote)];
+  const tr=document.createElement("tr"),type=row.simulated?"Simulated buy (dry run)":(row.type==="TransferOut"?"Withdrawal":row.type),vals=[dateLabel(Date.parse(row.datetime)),type,btc(row.shares),money(Number(row.price)*fxRate,displayCurrency)+"/BTC",money(Number(row.amount)*fxRate,displayCurrency),(row.simulated?"~":"")+money(Number(row.fee)*fxRate,displayCurrency)];
   vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i>=2)td.className="num";tr.appendChild(td)});
   const action=document.createElement("td");
   if(row.type==="Buy"){const button=document.createElement("button");button.className="secondary";button.textContent="Delete";button.addEventListener("click",async()=>{if(!confirm("Delete this purchase from local bot history? This does not reverse an exchange order."))return;try{const response=await fetch("/api/activity/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({activityId:row.activityId})});const result=await response.json();if(!response.ok)throw new Error(result.error||"Could not delete purchase.");await loadAnalytics()}catch(e){showError(e.message)}});action.appendChild(button)}
@@ -98,14 +110,23 @@ function renderActivities(){
 $("pageSize").addEventListener("change",()=>{currentPage=1;renderActivities()});
 $("previousPage").addEventListener("click",()=>{if(currentPage>1){currentPage--;renderActivities()}});
 $("nextPage").addEventListener("click",()=>{currentPage++;renderActivities()});
+$("displayCurrency").addEventListener("change",()=>{displayCurrency=$("displayCurrency").value;localStorage.setItem("bitcoinDcaDisplayCurrency",displayCurrency);loadAnalytics()});
 async function loadAnalytics(){
- try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end);const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load the report.");quote=d.quote;dataCurrency=quote;const ex=d.exchange==="KRAKEN"?"Kraken":"Bitvavo";$("exchangeName").textContent=ex+" · DCA";$("exchangeLabel").textContent=ex;document.title=ex+" DCA · Portfolio";
- $("balance").textContent=btc(d.snapshot.balance);$("spot").textContent=money(d.snapshot.price,quote)+"/BTC";$("balanceValue").textContent=money(d.snapshot.value,quote);
- $("threshold").textContent=money(d.snapshot.withdrawThreshold,quote);
+ try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end);const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load the report.");quote=d.quote;
+ if(!displayCurrency){const saved=localStorage.getItem("bitcoinDcaDisplayCurrency");displayCurrency=["EUR","USD"].includes(saved)?saved:(["EUR","USD"].includes(quote)?quote:"EUR")}
+ $("displayCurrency").value=displayCurrency;
+ const priceResponse=await fetch("/api/market-price?currency="+displayCurrency);const market=await priceResponse.json();if(!priceResponse.ok)throw new Error(market.error||"Could not load current BTC price.");
+ fxRate=Number(market.conversionRate);const livePrice=Number(market.price);const ex=d.exchange==="KRAKEN"?"Kraken":"Bitvavo";$("exchangeName").textContent=ex+" · DCA";document.title=ex+" DCA · Portfolio";
+ $("balance").textContent=btc(d.snapshot.balance);$("spot").textContent=money(livePrice,displayCurrency)+"/BTC";$("spotUpdated").textContent="CoinGecko · "+new Date(Number(market.updatedAt)*1000).toLocaleTimeString("en-GB");
+ $("balanceValue").textContent=money(Number(d.snapshot.balance)*livePrice,displayCurrency);
+ $("settingExchange").textContent=ex;$("tradingMode").textContent=d.configuration.liveTrading?"Live":"Dry run";
+ $("buyAmount").textContent=Number(d.configuration.buyAmount)===0?"Exchange minimum":btc(d.configuration.buyAmount);
+ $("depositDay").textContent=String(d.configuration.depositDay);$("withdrawEnabled").textContent=d.configuration.withdrawalsEnabled?"Enabled":"Disabled";
+ $("threshold").textContent=money(Number(d.configuration.withdrawalThreshold)*fxRate,displayCurrency);
  $("buyCount").textContent=d.summary.buyCount;$("buyBtc").textContent=btc(d.summary.boughtBtc);$("simulatedCount").textContent=d.summary.simulatedBuyCount;$("simulatedBtc").textContent=btc(d.summary.simulatedBtc);
- $("buyVolume").textContent=money(d.summary.buyVolume,quote);$("avgPrice").textContent="Average: "+money(d.summary.averagePrice,quote)+"/BTC";
- $("tradeFees").textContent=money(d.summary.tradeFees,quote);$("withdrawBtc").textContent=btc(d.summary.withdrawnBtc);$("withdrawCount").textContent=d.summary.withdrawalCount+" withdrawals";
- $("withdrawFees").textContent=money(d.summary.withdrawalFees,quote);$("netBtc").textContent=btc(d.summary.netBtc);
+ $("buyVolume").textContent=money(Number(d.summary.buyVolume)*fxRate,displayCurrency);$("avgPrice").textContent="Average: "+money(Number(d.summary.averagePrice)*fxRate,displayCurrency)+"/BTC";
+ $("tradeFees").textContent=money(Number(d.summary.tradeFees)*fxRate,displayCurrency);$("withdrawBtc").textContent=btc(d.summary.withdrawnBtc);$("withdrawCount").textContent=d.summary.withdrawalCount+" withdrawals";
+ $("withdrawFees").textContent=money(Number(d.summary.withdrawalFees)*fxRate,displayCurrency);$("netBtc").textContent=btc(d.summary.netBtc);
  $("periodLabel").textContent=new Date(p.start).toLocaleString("en-GB")+" – "+new Date(p.end).toLocaleString("en-GB");$("updated").textContent=new Date(d.snapshot.updatedAt||Date.now()).toLocaleTimeString("en-GB");
  activityRows=d.activities.slice().reverse();currentPage=1;renderActivities();
  }catch(e){showError(e.message)}
@@ -115,6 +136,43 @@ $("download").addEventListener("click",async()=>{try{showError("");const p=selec
 (async()=>{try{await loadIntervals();await loadAnalytics()}catch(e){showError(e.message)}})();
 </script></body></html>
 """
+
+
+def _coingecko_market_price(display_currency, quote_currency):
+    display_currency = display_currency.upper()
+    quote_currency = quote_currency.upper()
+    if display_currency not in ("EUR", "USD") or quote_currency not in ("EUR", "USD"):
+        raise ValueError("Display currency and QUOTE_CURRENCY must be EUR or USD")
+    api_key = os.getenv("COINGECKO_DEMO_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("Set COINGECKO_DEMO_API_KEY in .env to load live BTC prices")
+    response = requests.get(
+        "https://api.coingecko.com/api/v3/simple/price",
+        params={
+            "ids": "bitcoin",
+            "vs_currencies": "eur,usd",
+            "include_last_updated_at": "true",
+            "precision": "full",
+        },
+        headers={"x-cg-demo-api-key": api_key},
+        timeout=15,
+    )
+    response.raise_for_status()
+    btc_prices = response.json()["bitcoin"]
+    prices = {
+        currency: Decimal(str(btc_prices[currency.lower()]))
+        for currency in ("EUR", "USD")
+    }
+    if prices[quote_currency] <= 0 or prices[display_currency] <= 0:
+        raise ValueError("CoinGecko returned an invalid BTC price")
+    conversion = prices[display_currency] / prices[quote_currency]
+    return {
+        "currency": display_currency,
+        "quoteCurrency": quote_currency,
+        "price": str(prices[display_currency]),
+        "conversionRate": str(conversion),
+        "updatedAt": int(btc_prices.get("last_updated_at") or datetime.now(timezone.utc).timestamp()),
+    }
 
 
 def _period(query):
@@ -174,6 +232,19 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, HTML, "text/html; charset=utf-8")
             return
         query = parse_qs(parsed.query)
+        if parsed.path == "/api/market-price":
+            currency = query.get("currency", ["EUR"])[0].upper()
+            try:
+                market = _coingecko_market_price(currency, self.settings["quote"])
+                self._json(200, market)
+            except ValueError as exc:
+                self._json(400, {"error": str(exc)})
+            except RuntimeError as exc:
+                self._json(503, {"error": str(exc)})
+            except Exception:
+                LOG.exception("CoinGecko market price request failed")
+                self._json(502, {"error": "Could not fetch a current BTC price from CoinGecko. Check the API key and container internet access."})
+            return
         try:
             records = read_activity_records()
             if parsed.path == "/api/withdrawals":
@@ -238,6 +309,13 @@ def _analytics_from_rows(settings, records, snapshot):
     return {
         "quote": quote,
         "exchange": snapshot.get("exchange", settings["exchange"]),
+        "configuration": {
+            "liveTrading": bool(settings["live"]),
+            "buyAmount": str(settings["buy_amount"]),
+            "depositDay": int(settings["deposit_day"]),
+            "withdrawalsEnabled": bool(settings["withdrawals_enabled"]),
+            "withdrawalThreshold": str(settings["withdraw_threshold"]),
+        },
         "snapshot": {
             "balance": str(balance),
             "price": str(price),
