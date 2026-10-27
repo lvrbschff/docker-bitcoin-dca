@@ -29,7 +29,7 @@ Create a key under **Settings → API**. Enable 2FA on your account.
 
 Copy the key and secret into `BITVAVO_API_KEY` and `BITVAVO_API_SECRET` in your local .env file. See Bitvavo's [API key setup guide](https://docs.bitvavo.com/docs/get-started/).
 
-For withdrawals, add and verify the destination address in Bitvavo first. The bot uses `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK`.
+For withdrawals, add and verify the destination address in Bitvavo first, then set `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK` in .env.
 
 ### Kraken
 
@@ -85,7 +85,7 @@ Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings 
 
 ### Bitvavo settings
 
-These variables are used only when `EXCHANGE=BITVAVO`. Put the API key and secret in .env. Set the withdrawal address and network in docker-compose.yml when `WITHDRAWALS_ENABLED=true` and `EXCHANGE=BITVAVO`.
+These variables are used only when `EXCHANGE=BITVAVO`. Put the API key and secret in .env. Set the withdrawal address and network in .env when `WITHDRAWALS_ENABLED=true` and `EXCHANGE=BITVAVO`.
 
 | Variable | Required when | Description |
 | --- | --- | --- |
