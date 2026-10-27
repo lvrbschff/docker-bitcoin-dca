@@ -48,6 +48,8 @@ Copy the example file and fill in the credentials for the selected exchange:
 cp .env.example .env
 ~~~
 
+Create a free CoinGecko Demo API key in its [Developer Dashboard](https://docs.coingecko.com/docs/setting-up-your-api-key) and add it as `COINGECKO_DEMO_API_KEY` in .env. The web UI uses this key to fetch current BTC prices in EUR and USD.
+
 For Bitvavo, fill in `BITVAVO_API_KEY` and `BITVAVO_API_SECRET`. For Kraken, fill in `KRAKEN_API_KEY` and `KRAKEN_API_SECRET`. Add your CoinGecko Demo key as `COINGECKO_DEMO_API_KEY`; the web UI uses it only to fetch current BTC prices in EUR and USD. Leave the other exchange's credentials empty. Never commit .env or API credentials to the repository.
 
 `WEB_UI_PORT`, `COINGECKO_DEMO_API_KEY`, exchange API credentials, and (for Kraken withdrawals) `KRAKEN_WITHDRAW_KEY` are set in .env. The other bot settings are configured directly in docker-compose.yml, including Bitvavo's `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK`.
