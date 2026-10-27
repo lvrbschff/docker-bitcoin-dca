@@ -57,7 +57,7 @@ The web UI reads current prices from Kraken’s public [BTC/EUR](https://www.kra
 
 For Bitvavo, fill in `BITVAVO_API_KEY` and `BITVAVO_API_SECRET`. For Kraken, fill in `KRAKEN_API_KEY` and `KRAKEN_API_SECRET`. Leave the other exchange's credentials empty. Never commit .env or API credentials to the repository.
 
-`WEB_UI_PORT`, `WEB_UI_USERNAME`, `WEB_UI_PASSWORD`, exchange API credentials, and (for Kraken withdrawals) `KRAKEN_WITHDRAW_KEY` are set in .env. The other bot settings are configured directly in docker-compose.yml, including Bitvavo's `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK`.
+`WEB_UI_PORT`, `WEB_UI_USERNAME`, `WEB_UI_PASSWORD`, exchange API credentials, and withdrawal settings (`KRAKEN_WITHDRAW_KEY` for Kraken; `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK` for Bitvavo) are set in .env. The other bot settings are configured directly in docker-compose.yml.
 
 ## 3. Configure the bot
 
@@ -91,8 +91,8 @@ These variables are used only when `EXCHANGE=BITVAVO`. Put the API key and secre
 | --- | --- | --- |
 | `BITVAVO_API_KEY` | `EXCHANGE=BITVAVO` | Bitvavo API key in .env. |
 | `BITVAVO_API_SECRET` | `EXCHANGE=BITVAVO` | Bitvavo API secret in .env. |
-| `WITHDRAW_ADDRESS` | `WITHDRAWALS_ENABLED=true` and `EXCHANGE=BITVAVO` | Verified Bitvavo Bitcoin destination address in docker-compose.yml. |
-| `WITHDRAW_NETWORK` | `WITHDRAWALS_ENABLED=true` and `EXCHANGE=BITVAVO` | Bitvavo withdrawal network in docker-compose.yml. |
+| `WITHDRAW_ADDRESS` | `WITHDRAWALS_ENABLED=true` and `EXCHANGE=BITVAVO` | Verified Bitvavo Bitcoin destination address in .env. |
+| `WITHDRAW_NETWORK` | `WITHDRAWALS_ENABLED=true` and `EXCHANGE=BITVAVO` | Bitvavo withdrawal network in .env. |
 
 ### Kraken settings
 
@@ -196,7 +196,7 @@ The Docker and configuration files have different jobs:
 
 - **Dockerfile** is the image build recipe. It installs Python dependencies and copies the bot and adapter code into the image.
 - **docker-compose.yml** builds and runs that image, sets the bot's runtime options, and publishes the local web UI port.
-- **.env.example** is a template for a local .env file. Use it for exchange API credentials, WEB_UI_PORT, WEB_UI_USERNAME, WEB_UI_PASSWORD, and KRAKEN_WITHDRAW_KEY when needed. It is not a second Docker build file, and it contains no exchange API credentials.
+- **.env.example** is a template for a local .env file. Use it for exchange API credentials, web UI settings, KRAKEN_WITHDRAW_KEY, and Bitvavo's WITHDRAW_ADDRESS and WITHDRAW_NETWORK when needed. It is not a second Docker build file, and it contains no exchange API credentials.
 
 The code is separated by responsibility:
 
