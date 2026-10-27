@@ -54,6 +54,28 @@ def local_now(timezone_name):
     return datetime.now(ZoneInfo(timezone_name))
 
 
+def latest_recorded_buy_time(base_asset):
+    """Return the newest real buy of the configured asset from persistent UI activity."""
+    buy_times = []
+    for record in read_activity_records():
+        if record.get("simulated"):
+            continue
+        row = record.get("row", {})
+        if row.get("type") != "Buy" or str(row.get("identifier", "")).upper() != base_asset.upper():
+            continue
+        value = row.get("datetime")
+        if not value:
+            continue
+        try:
+            timestamp = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
+            buy_times.append(timestamp.astimezone(timezone.utc))
+        except (TypeError, ValueError):
+            LOG.warning("Ignoring activity buy with invalid datetime: %r", value)
+    return max(buy_times) if buy_times else None
+
+
 def read_state(path, cycle_key):
     if not path.exists():
         return {"cycle": cycle_key, "spent": "0"}
@@ -305,6 +327,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
         state.pop("pending_order", None)
         save_state(state_path, state)
         settings["first_purchase_done"] = True
+        settings["startup_last_buy_at"] = None
         LOG.info("Reconciled previous %s order %s; status=%s; saved %s bot activity record(s). Recalculating the next purchase schedule now.", settings["exchange"], event_id, result.get("status", "found"), added)
         now = local_now(settings["timezone"])
     try:
@@ -354,11 +377,32 @@ def run_once(api, settings, check_interval, schedule_only=False):
         order_amount, base, order_quote, quote, possible_buys,
         next_deposit.isoformat(), int(interval_seconds / 60),
     )
-    if not settings["first_purchase_done"]:
+    startup_last_buy = settings.get("startup_last_buy_at")
+    if startup_last_buy:
+        elapsed = max(0, (now.astimezone(timezone.utc) - startup_last_buy).total_seconds())
+        remaining_seconds = max(0, int(interval_seconds - elapsed))
+        if remaining_seconds > 0:
+            next_purchase_at = now + timedelta(seconds=remaining_seconds)
+            LOG.info(
+                "Aligning first purchase after restart to the previous DCA cadence: "
+                "last recorded buy=%s; elapsed=%s minutes of %s-minute interval; "
+                "next purchase in about %s minutes at %s local time.",
+                startup_last_buy.isoformat(timespec="seconds"),
+                int(elapsed / 60), int(interval_seconds / 60),
+                int(remaining_seconds / 60),
+                next_purchase_at.strftime("%Y-%m-%d %H:%M:%S %Z"),
+            )
+            return remaining_seconds
         LOG.info(
-            "First purchase is due after the configured startup delay of %s seconds; "
-            "the next interval will be recalculated after that purchase.",
-            settings["first_buy_delay_seconds"],
+            "Previous DCA interval has elapsed since the last recorded buy at %s; "
+            "the next purchase is due now.",
+            startup_last_buy.isoformat(timespec="seconds"),
+        )
+    elif not settings["first_purchase_done"]:
+        LOG.info(
+            "No previous real %s purchase is recorded; the first purchase follows "
+            "the configured startup delay of %s seconds.",
+            base, settings["first_buy_delay_seconds"],
         )
     else:
         last_order = state.get("last_order_at")
@@ -417,6 +461,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
         LOG.info("Saved %s simulated purchase record(s) for the web UI; excluded from the Parqet CSV export.", added)
 
     settings["first_purchase_done"] = True
+    settings["startup_last_buy_at"] = None
     # Debit budget for dry-run too, to make its monthly schedule representative.
     state["spent"] = str(spent + order_quote)
     state["last_order_at"] = datetime.now(timezone.utc).isoformat()
@@ -429,12 +474,22 @@ def run_once(api, settings, check_interval, schedule_only=False):
 
 
 def bot_loop(api, settings, interval):
-    if settings["first_buy_delay_seconds"] > 0:
+    last_buy = latest_recorded_buy_time(settings["base"])
+    if last_buy is None:
+        if settings["first_buy_delay_seconds"] > 0:
+            LOG.info(
+                "No previous real %s purchase is recorded in persistent activity; "
+                "waiting %s seconds before the first purchase.",
+                settings["base"], settings["first_buy_delay_seconds"],
+            )
+            time.sleep(settings["first_buy_delay_seconds"])
+    else:
+        settings["startup_last_buy_at"] = last_buy
         LOG.info(
-            "Waiting %s seconds after container startup before the first purchase check.",
-            settings["first_buy_delay_seconds"],
+            "Found previous real %s purchase in persistent activity at %s; "
+            "the first purchase after startup will be aligned to the recalculated DCA interval.",
+            settings["base"], last_buy.isoformat(timespec="seconds"),
         )
-        time.sleep(settings["first_buy_delay_seconds"])
     while True:
         next_wait = interval
         try:
