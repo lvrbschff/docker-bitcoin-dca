@@ -7,7 +7,6 @@ A Docker-based DCA bot for buying Bitcoin with fiat deposits on Bitvavo or Krake
 - Docker Engine and the Docker Compose plugin
 - An account at Bitvavo or Kraken
 - API credentials for the exchange you select
-- A free CoinGecko Demo API key for the live portfolio price and currency conversion
 - For automatic withdrawals: a verified Bitvavo withdrawal address, or a saved Bitcoin withdrawal method on Kraken
 
 ## 1. Choose your exchange and create an API key
@@ -48,11 +47,11 @@ Copy the example file and fill in the credentials for the selected exchange:
 cp .env.example .env
 ~~~
 
-Create a free CoinGecko Demo API key in its [Developer Dashboard](https://docs.coingecko.com/docs/setting-up-your-api-key) and add it as `COINGECKO_DEMO_API_KEY` in .env. The web UI uses this key to fetch current BTC prices in EUR and USD.
+The web UI fetches the displayed BTC price from CoinGecko’s public EUR and USD price pages. No CoinGecko API key is required; the Docker host must have internet access.
 
-For Bitvavo, fill in `BITVAVO_API_KEY` and `BITVAVO_API_SECRET`. For Kraken, fill in `KRAKEN_API_KEY` and `KRAKEN_API_SECRET`. Add your CoinGecko Demo key as `COINGECKO_DEMO_API_KEY`; the web UI uses it only to fetch current BTC prices in EUR and USD. Leave the other exchange's credentials empty. Never commit .env or API credentials to the repository.
+For Bitvavo, fill in `BITVAVO_API_KEY` and `BITVAVO_API_SECRET`. For Kraken, fill in `KRAKEN_API_KEY` and `KRAKEN_API_SECRET`. Leave the other exchange's credentials empty. Never commit .env or API credentials to the repository.
 
-`WEB_UI_PORT`, `COINGECKO_DEMO_API_KEY`, exchange API credentials, and (for Kraken withdrawals) `KRAKEN_WITHDRAW_KEY` are set in .env. The other bot settings are configured directly in docker-compose.yml, including Bitvavo's `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK`.
+`WEB_UI_PORT`, exchange API credentials, and (for Kraken withdrawals) `KRAKEN_WITHDRAW_KEY` are set in .env. The other bot settings are configured directly in docker-compose.yml, including Bitvavo's `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK`.
 
 ## 3. Configure the bot
 
@@ -77,7 +76,6 @@ Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings 
 | `WITHDRAW_THRESHOLD_QUOTE` | `1000` | Withdraw when the available BTC balance reaches this value in `QUOTE_CURRENCY`. |
 | `WEB_UI_ENABLED` | `true` | Enables the local portfolio dashboard. |
 | `LOG_LEVEL` | `INFO` | Python log level, such as `INFO`, `WARNING`, or `DEBUG`. |
-| `COINGECKO_DEMO_API_KEY` | Required for web UI prices | CoinGecko free Demo API key stored in .env. Used for current EUR/USD BTC prices and fiat conversion; not used for orders. |
 
 ### Bitvavo settings
 
