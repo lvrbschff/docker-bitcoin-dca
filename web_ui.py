@@ -46,7 +46,8 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <section class="panel"><h2>Bot-tracked portfolio</h2><div class="grid">
 <div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
 <div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
-<div class="card"><label>Value in fiat currency</label><div class="value" id="balanceValue">—</div></div>\n<div class="card"><label>Profit / loss vs. selected-period buys</label><div class="value" id="profitLoss">—</div><div class="small" id="profitLossBasis">Portfolio value minus purchases and trading fees in the selected period</div></div>
+<div class="card"><label>Value in fiat currency</label><div class="value" id="balanceValue">—</div></div>
+<div class="card"><label>Profit / loss vs. selected-period buys</label><div class="value" id="profitLoss">—</div><div class="small" id="profitLossBasis">Portfolio value minus purchases and trading fees in the selected period</div></div>
 </div></section>
 <section class="panel">
 <h2>Bot settings</h2>
