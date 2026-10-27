@@ -2,6 +2,12 @@
 
 A Docker-based DCA bot for buying Bitcoin with fiat deposits on Bitvavo or Kraken. Choose the exchange, quote currency, purchase amount, and deposit day. The bot recalculates purchase timing from the available balance and the selected exchange's current minimum order rules. A local web UI shows activity recorded by the bot and can generate Parqet-compatible CSV exports.
 
+### Example web UI (fictional data)
+
+The image below is an illustrative screenshot with fictional values; it does not show real balances or activity.
+
+![Bitcoin DCA web UI example using fictional data](docs/web-ui-example.svg)
+
 ## What you need
 
 - Docker Engine and the Docker Compose plugin
