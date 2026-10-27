@@ -175,6 +175,7 @@ def update_dashboard_snapshot(settings, quote_balance, price):
         Decimal(0),
     )
     tracked_btc = bought - withdrawn
+    previous = read_dashboard_snapshot()
     write_dashboard_snapshot({
         "exchange": settings["exchange"],
         "quote": settings["quote"],
@@ -183,8 +184,20 @@ def update_dashboard_snapshot(settings, quote_balance, price):
         "value": format(tracked_btc * price, "f"),
         "quoteBalance": format(quote_balance, "f"),
         "withdrawThreshold": format(settings["withdraw_threshold"], "f"),
+        "nextPurchaseAt": previous.get("nextPurchaseAt"),
+        "nextPurchaseStatus": previous.get("nextPurchaseStatus", "Schedule pending"),
         "updatedAt": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     })
+
+
+def update_dashboard_schedule(next_purchase_at, status):
+    snapshot = read_dashboard_snapshot()
+    snapshot["nextPurchaseAt"] = (
+        next_purchase_at.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+        if next_purchase_at is not None else None
+    )
+    snapshot["nextPurchaseStatus"] = status
+    write_dashboard_snapshot(snapshot)
 
 
 def persist_bot_buy(api, order, settings, event_id, fallback_timestamp_ms):
@@ -359,6 +372,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
     price = api.price(symbol)
     update_dashboard_snapshot(settings, balance, price)
     if balance_after_simulated_spend <= 0:
+        update_dashboard_schedule(None, "Waiting for available quote-currency funds")
         simulated_spent = spent if not settings["live"] else Decimal(0)
         LOG.info(
             "No available %s balance for DCA purchases (balance=%s, simulated spend=%s).",
@@ -366,6 +380,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
         )
         return check_interval
     if market.get("status") != "trading":
+        update_dashboard_schedule(None, f"Waiting for market status: {market.get('status')}")
         LOG.info("Market %s is %s; waiting.", symbol, market.get("status"))
         return check_interval
     min_quote = Decimal(market["minOrderInQuoteAsset"])
@@ -379,6 +394,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
     affordable_budget = min(spendable, available)
     possible_buys = int(affordable_budget // order_quote)
     if possible_buys < 1:
+        update_dashboard_schedule(None, "Waiting until the balance covers an order")
         LOG.info("Waiting: available balance %s %s; minimum order %s %s.", affordable_budget, quote, order_quote, quote)
         return check_interval
 
@@ -399,6 +415,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
         remaining_seconds = max(0, int(interval_seconds - elapsed))
         if remaining_seconds > 0:
             next_purchase_at = now + timedelta(seconds=remaining_seconds)
+            update_dashboard_schedule(next_purchase_at, "Scheduled")
             LOG.info(
                 "Aligning first purchase after restart to the previous DCA cadence: "
                 "last recorded buy=%s; elapsed=%s minutes of %s-minute interval; "
@@ -409,12 +426,14 @@ def run_once(api, settings, check_interval, schedule_only=False):
                 next_purchase_at.strftime("%Y-%m-%d %H:%M:%S %Z"),
             )
             return remaining_seconds
+        update_dashboard_schedule(now, "Due now")
         LOG.info(
             "Previous DCA interval has elapsed since the last recorded buy at %s; "
             "the next purchase is due now.",
             startup_last_buy.isoformat(timespec="seconds"),
         )
     elif not settings["first_purchase_done"]:
+        update_dashboard_schedule(now, "Due now")
         LOG.info(
             "No previous real %s purchase is recorded; the first purchase follows "
             "the configured startup delay of %s seconds.",
@@ -427,6 +446,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
             if elapsed < interval_seconds:
                 remaining_seconds = max(0, int(interval_seconds - elapsed))
                 next_purchase_at = now + timedelta(seconds=remaining_seconds)
+                update_dashboard_schedule(next_purchase_at, "Scheduled")
                 LOG.info(
                     "Next purchase in about %s minutes, estimated around %s local time "
                     "(recomputed from %s %s available and %s possible buys).",
@@ -436,6 +456,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
                 )
                 return remaining_seconds
 
+    update_dashboard_schedule(now, "Due now")
     if schedule_only:
         # If the computed time has already arrived while recording the last order,
         # wake the normal loop immediately instead of submitting from this pass.
@@ -443,6 +464,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
 
     if settings["live"]:
         if available < order_quote:
+            update_dashboard_schedule(None, "Waiting until the balance covers an order")
             LOG.info("Waiting for sufficient available balance: %s %s; minimum order %s %s.", available, quote, order_quote, quote)
             return check_interval
         pending = {
@@ -490,6 +512,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
 
 
 def bot_loop(api, settings, interval):
+    update_dashboard_schedule(None, "Waiting for startup delay")
     if settings["first_buy_delay_seconds"] > 0:
         LOG.info(
             "Waiting %s seconds after container startup before checking purchase history or calculating the first order.",
