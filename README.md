@@ -7,6 +7,7 @@ A Docker-based DCA bot for buying Bitcoin with fiat deposits on Bitvavo or Krake
 - Docker Engine and the Docker Compose plugin
 - An account at Bitvavo or Kraken
 - API credentials for the exchange you select
+- A free CoinGecko Demo API key for the live portfolio price and currency conversion
 - For automatic withdrawals: a verified Bitvavo withdrawal address, or a saved Bitcoin withdrawal method on Kraken
 
 ## 1. Choose your exchange and create an API key
@@ -47,9 +48,9 @@ Copy the example file and fill in the credentials for the selected exchange:
 cp .env.example .env
 ~~~
 
-For Bitvavo, fill in `BITVAVO_API_KEY` and `BITVAVO_API_SECRET`. For Kraken, fill in `KRAKEN_API_KEY` and `KRAKEN_API_SECRET`. Leave the other exchange's credentials empty. Never commit .env or API credentials to the repository.
+For Bitvavo, fill in `BITVAVO_API_KEY` and `BITVAVO_API_SECRET`. For Kraken, fill in `KRAKEN_API_KEY` and `KRAKEN_API_SECRET`. Add your CoinGecko Demo key as `COINGECKO_DEMO_API_KEY`; the web UI uses it only to fetch current BTC prices in EUR and USD. Leave the other exchange's credentials empty. Never commit .env or API credentials to the repository.
 
-`WEB_UI_PORT`, exchange API credentials, and (for Kraken withdrawals) `KRAKEN_WITHDRAW_KEY` are set in .env. The other bot settings are configured directly in docker-compose.yml, including Bitvavo's `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK`.
+`WEB_UI_PORT`, `COINGECKO_DEMO_API_KEY`, exchange API credentials, and (for Kraken withdrawals) `KRAKEN_WITHDRAW_KEY` are set in .env. The other bot settings are configured directly in docker-compose.yml, including Bitvavo's `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK`.
 
 ## 3. Configure the bot
 
@@ -74,6 +75,7 @@ Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings 
 | `WITHDRAW_THRESHOLD_QUOTE` | `1000` | Withdraw when the available BTC balance reaches this value in `QUOTE_CURRENCY`. |
 | `WEB_UI_ENABLED` | `true` | Enables the local portfolio dashboard. |
 | `LOG_LEVEL` | `INFO` | Python log level, such as `INFO`, `WARNING`, or `DEBUG`. |
+| `COINGECKO_DEMO_API_KEY` | Required for web UI prices | CoinGecko free Demo API key stored in .env. Used for current EUR/USD BTC prices and fiat conversion; not used for orders. |
 
 ### Bitvavo settings
 
@@ -141,7 +143,7 @@ Check the destination and network carefully before enabling automatic withdrawal
 
 ## Portfolio web UI
 
-The dashboard displays purchases and withdrawals recorded when this bot places them. Its activity history is stored in `activity.json` and the dashboard snapshot in `dashboard.json` on the Docker-managed named volume `bitcoin-dca-webui-data`. Docker Compose creates and reattaches this same volume on redeploy. On first startup after updating, previously stored activity files under `./state` are copied into the named volume. Keep the volume when updating; `docker compose down -v` deletes it. The dashboard reads its activity and latest price snapshot from these local files; the web UI does not query Kraken or Bitvavo for transaction history. The displayed BTC amount is the net amount tracked from the bot's recorded purchases and withdrawals, not the full exchange-account balance.
+The dashboard displays purchases and withdrawals recorded when this bot places them. Select EUR or USD as the display currency; the page fetches current BTC prices in both currencies from CoinGecko on load and converts historical fiat totals and fees using the same current price ratio. The displayed portfolio value is bot-tracked BTC multiplied by the selected live price. Its activity history is stored in `activity.json` and the dashboard snapshot in `dashboard.json` on the Docker-managed named volume `bitcoin-dca-webui-data`. Docker Compose creates and reattaches this same volume on redeploy. On first startup after updating, previously stored activity files under `./state` are copied into the named volume. Keep the volume when updating; `docker compose down -v` deletes it. The dashboard reads its activity and latest price snapshot from these local files; the web UI does not query Kraken or Bitvavo for transaction history. The displayed BTC amount is the net amount tracked from the bot's recorded purchases and withdrawals, not the full exchange-account balance.
 
 Choose an interval between bot-recorded Bitcoin withdrawals or enter custom start and end dates. The activity table distinguishes simulated dry-run purchases from real purchases. Simulated fees are estimates based on your current exchange taker fee tier and are prefixed with `~`. Use **Delete** to remove an individual purchase from the local activity history; this does not reverse an order on the exchange. Download the selected period as a Parqet-compatible CSV for import into Parqet. Simulated purchases are excluded. Activity from before local tracking is enabled is not imported automatically. Set `WEB_UI_ENABLED` to false to disable the dashboard.
 
