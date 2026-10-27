@@ -175,10 +175,10 @@ def _kraken_public_btc_price(currency):
     parser = _PageTextParser()
     parser.feed(response.text)
     page_text = " ".join(" ".join(parser.parts).split())
-    number = r"([0-9][0-9,]*(?:\\.[0-9]+)?)"
+    number = r"([0-9][0-9,]*(?:\.[0-9]+)?)"
     patterns = (
-        rf"1\\s*BTC\\s*=\\s*{number}\\s*{currency}\\b",
-        rf"1(?:\\.00)?\\s*BTC\\s*=\\s*[$€]\\s*{number}",
+        rf"1\s*BTC\s*=\s*{number}\s*{currency}\b",
+        rf"1(?:\.00)?\s*BTC\s*=\s*[$€]\s*{number}",
     )
     for pattern in patterns:
         match = re.search(pattern, page_text, flags=re.IGNORECASE)
