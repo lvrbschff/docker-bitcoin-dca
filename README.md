@@ -196,7 +196,7 @@ The Docker and configuration files have different jobs:
 
 - **Dockerfile** is the image build recipe. It installs Python dependencies and copies the bot and adapter code into the image.
 - **docker-compose.yml** builds and runs that image, sets the bot's runtime options, and publishes the local web UI port.
-- **.env.example** is a template for a local .env file. Use it for exchange API credentials, WEB_UI_PORT, WEB_UI_USERNAME, WEB_UI_PASSWORD, and KRAKEN_WITHDRAW_KEY when needed. It is not a second Docker build file, and it contains no actual credentials by default.
+- **.env.example** is a template for a local .env file. Use it for exchange API credentials, WEB_UI_PORT, WEB_UI_USERNAME, WEB_UI_PASSWORD, and KRAKEN_WITHDRAW_KEY when needed. It is not a second Docker build file, and it contains no exchange API credentials.
 
 The code is separated by responsibility:
 
