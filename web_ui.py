@@ -27,7 +27,7 @@ main{max-width:1180px;margin:0 auto;padding:36px 22px 64px}.top{display:flex;jus
 .badge{border:1px solid var(--line);border-radius:999px;padding:8px 12px;color:var(--muted);font-size:12px}.top-actions{display:flex;flex-direction:column;align-items:flex-end;gap:10px}.top-actions .field{min-width:170px}.top-actions .field label{margin-bottom:5px}
 .panel{background:linear-gradient(145deg,rgba(21,31,52,.96),rgba(15,22,39,.96));border:1px solid var(--line);border-radius:18px;padding:20px;margin:18px 0;box-shadow:0 14px 40px #0002}
 .controls{display:grid;grid-template-columns:2fr 1fr 1fr auto auto;gap:12px;align-items:end}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}select,input,button{font:inherit;color:var(--text);background:#0c1425;border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%}button{width:auto;cursor:pointer;background:var(--accent);border-color:var(--accent);color:#081122;font-weight:700}button.secondary{background:transparent;color:var(--text);border-color:var(--line)}button:hover{filter:brightness(1.08)}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card{padding:17px;border:1px solid var(--line);border-radius:14px;background:#0c1425a8}.card label{display:block;color:var(--muted);font-size:12px;margin-bottom:9px}.value{font-size:22px;font-weight:700;letter-spacing:-.02em}.small{font-size:12px;color:var(--muted);margin-top:4px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.period-summary-grid{grid-template-columns:repeat(5,1fr)}.card{padding:17px;border:1px solid var(--line);border-radius:14px;background:#0c1425a8}.card label{display:block;color:var(--muted);font-size:12px;margin-bottom:9px}.value{font-size:22px;font-weight:700;letter-spacing:-.02em}.small{font-size:12px;color:var(--muted);margin-top:4px}
 h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:740px}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}td.num{text-align:right;font-variant-numeric:tabular-nums}.positive{color:var(--green)}.negative{color:var(--red)}.notice{color:var(--muted);font-size:13px;margin-top:12px}.error{color:var(--red);margin:12px 0}.hidden{display:none}.activity-heading,.pagination,.settings-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.settings-heading h2{margin:0}.settings-heading .field{min-width:160px}.activity-heading h2{margin:0}.page-size{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}.page-size select{width:auto;padding:7px 10px}.pagination{margin-top:12px}.pagination button{padding:8px 12px}.pagination .notice{margin:0;text-align:center}
 @media(max-width:850px){.controls{grid-template-columns:1fr 1fr}.controls .field:first-child{grid-column:span 2}.grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:520px){main{padding:24px 14px}.top{align-items:flex-start;flex-direction:column}.top-actions{align-items:flex-start}h1{font-size:25px}.controls{grid-template-columns:1fr}.controls .field:first-child{grid-column:auto}.grid{gap:9px}.card{padding:13px}.value{font-size:18px}.activity-heading,.settings-heading{align-items:flex-start;flex-direction:column}.pagination{gap:8px}.pagination button{padding:8px}.pagination .notice{font-size:11px}}
@@ -47,7 +47,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
 <div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
 <div class="card"><label>Value in fiat currency</label><div class="value" id="balanceValue">—</div></div>
-<div class="card"><label>Profit / loss vs. selected-period buys</label><div class="value" id="profitLoss">—</div><div class="small" id="profitLossBasis">Portfolio value minus purchases and trading fees in the selected period</div></div>
+
 </div></section>
 <section class="panel">
 <h2>Bot settings</h2>
@@ -61,11 +61,12 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <div class="card"><label>Withdrawal threshold (WITHDRAW_THRESHOLD_QUOTE)</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured environment variable</div></div>
 </div><div class="notice">Fiat values are converted to the selected display currency. The current BTC price is fetched from Kraken’s public BTC-to-fiat pages when the report loads. Parqet CSV exports retain the currency in which each transaction was recorded.</div>
 </section>
-<section class="panel"><h2>Selected period summary</h2><div class="grid">
+<section class="panel"><h2>Selected period summary</h2><div class="grid period-summary-grid">
 <div class="card"><label>BTC purchases</label><div class="value" id="buyCount">—</div><div class="small" id="buyBtc"></div></div>
 <div class="card"><label>Purchase volume</label><div class="value" id="buyVolume">—</div><div class="small" id="avgPrice"></div></div>
 <div class="card"><label>Trading fees</label><div class="value" id="tradeFees">—</div></div>
 <div class="card"><label>Withdrawals</label><div class="value" id="withdrawBtc">—</div><div class="small" id="withdrawCount"></div></div>
+<div class="card"><label>Profit / loss on period purchases</label><div class="value" id="profitLoss">—</div><div class="small" id="profitLossBasis">Current value of BTC bought in this period minus purchase costs and trading fees</div></div>
 </div><div class="grid" style="margin-top:14px">
 <div class="card"><label>Withdrawal fees</label><div class="value" id="withdrawFees">—</div></div>
 <div class="card"><label>Net BTC in period</label><div class="value" id="netBtc">—</div><div class="small">Purchases minus withdrawals</div></div>
@@ -132,8 +133,9 @@ async function loadAnalytics(){
  const currentPortfolioValue=Number(d.snapshot.balance)*livePrice;
  $("balanceValue").textContent=livePrice>0?money(currentPortfolioValue,displayCurrency):"—";
  if(livePrice>0){
+  const periodPurchaseValue=Number(d.summary.boughtBtc)*livePrice;
   const periodPurchaseCosts=(Number(d.summary.buyVolume)+Number(d.summary.tradeFees))*fxRate;
-  const profitLoss=currentPortfolioValue-periodPurchaseCosts;
+  const profitLoss=periodPurchaseValue-periodPurchaseCosts;
   $("profitLoss").textContent=money(profitLoss,displayCurrency);
   $("profitLoss").className="value "+(profitLoss>=0?"positive":"negative");
  }else{$("profitLoss").textContent="—";$("profitLoss").className="value"}
