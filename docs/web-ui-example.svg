@@ -22,7 +22,7 @@
 <rect width="1440" height="1300" rx="22" fill="url(#bg)"/>
 <rect x="24" y="24" width="1392" height="1252" rx="22" fill="#0b1020"/>
 <!-- Header -->
-<text x="68" y="70" class="eyebrow accent">KRAKEN · DCA</text>
+<text x="68" y="70" class="eyebrow accent">KRAKEN</text>
 <text x="68" y="116" class="title">DCA Crypto Bot</text>
 <text x="68" y="146" class="sub muted">Portfolio overview and activity analysis, with optional Parqet CSV export</text>
 <rect x="1190" y="53" width="160" height="34" rx="17" fill="#10182a" stroke="#26324a"/>
