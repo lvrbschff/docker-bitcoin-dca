@@ -205,8 +205,20 @@ The code is separated by responsibility:
 
 The workflow in .github/workflows/publish.yml builds and publishes the image to GHCR when changes are pushed to main, when version tags such as v1.0.0 are pushed, or when the workflow is started manually. Configure API credentials on the Docker host; credentials are not included in the image.
 
-## Limitations
+## Limitations and disclaimer
 
-The bot supports BTC withdrawals and Parqet exports for Bitcoin activity. Exchange markets, deposit history, minimums, fees, and available fiat currencies differ. Confirm that the selected exchange supports your `QUOTE_CURRENCY` and BTC market before using live trading.
+### Technical limitations
 
-This project is a technical example, not investment advice.
+- The bot places spot market orders. The final execution price, spread, fill amount, and fees can differ from estimates. Exchange rules, market minimums, fee tiers, API behavior, and permissions can change.
+- Purchase timing is an estimate based on the available quote-currency balance, the current market price, the effective order size, and `DEPOSIT_DAY`. The bot cannot identify which part of the balance you intend to spend or verify that a new monthly deposit has arrived.
+- The bot supports only markets and quote currencies offered by the selected exchange. Check that the `BASE_ASSET`-`QUOTE_CURRENCY` market is available before enabling live trading.
+- The activity database contains activity recorded by this bot. It does not import manual trades, deposits, transfers, or older account history. Dashboard totals and Parqet CSV exports are therefore not a complete exchange-account statement or tax report.
+- The portfolio value is based only on bot-recorded purchases and withdrawals. It may differ from the exchange account balance, especially when the account has other funds or activity.
+- Automatic withdrawals and Parqet exports currently support BTC activity only. A withdrawal address or saved method must be correct; crypto withdrawals may be irreversible. If a withdrawal or order has an uncertain result, check its status with the exchange before taking further action.
+- The UI's current BTC price comes from Kraken's public converter pages, not necessarily the selected exchange's executable price. The UI needs internet access, and a change to Kraken's page could interrupt price extraction. Stored activity remains local to the configured Docker volume.
+
+### No warranty or financial advice
+
+This software is provided “as is” and “as available”, without warranties. It is not investment, tax, or legal advice. You are responsible for reviewing the code and configuration, protecting API credentials, monitoring the bot, and verifying orders, withdrawals, fees, and exports.
+
+To the fullest extent permitted by applicable law, the maintainer assumes no liability for financial losses, missed or unexpected trades, fees, withdrawal errors, exchange or API outages, data loss, or other damages arising from use of, or inability to use, this software. Nothing in this statement excludes liability that cannot legally be excluded.
