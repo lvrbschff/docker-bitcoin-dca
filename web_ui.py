@@ -75,6 +75,8 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 .footnote-ref{color:var(--accent);text-decoration:none;margin-left:3px}.footnote-ref:hover{text-decoration:underline}.footnote-ref:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
 .dashboard-footnotes{margin-top:30px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
 .dashboard-footnotes h2{font-size:14px;margin:0 0 12px}.dashboard-footnotes ol{margin:0;padding-left:20px}.dashboard-footnotes li{padding-left:4px;margin-bottom:14px;scroll-margin-top:20px}.dashboard-footnotes strong{color:var(--text);font-weight:600}.dashboard-footnotes p{margin:4px 0 0}
+.export-feedback{margin:10px 0 0;text-align:right;color:var(--red);font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+@media(max-width:600px){.export-feedback{text-align:left}}
 </style>
 </head>
 <body><main>
@@ -124,7 +126,8 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 <div class="card"><label>Last updated</label><div class="value" id="updated">—</div></div>
 </div></section>
 <section class="panel"><div class="activity-heading"><h2>Activity</h2><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>10</option><option selected>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th><th>Action</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><button class="secondary" id="previousPage">Previous</button><span id="pageInfo" class="notice"></span><button class="secondary" id="nextPage">Next</button></div></section>
-<div class="bottom-actions"><button class="secondary" id="download">Download Parqet CSV</button></div>
+<div class="bottom-actions"><button class="secondary" id="download" aria-describedby="exportMessage">Download Parqet CSV</button></div>
+<p id="exportMessage" class="export-feedback hidden" role="alert"></p>
 </section>
 <footer class="dashboard-footnotes" aria-labelledby="notesHeading">
 <h2 id="notesHeading">Notes</h2>
@@ -252,7 +255,19 @@ async function loadAnalytics(){
  }catch(e){showError(e.message)}
 }
 $("refresh").addEventListener("click",loadAnalytics);
-$("download").addEventListener("click",async()=>{try{showError("");const p=selectedPeriod();const response=await fetch("/api/export.csv?start="+p.start+"&end="+p.end);if(!response.ok){const d=await response.json();throw new Error(d.error||"Could not generate the CSV export.")}const blob=await response.blob(),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="parqet_crypto_"+new Date(p.start).toISOString().slice(0,10)+"_"+new Date(p.end).toISOString().slice(0,10)+".csv";a.click();URL.revokeObjectURL(url)}catch(e){showError(e.message)}});
+$("download").addEventListener("click",async()=>{
+ const button=$("download"),message=$("exportMessage");
+ message.textContent="";message.classList.add("hidden");
+ button.disabled=true;button.textContent="Generating CSV…";
+ try{
+  const p=selectedPeriod(),response=await fetch("/api/export.csv?start="+p.start+"&end="+p.end);
+  if(!response.ok){const d=await response.json();throw new Error(d.error||"Could not generate the CSV export.")}
+  const blob=await response.blob(),url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download="parqet_crypto_"+new Date(p.start).toISOString().slice(0,10)+"_"+new Date(p.end).toISOString().slice(0,10)+".csv";
+  a.click();URL.revokeObjectURL(url);
+ }catch(e){message.textContent=e.message;message.classList.remove("hidden")}
+ finally{button.disabled=false;button.textContent="Download Parqet CSV"}
+});
 (async()=>{try{await loadIntervals();await loadAnalytics()}catch(e){showError(e.message)}})();
 </script></body></html>
 """
@@ -555,6 +570,18 @@ class Handler(BaseHTTPRequestHandler):
                     if start_ms < _row_timestamp_ms(record["row"]) <= end_ms
                 ]
                 if parsed.path == "/api/export.csv":
+                    real_records = [record for record in selected_records if not record.get("simulated")]
+                    if not any(record["row"].get("type") == "TransferOut" for record in real_records):
+                        raise ValueError(
+                            "No bot-recorded BTC withdrawal was found in the selected period. "
+                            "The Parqet export requires a purchase and a withdrawal. "
+                            "Choose a period that includes a withdrawal, or export after your first withdrawal."
+                        )
+                    if not any(record["row"].get("type") == "Buy" for record in real_records):
+                        raise ValueError(
+                            "No real bot purchase was found in the selected period. "
+                            "The Parqet export requires a real purchase and a withdrawal; dry-run purchases are excluded."
+                        )
                     rows = parqet_aggregate_rows(
                         selected_records, self.settings["exchange"], self.settings["base"]
                     )
