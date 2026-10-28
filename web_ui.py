@@ -89,7 +89,6 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 <h2>Bot configuration</h2>
 <div class="grid">
 <div class="card"><label>Exchange</label><div class="value" id="settingExchange">—</div></div>
-<div class="card"><label>Bitcoin</label><div class="value">BTC</div></div>
 <div class="card"><label>Quote currency</label><div class="value" id="settingQuoteCurrency">—</div></div>
 <div class="card"><label>Trading mode</label><div class="value" id="tradingMode">—</div></div>
 <div class="card"><label>Purchase amount</label><div class="value" id="buyAmount">—</div></div>
