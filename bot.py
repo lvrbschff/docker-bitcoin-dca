@@ -405,6 +405,16 @@ def reconcile_pending_order(api, state, state_path, settings, check_interval):
 
 @serialized
 def run_once(api, settings, check_interval, schedule_only=False):
+    # Optional adapter scope: share balance reads within this cycle only.
+    # The adapter invalidates it whenever an order or withdrawal is submitted.
+    snapshot_scope = getattr(type(api), "balance_snapshot", None)
+    if snapshot_scope is None:
+        return _run_once(api, settings, check_interval, schedule_only)
+    with snapshot_scope(api):
+        return _run_once(api, settings, check_interval, schedule_only)
+
+
+def _run_once(api, settings, check_interval, schedule_only=False):
     quote = settings["quote"]
     symbol = f"BTC-{quote}"
     state_path = Path("/data/state.json")

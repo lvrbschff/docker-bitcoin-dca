@@ -8,6 +8,7 @@ import os
 import threading
 import time
 from datetime import datetime, timezone
+from contextlib import contextmanager
 from decimal import Decimal
 from urllib.parse import urlencode
 
@@ -17,6 +18,8 @@ BASE_URL = "https://api.kraken.com/0"
 LOG = logging.getLogger("bitcoin-dca.kraken")
 _NONCE_LOCK = threading.Lock()
 _LAST_NONCE = 0
+_HTTP_IDLE_RESET_SECONDS = 60
+_BALANCE_SNAPSHOT_MAX_AGE_SECONDS = 5
 _READ_ONLY_PRIVATE_METHODS = frozenset({
     "Balance", "BalanceEx", "TradeVolume", "Ledgers", "TradesHistory",
     "WithdrawStatus", "WithdrawInfo", "OpenOrders", "ClosedOrders", "QueryOrders",
@@ -57,6 +60,10 @@ class Kraken:
         except Exception as exc:
             raise ValueError("KRAKEN_API_SECRET must be Kraken's base64-encoded API secret") from exc
         self.session = requests.Session()
+        self._last_http_activity = None
+        self._balance_scope_depth = 0
+        self._balance_cache = None
+        self._balance_cache_at = None
         self.quote_currency = _canonical_asset(quote_currency)
         self.withdraw_key = withdraw_key
         self._assets = None
@@ -70,22 +77,70 @@ class Kraken:
             raise KrakenAPIError("; ".join(errors))
         return payload.get("result", {})
 
+    def _reset_http_session(self):
+        """Discard pooled connections; the next request establishes a fresh one."""
+        self.session.close()
+        self.session = requests.Session()
+        self._last_http_activity = None
+        self._balance_cache = None
+        self._balance_cache_at = None
+
     def _request_result(self, endpoint, send_request, retry_safe):
+        started = time.monotonic()
+        last_activity = self._last_http_activity
+        if last_activity is not None and started - last_activity >= _HTTP_IDLE_RESET_SECONDS:
+            LOG.debug("Kraken HTTP connection pool renewed after %.1fs idle.", started - last_activity)
+            self._reset_http_session()
+        # A submitted action may change funds even if its response is lost.
+        if not retry_safe:
+            self._balance_cache = None
+            self._balance_cache_at = None
         attempts = 3 if retry_safe else 1
         for attempt in range(1, attempts + 1):
+            attempt_started = time.monotonic()
             try:
-                return self._check_response(send_request())
+                result = self._check_response(send_request())
+                if attempt > 1:
+                    LOG.info(
+                        "Kraken %s recovered on read attempt %s/%s after %.1fs; "
+                        "the retry used a fresh HTTP connection.",
+                        endpoint, attempt, attempts, time.monotonic() - started,
+                    )
+                LOG.debug("Kraken %s completed in %.3fs (attempt %s/%s).",
+                          endpoint, time.monotonic() - attempt_started, attempt, attempts)
+                return result
             except (requests.Timeout, requests.ConnectionError) as exc:
+                elapsed = time.monotonic() - attempt_started
+                self._reset_http_session()
                 if attempt == attempts:
                     raise KrakenAPIError(
-                        f"{endpoint} failed after {attempts} attempt(s): {exc}"
+                        f"{endpoint} failed after {attempts} attempt(s) "
+                        f"({time.monotonic() - started:.1f}s elapsed): {exc}"
                     ) from exc
                 delay = attempt
                 LOG.warning(
-                    "Kraken %s: %s on read attempt %s/%s; retrying in %ss.",
-                    endpoint, type(exc).__name__, attempt, attempts, delay,
+                    "Kraken %s: %s after %.1fs on read attempt %s/%s; "
+                    "retrying in %ss with a fresh HTTP connection.",
+                    endpoint, type(exc).__name__, elapsed, attempt, attempts, delay,
                 )
                 time.sleep(delay)
+            finally:
+                self._last_http_activity = time.monotonic()
+
+    @contextmanager
+    def balance_snapshot(self):
+        """Reuse BalanceEx briefly within a bot cycle, never across cycles."""
+        if self._balance_scope_depth == 0:
+            self._balance_cache = None
+            self._balance_cache_at = None
+        self._balance_scope_depth += 1
+        try:
+            yield
+        finally:
+            self._balance_scope_depth -= 1
+            if self._balance_scope_depth == 0:
+                self._balance_cache = None
+                self._balance_cache_at = None
 
     def public(self, method, params=None):
         return self._request_result(
@@ -194,7 +249,14 @@ class Kraken:
         return Decimal(str(quote_amount)) * rate
 
     def balance(self, currency):
-        balances = self.private("BalanceEx")
+        if self._balance_scope_depth:
+            if (self._balance_cache is None or self._balance_cache_at is None
+                    or time.monotonic() - self._balance_cache_at >= _BALANCE_SNAPSHOT_MAX_AGE_SECONDS):
+                self._balance_cache = self.private("BalanceEx")
+                self._balance_cache_at = time.monotonic()
+            balances = self._balance_cache
+        else:
+            balances = self.private("BalanceEx")
         wanted = _canonical_asset(currency)
         for code, info in balances.items():
             if _canonical_asset(code) == wanted:
