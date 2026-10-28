@@ -57,7 +57,7 @@ The web UI reads current prices from Kraken’s public [BTC/EUR](https://www.kra
 
 For Bitvavo, fill in `BITVAVO_API_KEY` and `BITVAVO_API_SECRET`. For Kraken, fill in `KRAKEN_API_KEY` and `KRAKEN_API_SECRET`. Leave the other exchange's credentials empty. Never commit .env or API credentials to the repository.
 
-`WEB_UI_PORT`, `WEB_UI_USERNAME`, `WEB_UI_PASSWORD`, `ORDER_STATUS_CHECK_SECONDS`, exchange API credentials, and withdrawal settings (`KRAKEN_WITHDRAW_KEY` for Kraken; `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK` for Bitvavo) are set in .env. The other bot settings are configured directly in docker-compose.yml.
+`WEB_UI_PORT`, `WEB_UI_USERNAME`, `WEB_UI_PASSWORD`, exchange API credentials, and withdrawal settings (`KRAKEN_WITHDRAW_KEY` for Kraken; `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK` for Bitvavo) are set in .env. The other bot settings are configured directly in docker-compose.yml.
 
 ## 3. Configure the bot
 
@@ -78,7 +78,7 @@ Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings 
 | `TIMEZONE` | `Europe/Berlin` | Time zone used to calculate the deposit-cycle boundary. |
 | `LIVE_TRADING` | `false` | Set to `true` to submit real orders. Keep `false` to run in dry-run mode. |
 | `CHECK_INTERVAL_SECONDS` | `300` | Retry delay when a purchase cannot proceed, for example because funds are insufficient or the market is unavailable. Values below 60 are raised to 60 seconds. |
-| `ORDER_STATUS_CHECK_SECONDS` | `30` | Set in .env. Delay after a live-order submission before its first status check, and between subsequent checks while it is open or unresolved. Must be greater than zero; applies to both exchanges. |
+| `ORDER_STATUS_CHECK_SECONDS` | `30` | Set in docker-compose.yml. Delay after a live-order submission before its first status check, and between subsequent checks while it is open or unresolved. Must be greater than zero; applies to both exchanges. |
 | `WITHDRAWALS_ENABLED` | `false` | Enables automatic Bitcoin withdrawals. Also requires `LIVE_TRADING=true`. |
 | `WITHDRAW_THRESHOLD_QUOTE` | `1000` | Withdraw when the available BTC balance reaches this value in `QUOTE_CURRENCY`. |
 | `WEB_UI_ENABLED` | `true` | Enables the local portfolio dashboard. |
