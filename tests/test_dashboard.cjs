@@ -6,7 +6,6 @@ m=ast.parse(Path('web_ui.py').read_text());print(json.dumps(next(ast.literal_eva
 const script=html.split('<script>')[1].split('</script>')[0];
 class Element{
  constructor(){this.value='';this.children=[];this.handlers={};this.textContent='';this.disabled=false;this.classList={toggle(){},add(){},remove(){}}}
- showModal(){this.open=true} close(){this.open=false}
  appendChild(e){this.children.push(e)} append(...e){this.children.push(...e)} replaceChildren(...e){this.children=e}
  set innerHTML(v){this.children=[]} addEventListener(event,handler){this.handlers[event]=handler}
 }
@@ -68,11 +67,10 @@ const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate)};
  withdrawalUnavailable=true;
  const submissions=requests.filter(u=>u==='/api/withdrawal/preview'||u==='/api/withdrawal/confirm').length;
  await get('manualWithdraw').handlers.click();
- assert(get('withdrawalNotice').open,'Missing configuration opens the styled dialog');
- assert.equal(get('withdrawalNoticeTitle').textContent,'Manual withdrawal unavailable');
- assert(get('withdrawalNoticeText').textContent.includes('KRAKEN_WITHDRAW_KEY'));
- assert.equal(get('manualWithdraw').disabled,false,'Button is available after closing the message');
+ assert(get('withdrawalFeedback').textContent.includes('KRAKEN_WITHDRAW_KEY'),'Missing configuration is displayed inline');
+ assert(html.includes('id="withdrawalFeedback" class="export-feedback withdraw-feedback hidden"'),'Uses the export feedback style');
+ assert(!html.includes('<dialog'),'Withdrawal feedback must not open a dialog');
+ assert.equal(get('manualWithdraw').disabled,false,'Button is available after displaying feedback');
  assert.equal(requests.filter(u=>u==='/api/withdrawal/preview'||u==='/api/withdrawal/confirm').length,submissions,'Missing configuration cannot submit financial actions');
- get('withdrawalNotice').close();assert(!get('withdrawalNotice').open);
  console.log('Dashboard regressions passed: interval dates, server pages, mixed-currency rows/totals and queued preview polling');
 })().catch(e=>{console.error(e);process.exit(1)});
