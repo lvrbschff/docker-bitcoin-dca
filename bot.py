@@ -12,7 +12,7 @@ import calendar
 import threading
 
 import requests
-from activity import append_activity_records, read_activity_records, write_dashboard_snapshot
+from activity import append_activity_records, read_activity_records, read_dashboard_snapshot, write_dashboard_snapshot
 from exchange import create_exchange
 
 LOG = logging.getLogger("bitvavo-dca")
@@ -330,6 +330,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
     spent = Decimal(state.get("spent", "0"))
     pending = state.get("pending_order")
     if settings["live"] and pending:
+        update_dashboard_schedule(None, "Waiting for confirmation of the previous order")
         try:
             result = api.get_order(symbol, pending["clientOrderId"], pending.get("exchangeOrderId"))
         except requests.RequestException as exc:
@@ -475,6 +476,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
         }
         state["pending_order"] = pending
         save_state(state_path, state)
+        update_dashboard_schedule(None, "Submitting the order and confirming its fill")
         result = api.buy_base(symbol, order_amount, pending["clientOrderId"])
         status = result.get("status", "submitted")
         pending["exchangeOrderId"] = result.get("orderId")
@@ -542,8 +544,10 @@ def bot_loop(api, settings, interval):
                 next_wait = max(1, int(calculated_wait))
         except requests.RequestException as exc:
             LOG.error("%s request failed: %s", settings["exchange"], exc)
+            update_dashboard_schedule(None, "Exchange request failed; waiting for the next retry")
         except Exception:
             LOG.exception("Cycle failed")
+            update_dashboard_schedule(None, "Cycle failed; waiting for the next retry")
         time.sleep(next_wait)
 
 
