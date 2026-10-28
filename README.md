@@ -160,11 +160,7 @@ The worker checks the available BTC balance and its value in `QUOTE_CURRENCY`. W
 
 Check the destination and network carefully before enabling automatic withdrawals on either exchange. If a withdrawal request has an ambiguous response, retry behavior differs: Bitvavo may retry the identical request using the same idempotency key, while Kraken withdrawals are not retried automatically. For Kraken, check the withdrawal status in Kraken before taking further action. For Bitvavo, the idempotency key is intended to prevent duplicate withdrawals, but verify the status in Bitvavo before taking manual action.
 
-### Manual Bitcoin withdrawals
-
-Click **Withdraw BTC manually** at the top right, directly below **Log out** to review the available BTC balance and configured destination, then confirm the transfer. Requests are queued in the account worker; the page shows progress while the HTTP server remains responsive. Queue results are bound to the signed-in session and confirmation tokens remain single use and expire after two minutes. The button sends the entire available BTC balance less the exchange withdrawal fee. Kraken previews the fee and net amount; Bitvavo returns the fee on submission. The destination is also shown in the dashboard footnote: `KRAKEN_WITHDRAW_KEY` selects a saved Kraken withdrawal method, while `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK` select the Bitvavo destination. These values are configured in .env. The button uses the same outline style as Log out, with note 4 inside the button. Configuration details appear in Notes. If setup is incomplete, clicking the button shows a message identifying the missing live-trading or destination settings; the button remains clickable.
-
-Manual withdrawals require `LIVE_TRADING=true` and withdrawal permissions on the selected exchange's API key. They work independently of `WITHDRAWALS_ENABLED` and `WITHDRAW_THRESHOLD_QUOTE`. Confirmation expires after two minutes; a changed balance or intervening withdrawal requires a new preview. Unresolved orders or withdrawals block submission. Submitted withdrawals are recorded immediately in Activity. Their net BTC and withdrawal fees count toward Parqet exports only after confirmation by the exchange. Submission does not confirm blockchain settlement. If the outcome is uncertain, check the exchange before taking further action.
+Manual withdrawals are also available in the [web UI](#manual-bitcoin-withdrawals).
 
 ## Portfolio web UI
 
@@ -172,10 +168,13 @@ Open [http://localhost:6890](http://localhost:6890) and sign in with the credent
 
 - Select EUR or USD for display. Reference prices come from Kraken’s public [BTC/EUR](https://www.kraken.com/convert/btc/eur) and [BTC/USD](https://www.kraken.com/convert/btc/usd) pages; cached prices are labelled.
 - Choose a withdrawal interval or custom dates in **Period analysis**, browse Activity, and download a [Parqet CSV](#parqet-csv-exports). Dry-run purchases are marked and excluded from exports.
-- Use **Withdraw BTC manually** below **Log out** to review and confirm a withdrawal. Destination details appear in Notes; see [Manual Bitcoin withdrawals](#manual-bitcoin-withdrawals).
 - **Delete** removes a purchase from local history only; it never reverses an exchange order.
 
 The portfolio covers bot-recorded activity, not the full exchange account. Data persists in the named volume `bitcoin-dca-webui-data`. Set `WEB_UI_ENABLED=false` to disable the dashboard.
+
+### Manual Bitcoin withdrawals
+
+Click **Withdraw BTC manually** below **Log out**, review the balance and destination, then confirm. This sends the entire available BTC balance less the exchange fee. Destination settings appear in Notes. Requires `LIVE_TRADING=true`, withdrawal permissions and a configured destination; the automatic-withdrawal toggle and threshold do not apply. Confirmation expires after two minutes. Submitted withdrawals appear in Activity and enter exports only after exchange confirmation.
 
 ## Parqet CSV exports
 
@@ -189,13 +188,34 @@ A period needs at least one real purchase and one confirmed withdrawal. Simulati
 
 Choose periods carefully: purchases after the latest withdrawal are still included, and overlapping exports can duplicate activity. See [Prices and Parqet exports](#prices-and-parqet-exports) for limitations.
 
-## Worker health and updating
+## Architecture and operation
+
+### Project structure and Docker files
+
+The bot runs as one Python process inside one Docker container. A single account worker serializes scheduled checks and manual withdrawals, while the HTTP server serves the dashboard and reports.
+
+```mermaid
+flowchart LR
+    UI["Web UI<br/>web_ui.py"] -->|Manual actions| Worker["Account worker<br/>worker.py"]
+    Worker --> Bot["DCA logic and verification<br/>bot.py · withdrawals.py"]
+    Bot --> Adapter["Exchange adapter<br/>exchange.py → kraken.py / bitvavo.py"]
+    Adapter <-->|API| Exchange["Kraken or Bitvavo"]
+    Bot <-->|Pending requests and schedule| State["./state"]
+    Bot --> Ledger["SQLite activity ledger<br/>activity.py"]
+    Ledger -->|Reports and CSV| UI
+```
+
+`analytics.py` builds summaries, `reporting.py` generates Parqet exports, and the cache modules reduce repeated reads. A supervisor and `healthcheck.py` monitor the worker.
+
+`Dockerfile` builds the image; `docker-compose.yml` configures runtime settings, the local port and persistent mounts. Copy `.env.example` to `.env` for credentials, withdrawal destinations and web UI access.
+
+### Worker health and updating
 
 Docker checks `/data/worker-health.json` every 30 seconds. The worker updates its heartbeat during normal waits; a heartbeat older than ten minutes or a stopped worker is unhealthy. A supervisor exits the process for Docker’s existing restart policy when the worker stops or remains stalled. Saved pending orders and uncertain withdrawals are retained across restarts. The local `/healthz` route exposes only the worker health status. Health indicates that the worker is running, not that exchange requests are succeeding or that trading is possible. Ordinary API errors are logged and retried without making a responsive worker unhealthy. Docker marking a container unhealthy does not itself restart it; the supervisor exits the process for stalled or stopped workers, and `restart: unless-stopped` handles that exit.
 
 Keep both persistent mounts when updating: `./state` contains pending requests and scheduling state; `bitcoin-dca-webui-data` contains `activity.sqlite3` and `dashboard.json`. Back up both before upgrading. On first database access, legacy `activity.json` is imported once into SQLite, preserving IDs and amounts and retaining the original JSON. Older withdrawals without a confirmed status remain excluded from exports until uniquely verified; see [Withdrawals and local records](#withdrawals-and-local-records). Reverting to a JSON-only release does not restore new SQLite activity to JSON. Do not use `docker compose down -v` during an update. Rebuild and recreate with `docker compose up -d --build` after updating the source checkout.
 
-## Logs
+### Logs
 
 The bot writes logs to the container's standard output and error streams. Each entry includes a timestamp, severity level, and message. The default level is `INFO`; change it with `LOG_LEVEL` in `docker-compose.yml`.
 
@@ -223,25 +243,6 @@ Kraken balance, market-data, and other read-only queries use a 10-second connect
 Within a bot check, immediately repeated BTC and quote-currency balance reads share one `BalanceEx` response for at most five seconds. This snapshot is cleared at the end of the check and whenever an order or withdrawal is submitted, including when its response is uncertain. Manual withdrawal checks outside the bot cycle always fetch a fresh balance. No balance from an earlier cycle is used to place a new order. Kraken order and withdrawal submissions are sent once; uncertain outcomes follow the existing pending-order or withdrawal handling. If market or balance read attempts fail, the bot falls back to `CHECK_INTERVAL_SECONDS` before the next cycle. Failed order-status checks keep the order pending and use `ORDER_STATUS_CHECK_SECONDS` before checking again.
 
 Logs may contain account balances, trade amounts, prices, and exchange order or withdrawal IDs. Review them before sharing publicly.
-
-## Project structure and Docker files
-
-The bot runs as one Python process inside one Docker container. A single account worker serializes scheduled checks and manual withdrawals, while the HTTP server serves the dashboard and reports.
-
-```mermaid
-flowchart LR
-    UI["Web UI<br/>web_ui.py"] -->|Manual actions| Worker["Account worker<br/>worker.py"]
-    Worker --> Bot["DCA logic and verification<br/>bot.py · withdrawals.py"]
-    Bot --> Adapter["Exchange adapter<br/>exchange.py → kraken.py / bitvavo.py"]
-    Adapter <-->|API| Exchange["Kraken or Bitvavo"]
-    Bot <-->|Pending requests and schedule| State["./state"]
-    Bot --> Ledger["SQLite activity ledger<br/>activity.py"]
-    Ledger -->|Reports and CSV| UI
-```
-
-`analytics.py` builds summaries, `reporting.py` generates Parqet exports, and the cache modules reduce repeated reads. A supervisor and `healthcheck.py` monitor the worker.
-
-`Dockerfile` builds the image; `docker-compose.yml` configures runtime settings, the local port and persistent mounts. Copy `.env.example` to `.env` for credentials, withdrawal destinations and web UI access.
 
 ## GitHub Container Registry
 
