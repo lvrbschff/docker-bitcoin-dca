@@ -67,6 +67,8 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <div class="card"><label>Deposit day (DEPOSIT_DAY)</label><div class="value" id="depositDay">—</div></div>
 <div class="card"><label>Automatic withdrawals (WITHDRAWALS_ENABLED)</label><div class="value" id="withdrawEnabled">—</div></div>
 <div class="card"><label>Withdrawal threshold (WITHDRAW_THRESHOLD_QUOTE)</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured environment variable</div></div>
+<div class="card"><label>Next purchase (estimated)</label><div class="value" id="nextPurchaseAt">—</div><div class="small" id="nextPurchaseStatus">Waiting for the bot schedule</div></div>
+<div class="card"><label>Time until next purchase</label><div class="value" id="nextPurchaseCountdown">—</div><div class="small">Updates every second</div></div>
 </div><div class="notice">Fiat values are converted to the selected display currency. The current BTC price is fetched from Kraken’s public BTC-to-fiat pages when the report loads. Parqet CSV exports retain the currency in which each transaction was recorded.</div>
 </section>
 <section class="panel"><h2>Selected period summary</h2><div class="grid period-summary-grid">
@@ -92,6 +94,34 @@ function parseInput(el){return new Date(el.value).getTime()}
 function money(v,c){try{return new Intl.NumberFormat("en-GB",{style:"currency",currency:c,maximumFractionDigits:2}).format(Number(v||0))}catch(e){return Number(v||0).toFixed(2)+" "+c}}
 function btc(v){return Number(v||0).toLocaleString("en-GB",{minimumFractionDigits:0,maximumFractionDigits:8})+" BTC"}
 function dateLabel(ms){return new Date(ms).toLocaleString("en-GB")}
+let nextPurchaseTimestamp=null, scheduleClockOffset=0;
+function renderPurchaseCountdown(){
+ const output=$("nextPurchaseCountdown");
+ if(nextPurchaseTimestamp===null){output.textContent="—";return}
+ let seconds=Math.max(0,Math.ceil((nextPurchaseTimestamp-Date.now()-scheduleClockOffset)/1000));
+ if(!seconds){output.textContent="Due now";return}
+ const days=Math.floor(seconds/86400);seconds%=86400;
+ const hours=Math.floor(seconds/3600);seconds%=3600;
+ const minutes=Math.floor(seconds/60),remaining=seconds%60;
+ output.textContent=(days?days+"d ":"")+String(hours).padStart(2,"0")+"h "+String(minutes).padStart(2,"0")+"m "+String(remaining).padStart(2,"0")+"s";
+}
+async function refreshPurchaseSchedule(){
+ try{
+  const response=await fetch("/api/schedule");
+  if(response.status===401){window.location.reload();return}
+  if(!response.ok)throw new Error("Schedule unavailable");
+  const schedule=await response.json(),target=Date.parse(schedule.nextPurchaseAt),serverTime=Date.parse(schedule.serverTime);
+  nextPurchaseTimestamp=Number.isFinite(target)?target:null;
+  scheduleClockOffset=Number.isFinite(serverTime)?serverTime-Date.now():0;
+  $("nextPurchaseAt").textContent=nextPurchaseTimestamp===null?"Not scheduled":new Date(nextPurchaseTimestamp).toLocaleString("en-GB",{timeZone:schedule.timezone||"UTC",timeZoneName:"short"});
+  $("nextPurchaseStatus").textContent=schedule.nextPurchaseStatus||"Waiting for the bot schedule";
+  renderPurchaseCountdown();
+ }catch(e){$("nextPurchaseStatus").textContent="Could not refresh the bot schedule"}
+}
+setInterval(renderPurchaseCountdown,1000);
+setInterval(refreshPurchaseSchedule,30000);
+refreshPurchaseSchedule();
+
 function showError(message){$("error").textContent=message||"";$("error").classList.toggle("hidden",!message)}
 function selectedPeriod(){const start=parseInput($("start")),end=parseInput($("end"));if(!Number.isFinite(start)||!Number.isFinite(end)||start>=end)throw new Error("Please choose a valid date range.");return {start:start,end:end}}
 async function loadIntervals(){
@@ -434,6 +464,15 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(502, {"error": "Could not fetch the current BTC price from Kraken’s public page. Check container internet access."})
             return
         try:
+            if parsed.path == "/api/schedule":
+                snapshot = read_dashboard_snapshot()
+                self._json(200, {
+                    "nextPurchaseAt": snapshot.get("nextPurchaseAt"),
+                    "nextPurchaseStatus": snapshot.get("nextPurchaseStatus", "Schedule pending"),
+                    "timezone": self.settings["timezone"],
+                    "serverTime": datetime.now(timezone.utc).isoformat(),
+                })
+                return
             records = read_activity_records()
             if parsed.path == "/api/withdrawals":
                 withdrawals = [
