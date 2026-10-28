@@ -1,108 +1,268 @@
-"""Persistent local activity and dashboard snapshot storage."""
+"""Transactional activity ledger with indexed queries and one-time JSON migration."""
 import json
+import logging
 import os
+import sqlite3
+import time
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from threading import RLock
-from decimal import Decimal
 
-ACTIVITY_PATH = Path("/webui-data/activity.json")
-SNAPSHOT_PATH = Path("/webui-data/dashboard.json")
-LEGACY_ACTIVITY_PATHS = (Path("/data/activity.json"),)
-LEGACY_SNAPSHOT_PATHS = (Path("/data/dashboard.json"),)
+ACTIVITY_PATH = Path('/webui-data/activity.json')  # Legacy source; never overwritten.
+SNAPSHOT_PATH = Path('/webui-data/dashboard.json')
+LEGACY_ACTIVITY_PATHS = (Path('/data/activity.json'),)
+LEGACY_SNAPSHOT_PATHS = (Path('/data/dashboard.json'),)
 _ACTIVITY_LOCK = RLock()
 
 
-def _migrate_legacy_file(path, legacy_paths):
-    if path.exists():
-        return
-    for legacy_path in legacy_paths:
-        if not legacy_path.exists():
-            continue
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_suffix(path.suffix + ".migration")
-        temporary.write_bytes(legacy_path.read_bytes())
-        if not path.exists():
-            os.replace(temporary, path)
-        else:
-            temporary.unlink(missing_ok=True)
-        return
-
-
-def read_activity_records():
-    with _ACTIVITY_LOCK:
-        _migrate_legacy_file(ACTIVITY_PATH, LEGACY_ACTIVITY_PATHS)
-        if not ACTIVITY_PATH.exists():
-            return []
-        payload = json.loads(ACTIVITY_PATH.read_text(encoding="utf-8"))
-        records = payload.get("records", []) if isinstance(payload, dict) else payload
-        if not isinstance(records, list):
-            raise ValueError("Stored activity data must be a list")
-        return [record for record in records if isinstance(record, dict) and isinstance(record.get("row"), dict)]
+def _timestamp(row):
+    value = datetime.fromisoformat(row['datetime'].replace('Z', '+00:00'))
+    return int(value.replace(tzinfo=value.tzinfo or timezone.utc).timestamp() * 1000)
 
 
 def bitcoin_activity_records(records):
-    """Select Bitcoin activity without modifying previously stored records."""
-    return [record for record in records
-            if str(record.get("row", {}).get("identifier", "")).upper() == "BTC"]
+    return [r for r in records if str(r.get('row', {}).get('identifier', '')).upper() == 'BTC']
 
 
-def read_bitcoin_activity_records():
-    return bitcoin_activity_records(read_activity_records())
+def withdrawal_gross(record):
+    if record.get('withdrawalStatus') in ('failed', 'canceled', 'cancelled'):
+        return Decimal(0)
+    if record.get('grossWithdrawalAmountBtc') is not None:
+        return Decimal(str(record['grossWithdrawalAmountBtc']))
+    row = record['row']
+    amount = Decimal(str(row.get('shares', '0')))
+    if record.get('netWithdrawalAmount') or record.get('exchange')=='KRAKEN':
+        fee = record.get('networkFeeBtc')
+        if fee is None:
+            price = Decimal(str(row.get('price', '0')))
+            fee = Decimal(str(row.get('fee', '0'))) / price if price > 0 else Decimal(0)
+        amount += Decimal(str(fee))
+    return amount
 
 
 def tracked_bitcoin_balance(records):
-    rows = [record["row"] for record in bitcoin_activity_records(records)
-            if not record.get("simulated")]
-    bought = sum((Decimal(row["shares"]) for row in rows if row.get("type") == "Buy"), Decimal(0))
-    withdrawn = sum((Decimal(row["shares"]) for row in rows if row.get("type") == "TransferOut"), Decimal(0))
-    return bought - withdrawn
+    total = Decimal(0)
+    for record in bitcoin_activity_records(records):
+        if record.get('simulated'):
+            continue
+        row = record['row']
+        if row.get('type') == 'Buy':
+            total += Decimal(row['shares'])
+        elif row.get('type') == 'TransferOut':
+            total -= withdrawal_gross(record)
+    return total
 
 
-def read_activity_rows():
-    return [record["row"] for record in read_activity_records()]
+class _DecimalSum:
+    def __init__(self): self.value = Decimal(0)
+    def step(self, value): self.value += Decimal(str(value or '0'))
+    def finalize(self): return format(self.value, 'f')
+
+
+def _values(record):
+    row = record['row']
+    return (record['id'], _timestamp(row), row.get('type', ''), row.get('identifier', '').upper(),
+            int(bool(record.get('simulated'))), record.get('exchange', ''), row.get('currency', ''),
+            row.get('shares', '0'), row.get('amount', '0'), row.get('fee', '0'),
+            str(withdrawal_gross(record)) if row.get('type') == 'TransferOut' else '0',
+            record.get('withdrawalStatus', 'legacy_unverified') if row.get('type') == 'TransferOut' else '',
+            json.dumps(record, ensure_ascii=False))
+
+
+_INSERT = 'INSERT OR IGNORE INTO activity VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)'
+
+
+@contextmanager
+def _db():
+    path = ACTIVITY_PATH.with_suffix('.sqlite3')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _ACTIVITY_LOCK:
+        connection = sqlite3.connect(path, timeout=30)
+        connection.create_aggregate('decimal_sum', 1, _DecimalSum)
+        try:
+            connection.execute('PRAGMA journal_mode=WAL')
+            connection.execute('PRAGMA synchronous=FULL')
+            connection.executescript('''
+                CREATE TABLE IF NOT EXISTS activity(
+                    id TEXT PRIMARY KEY, timestamp INTEGER NOT NULL, kind TEXT, asset TEXT,
+                    simulated INTEGER, exchange TEXT, currency TEXT, shares TEXT, amount TEXT,
+                    fee TEXT, gross TEXT, status TEXT, payload TEXT NOT NULL);
+                CREATE INDEX IF NOT EXISTS activity_period ON activity(asset,timestamp DESC,id);
+                CREATE INDEX IF NOT EXISTS activity_type ON activity(kind,status,timestamp);
+                CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS cache(key TEXT PRIMARY KEY,value TEXT,updated REAL);
+            ''')
+            if not connection.execute("SELECT 1 FROM metadata WHERE key='json_migrated'").fetchone():
+                source = next((p for p in (ACTIVITY_PATH, *LEGACY_ACTIVITY_PATHS) if p.exists()), None)
+                if source:
+                    payload = json.loads(source.read_text(encoding='utf-8'))
+                    records = payload.get('records', []) if isinstance(payload, dict) else payload
+                    if not isinstance(records, list): raise ValueError('Invalid legacy activity list')
+                    snapshot = read_dashboard_snapshot()
+                    for i, record in enumerate(records):
+                        if not isinstance(record, dict) or not isinstance(record.get('row'), dict): continue
+                        record = dict(record)
+                        record.setdefault('id', f'legacy:{i}')
+                        record.setdefault('exchange', '')
+                        if snapshot.get('exchange'):record.setdefault('legacyExchangeHint',snapshot['exchange'])
+                        if record['row'].get('type') == 'TransferOut':
+                            record.setdefault('withdrawalStatus', 'legacy_unverified')
+                        connection.execute(_INSERT, _values(record))
+                connection.execute("INSERT INTO metadata VALUES('json_migrated','1')")
+                connection.commit()
+            yield connection
+            connection.commit()
+        except BaseException:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
 
 
 def append_activity_records(records):
-    with _ACTIVITY_LOCK:
-        existing = read_activity_records()
-        known_ids = {record.get("id") for record in existing}
-        added = [record for record in records if record.get("id") not in known_ids]
-        if not added:
-            return 0
-        existing.extend(added)
-        write_json_atomic(ACTIVITY_PATH, {"records": existing})
-        return len(added)
+    with _db() as db:
+        before = db.total_changes
+        db.executemany(_INSERT, [_values(r) for r in records])
+        return db.total_changes - before
+
+
+def update_activity_record(record):
+    values = _values(record)
+    with _db() as db:
+        db.execute('UPDATE activity SET timestamp=?,kind=?,asset=?,simulated=?,exchange=?,currency=?,shares=?,amount=?,fee=?,gross=?,status=?,payload=? WHERE id=?', (*values[1:], values[0]))
+
+
+def read_activity_records():
+    with _db() as db:
+        return [json.loads(r[0]) for r in db.execute('SELECT payload FROM activity ORDER BY timestamp,id')]
+
+
+def read_bitcoin_activity_records():
+    with _db() as db:
+        return [json.loads(r[0]) for r in db.execute("SELECT payload FROM activity WHERE asset='BTC' ORDER BY timestamp,id")]
+
+
+def activity_page(start, end, page=1, limit=20):
+    limit = max(1, min(1000, int(limit)))
+    with _db() as db:
+        where = "asset='BTC' AND timestamp>? AND timestamp<=?"
+        total = db.execute('SELECT count(*) FROM activity WHERE '+where, (start,end)).fetchone()[0]
+        page = max(1, min(int(page), max(1, (total+limit-1)//limit)))
+        rows = db.execute('SELECT payload FROM activity WHERE '+where+' ORDER BY timestamp DESC,id DESC LIMIT ? OFFSET ?', (start,end,limit,(page-1)*limit))
+        return [json.loads(r[0]) for r in rows], total, page
+
+
+def period_records(start, end):
+    with _db() as db:
+        return [json.loads(r[0]) for r in db.execute("SELECT payload FROM activity WHERE asset='BTC' AND timestamp>? AND timestamp<=? ORDER BY timestamp,id", (start,end))]
+
+
+def _totals(db, start, end):
+    rows = db.execute("SELECT currency,kind,simulated,status,count(*),decimal_sum(shares),decimal_sum(amount),decimal_sum(fee),decimal_sum(gross) FROM activity WHERE asset='BTC' AND timestamp>? AND timestamp<=? GROUP BY currency,kind,simulated,status", (start,end)).fetchall()
+    return [dict(zip(('currency','kind','simulated','status','count','shares','amount','fee','gross'),r)) for r in rows]
+
+
+def activity_totals(start=0, end=2**63-1):
+    with _db() as db:return _totals(db,start,end)
+
+
+def _balance(groups):
+    total=Decimal(0)
+    for group in groups:
+        if group['simulated']:continue
+        if group['kind']=='Buy':total+=Decimal(group['shares'])
+        elif group['kind']=='TransferOut':total-=Decimal(group['gross'])
+    return total
+
+
+def ledger_balance():
+    return _balance(activity_totals())
+
+
+def read_report(start,end,page=1,limit=20):
+    """Rows, totals and global balance from one consistent SQLite read transaction."""
+    limit=max(1,min(1000,int(limit)))
+    with _db() as db:
+        db.execute('BEGIN')
+        where="asset='BTC' AND timestamp>? AND timestamp<=?"
+        total=db.execute('SELECT count(*) FROM activity WHERE '+where,(start,end)).fetchone()[0]
+        page=max(1,min(int(page),max(1,(total+limit-1)//limit)))
+        rows=db.execute('SELECT payload FROM activity WHERE '+where+' ORDER BY timestamp DESC,id DESC LIMIT ? OFFSET ?', (start,end,limit,(page-1)*limit)).fetchall()
+        return ([json.loads(r[0]) for r in rows],total,page,_totals(db,start,end),_balance(_totals(db,0,2**63-1)))
+
+
+def withdrawal_records(unresolved=False):
+    query = "SELECT payload FROM activity WHERE asset='BTC' AND kind='TransferOut' AND simulated=0"
+    if unresolved: query += " AND status NOT IN ('completed','failed','canceled','cancelled')"
+    query += ' ORDER BY timestamp,id'
+    with _db() as db: return [json.loads(r[0]) for r in db.execute(query)]
 
 
 def delete_activity_record(activity_id):
-    with _ACTIVITY_LOCK:
-        existing = read_activity_records()
-        target = next(
-            (record for record in existing
-             if record.get("id") == activity_id and record.get("row", {}).get("type") == "Buy"),
-            None,
-        )
-        if target is None:
-            return False
-        remaining = [record for record in existing if record is not target]
-        write_json_atomic(ACTIVITY_PATH, {"records": remaining})
-        return True
+    with _db() as db:
+        return db.execute("DELETE FROM activity WHERE id=? AND kind='Buy'", (activity_id,)).rowcount > 0
+
+
+def cache_get(key):
+    with _db() as db:
+        row = db.execute('SELECT value,updated FROM cache WHERE key=?', (key,)).fetchone()
+        return (json.loads(row[0]), row[1]) if row else None
+
+
+def cache_put(key, value):
+    with _db() as db: db.execute('INSERT OR REPLACE INTO cache VALUES(?,?,?)', (key,json.dumps(value),time.time()))
 
 
 def read_dashboard_snapshot():
-    _migrate_legacy_file(SNAPSHOT_PATH, LEGACY_SNAPSHOT_PATHS)
-    if not SNAPSHOT_PATH.exists():
-        return {}
-    payload = json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
-    return payload if isinstance(payload, dict) else {}
+    with _ACTIVITY_LOCK:
+        source = next((p for p in (SNAPSHOT_PATH,*LEGACY_SNAPSHOT_PATHS) if p.exists()),None)
+        if not source: return {}
+        try:value = json.loads(source.read_text(encoding='utf-8'))
+        except (ValueError,OSError):
+            logging.getLogger('bitcoin-dca.activity').warning('Derived dashboard snapshot could not be read; rebuilding from the ledger.')
+            return {}
+        return value if isinstance(value,dict) else {}
 
 
 def write_dashboard_snapshot(snapshot):
-    write_json_atomic(SNAPSHOT_PATH, snapshot)
+    with _ACTIVITY_LOCK: write_json_atomic(SNAPSHOT_PATH,snapshot)
 
 
 def write_json_atomic(path, payload):
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(temporary, path)
+    temporary = path.with_suffix(path.suffix+'.tmp')
+    with temporary.open('w',encoding='utf-8') as stream:
+        json.dump(payload,stream,ensure_ascii=False,indent=2)
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary,path)
+    descriptor = os.open(path.parent,os.O_RDONLY)
+    try: os.fsync(descriptor)
+    finally: os.close(descriptor)
+
+
+def cache_get_many(keys):
+    if not keys: return {}
+    with _db() as db:
+        return {key:(json.loads(value),updated) for key,value,updated in db.execute(
+            'SELECT key,value,updated FROM cache WHERE key IN ('+','.join('?' for _ in keys)+')',tuple(keys))}
+
+
+def cache_put_many(values):
+    with _db() as db:
+        db.executemany('INSERT OR REPLACE INTO cache VALUES(?,?,?)',
+                       [(key,json.dumps(value),time.time()) for key,value in values.items()])
+
+
+def get_activity_record(activity_id):
+    with _db() as db:
+        row=db.execute('SELECT payload FROM activity WHERE id=?',(activity_id,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+
+def latest_real_buy():
+    with _db() as db:
+        row=db.execute("SELECT timestamp FROM activity WHERE asset='BTC' AND kind='Buy' AND simulated=0 ORDER BY timestamp DESC LIMIT 1").fetchone()
+        return datetime.fromtimestamp(row[0]/1000,timezone.utc) if row else None

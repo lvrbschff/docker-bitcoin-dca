@@ -11,6 +11,8 @@ from zoneinfo import ZoneInfo
 import calendar
 import threading
 from functools import wraps
+from exchange_errors import DefinitiveRejection
+from withdrawals import reconcile_withdrawals
 
 BOT_LOCK = threading.RLock()
 
@@ -22,7 +24,7 @@ def serialized(function):
     return locked
 
 import requests
-from activity import append_activity_records, read_bitcoin_activity_records, read_dashboard_snapshot, tracked_bitcoin_balance, write_dashboard_snapshot
+from activity import append_activity_records, read_dashboard_snapshot, write_dashboard_snapshot, ledger_balance, withdrawal_records, write_json_atomic, get_activity_record, latest_real_buy
 from exchange import create_exchange
 
 LOG = logging.getLogger("bitcoin-dca")
@@ -66,24 +68,7 @@ def local_now(timezone_name):
 
 def latest_recorded_buy_time():
     """Return the newest real Bitcoin buy from persistent UI activity."""
-    buy_times = []
-    for record in read_bitcoin_activity_records():
-        if record.get("simulated"):
-            continue
-        row = record.get("row", {})
-        if row.get("type") != "Buy":
-            continue
-        value = row.get("datetime")
-        if not value:
-            continue
-        try:
-            timestamp = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-            if timestamp.tzinfo is None:
-                timestamp = timestamp.replace(tzinfo=timezone.utc)
-            buy_times.append(timestamp.astimezone(timezone.utc))
-        except (TypeError, ValueError):
-            LOG.warning("Ignoring activity buy with invalid datetime: %r", value)
-    return max(buy_times) if buy_times else None
+    return latest_real_buy()
 
 
 def read_state(path, cycle_key):
@@ -108,10 +93,7 @@ def read_state(path, cycle_key):
 
 
 def save_state(path, state):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_suffix(".tmp")
-    temp.write_text(json.dumps(state, indent=2))
-    temp.replace(path)
+    write_json_atomic(path, state)
 
 
 def utc_iso_from_ms(timestamp_ms):
@@ -131,7 +113,7 @@ def normalized_event_time(value, fallback_ms):
 
 
 def persist_bot_withdrawal(api, withdrawal, result, settings, context):
-    quote = settings["quote"]
+    quote = context.get("quote", settings["quote"])
     amount = Decimal(str(withdrawal.get("amount", "0")))
     fee_btc = Decimal(str(withdrawal.get("fee", result.get("fee", "0"))))
     # Kraken's request amount is already net of its fee; Bitvavo's request amount
@@ -167,13 +149,18 @@ def persist_bot_withdrawal(api, withdrawal, result, settings, context):
         "networkFeeBtc": format(fee_btc, "f"),
         "grossWithdrawalAmountBtc": format(gross_amount, "f"),
         "manual": bool(context.get("manual")),
+        "exchange": settings["exchange"],
+        "withdrawalStatus": "submitted",
+        "withdrawalId": result.get("id") or result.get("refid"),
+        "withdrawalAddress": withdrawal.get("address"),
+        "withdrawalNetwork": withdrawal.get("network"),
     }
+    context["record_id"] = record["id"]
     return append_activity_records([record])
 
 
 def update_dashboard_snapshot(settings, quote_balance, price):
-    records = read_bitcoin_activity_records()
-    tracked_btc = tracked_bitcoin_balance(records)
+    tracked_btc = ledger_balance()
     previous = read_dashboard_snapshot()
     write_dashboard_snapshot({
         "exchange": settings["exchange"],
@@ -203,10 +190,11 @@ def persist_bot_buy(api, order, settings, event_id, fallback_timestamp_ms):
     records = api.normalize_bot_buy(
         order, settings["quote"], event_id, fallback_timestamp_ms
     )
+    for record in records: record["exchange"] = settings["exchange"]
     return records, append_activity_records(records)
 
 
-def persist_simulated_buy(api, settings, amount, price, quote_amount):
+def persist_simulated_buy(api, settings, amount, price, quote_amount, estimated_fee=None):
     timestamp_ms = int(time.time() * 1000)
     event_id = f"dry-run:{uuid.uuid4()}"
     row = {
@@ -218,10 +206,10 @@ def persist_simulated_buy(api, settings, amount, price, quote_amount):
         "shares": format(amount, "f"),
         "amount": format(quote_amount, "f"),
         "currency": settings["quote"],
-        "fee": format(api.estimate_taker_fee(f"BTC-{settings['quote']}", quote_amount), "f"),
+        "fee": format(estimated_fee if estimated_fee is not None else api.estimate_taker_fee(f"BTC-{settings['quote']}", quote_amount), "f"),
         "tax": "0",
     }
-    record = {"id": event_id, "simulated": True, "row": row}
+    record = {"id": event_id, "simulated": True, "exchange": settings["exchange"], "row": row}
     return append_activity_records([record])
 
 
@@ -232,6 +220,16 @@ def ceil_to_places(value, places):
 
 
 def maybe_withdraw_btc(api, state, settings, manual_request=None):
+    if manual_request is None and settings['live']:
+        reconcile_withdrawals(api, settings)
+        last_record = get_activity_record(state.get('last_withdrawal',{}).get('activityId',''))
+        if last_record and last_record.get('withdrawalStatus')=='failed' and not state.get('withdrawal_armed',True):
+            state['withdrawal_armed']=True
+            save_state(Path('/data/state.json'),state)
+            return
+        if not state.get('pending_withdrawal') and any(r.get('exchange')==settings['exchange'] and r.get('withdrawalStatus')=='submitted'
+               for r in withdrawal_records(unresolved=True)):
+            return
     if not settings["withdrawals_enabled"] and manual_request is None and not state.get("pending_withdrawal"):
         return
     if not settings["live"]:
@@ -245,6 +243,8 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
         if not bitcoin_request:
             raise ValueError("Saved withdrawal is not a Bitcoin request for the selected exchange; check its status before continuing")
         context = state.get("pending_withdrawal_context", {})
+        if context.get("exchange", settings["exchange"]) != settings["exchange"]:
+            raise ValueError("Saved withdrawal belongs to another exchange; resolve it before switching exchanges")
         result = context.get("result")
         if result is None:
             if not getattr(api, "supports_withdrawal_idempotency", False):
@@ -252,6 +252,11 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
                 return
             try:
                 result = api.withdraw_btc(pending)
+            except DefinitiveRejection:
+                state.pop("pending_withdrawal", None)
+                state.pop("pending_withdrawal_context", None)
+                save_state(Path("/data/state.json"), state)
+                raise
             except requests.RequestException:
                 LOG.exception("Withdrawal outcome is uncertain; the same idempotent request will be retried next check.")
                 return
@@ -262,6 +267,7 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
         state["last_withdrawal"] = {
             "id": result.get("id"),
             "amount": pending["amount"],
+            "activityId": context.get('record_id'),
             "balanceBefore": context.get("balanceBefore", pending["amount"]),
             "createdAt": result.get("createdAt"),
         }
@@ -301,6 +307,8 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
     withdrawal = manual_request or api.withdrawal_request(amount, idempotency_key, settings)
     state["pending_withdrawal"] = withdrawal
     state["pending_withdrawal_context"] = {
+        "exchange": settings["exchange"],
+        "quote": settings["quote"],
         "price": format(price, "f"),
         "timestamp_ms": int(time.time() * 1000),
         "manual": manual_request is not None,
@@ -309,6 +317,11 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
     save_state(Path("/data/state.json"), state)
     try:
         result = api.withdraw_btc(withdrawal)
+    except DefinitiveRejection:
+        state.pop('pending_withdrawal',None)
+        state.pop('pending_withdrawal_context',None)
+        save_state(Path('/data/state.json'),state)
+        raise
     except requests.RequestException:
         LOG.exception("Withdrawal outcome is uncertain; check the exchange before taking further action.")
         if not getattr(api, "supports_withdrawal_idempotency", False):
@@ -322,6 +335,7 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
     state["last_withdrawal"] = {
         "id": result.get("id"),
         "amount": withdrawal["amount"],
+        "activityId": state.get('pending_withdrawal_context',{}).get('record_id'),
         "createdAt": result.get("createdAt"),
         "balanceBefore": format(available, "f"),
     }
@@ -414,7 +428,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
         return _run_once(api, settings, check_interval, schedule_only)
 
 
-def _run_once(api, settings, check_interval, schedule_only=False):
+def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=None):
     quote = settings["quote"]
     symbol = f"BTC-{quote}"
     state_path = Path("/data/state.json")
@@ -435,12 +449,19 @@ def _run_once(api, settings, check_interval, schedule_only=False):
         LOG.error("Automatic BTC withdrawal check failed: %s", exc)
     # Use the current available quote balance as the DCA budget. This includes
     # funds already on the exchange, even if they were deposited before this cycle.
-    balance = api.balance(quote)
+    balance = cycle_data['balance'] if cycle_data else api.balance(quote)
     balance_after_simulated_spend = (
         max(Decimal(0), balance - spent) if not settings["live"] else balance
     )
-    market = api.market(symbol)
-    price = api.price(symbol)
+    if balance_after_simulated_spend <= 0:
+        update_dashboard_snapshot(settings,balance,Decimal(str(read_dashboard_snapshot().get('price','0'))))
+        update_dashboard_schedule(None,'Waiting for available quote-currency funds')
+        return check_interval
+    # Fee lookup precedes the fresh market-rule check; it is cached by the adapter.
+    fee_rate = cycle_data['fee_rate'] if cycle_data else api.estimate_taker_fee(symbol, Decimal(1))
+    price = cycle_data['price'] if cycle_data else api.price(symbol)
+    market = cycle_data['market'] if cycle_data else api.market(symbol, refresh=True)
+    cycle_data = {'balance':balance,'price':price,'market':market,'fee_rate':fee_rate}
     update_dashboard_snapshot(settings, balance, price)
     if balance_after_simulated_spend <= 0:
         update_dashboard_schedule(None, "Waiting for available quote-currency funds")
@@ -463,13 +484,16 @@ def _run_once(api, settings, check_interval, schedule_only=False):
     spendable = balance_after_simulated_spend
     available = balance if settings["live"] else balance_after_simulated_spend
     affordable_budget = min(spendable, available)
-    possible_buys = int(affordable_budget // order_quote)
+    estimated_fee = order_quote * fee_rate
+    # 0.5% estimation buffer protects the budget, not the execution price of a market order.
+    planned_cost = ceil_to_places((order_quote + estimated_fee) * Decimal('1.005'), notional_decimals)
+    possible_buys = int(affordable_budget // planned_cost)
     if possible_buys < 1:
         update_dashboard_schedule(None, "Waiting until the balance covers an order")
         LOG.info("Waiting: available balance %s %s; minimum order %s %s.", affordable_budget, quote, order_quote, quote)
         return check_interval
 
-    seconds_left = max(60, (next_deposit - now).total_seconds())
+    seconds_left = max(60, (next_deposit.astimezone(timezone.utc) - now.astimezone(timezone.utc)).total_seconds())
     interval_seconds = max(60, int(seconds_left / possible_buys))
     LOG.info(
         "Recalculated DCA schedule: balance=%s %s; spendable=%s %s; "
@@ -480,61 +504,30 @@ def _run_once(api, settings, check_interval, schedule_only=False):
         order_amount, "BTC", order_quote, quote, next_deposit.isoformat(),
         possible_buys, int(interval_seconds / 60),
     )
-    startup_last_buy = settings.get("startup_last_buy_at")
-    if startup_last_buy:
-        elapsed = max(0, (now.astimezone(timezone.utc) - startup_last_buy).total_seconds())
-        remaining_seconds = max(0, int(interval_seconds - elapsed))
-        if remaining_seconds > 0:
-            next_purchase_at = now + timedelta(seconds=remaining_seconds)
-            update_dashboard_schedule(next_purchase_at, "Scheduled")
-            LOG.info(
-                "Aligning first purchase after restart to the previous DCA cadence: "
-                "last recorded buy=%s; elapsed=%s minutes of %s-minute interval; "
-                "next purchase in about %s minutes at %s local time.",
-                startup_last_buy.isoformat(timespec="seconds"),
-                int(elapsed / 60), int(interval_seconds / 60),
-                int(remaining_seconds / 60),
-                next_purchase_at.strftime("%Y-%m-%d %H:%M:%S %Z"),
-            )
-            return remaining_seconds
-        update_dashboard_schedule(now, "Due now")
-        LOG.info(
-            "Previous DCA interval has elapsed since the last recorded buy at %s; "
-            "the next purchase is due now.",
-            startup_last_buy.isoformat(timespec="seconds"),
-        )
-    elif not settings["first_purchase_done"]:
-        update_dashboard_schedule(now, "Due now")
-        LOG.info(
-            "No previous real %s purchase is recorded; the first purchase follows "
-            "the configured startup delay of %s seconds.",
-            "BTC", settings["first_buy_delay_seconds"],
-        )
+    last_buy = settings.get('startup_last_buy_at')
+    if last_buy is None and state.get('last_order_at'):
+        last_buy = datetime.fromisoformat(state['last_order_at'])
+    fingerprint = [str(affordable_budget),str(planned_cost),next_deposit.isoformat(),
+                   last_buy.isoformat() if last_buy else None]
+    previous_plan = state.get('schedule',{})
+    if previous_plan.get('fingerprint')==fingerprint:
+        due = datetime.fromisoformat(previous_plan['dueAt'])
     else:
-        last_order = state.get("last_order_at")
-        if last_order:
-            elapsed = (now - datetime.fromisoformat(last_order)).total_seconds()
-            if elapsed < interval_seconds:
-                remaining_seconds = max(0, int(interval_seconds - elapsed))
-                next_purchase_at = now + timedelta(seconds=remaining_seconds)
-                update_dashboard_schedule(next_purchase_at, "Scheduled")
-                LOG.info(
-                    "Next purchase in about %s minutes, estimated around %s local time "
-                    "(recomputed from %s %s available and %s possible buys).",
-                    int(remaining_seconds / 60),
-                    next_purchase_at.strftime("%Y-%m-%d %H:%M:%S %Z"),
-                    affordable_budget, quote, possible_buys,
-                )
-                return remaining_seconds
+        due = (last_buy + timedelta(seconds=interval_seconds)) if last_buy else now
+        if last_buy and not last_buy.tzinfo: due=due.replace(tzinfo=timezone.utc)
+    state['schedule']={'fingerprint':fingerprint,'dueAt':due.isoformat()}
+    save_state(state_path,state)
+    remaining=max(0,int((due.astimezone(timezone.utc)-now.astimezone(timezone.utc)).total_seconds()))
+    update_dashboard_schedule(due,'Scheduled' if remaining else 'Due now')
+    if remaining: return remaining
 
-    update_dashboard_schedule(now, "Due now")
     if schedule_only:
         # If the computed time has already arrived while recording the last order,
         # wake the normal loop immediately instead of submitting from this pass.
         return 1
 
     if settings["live"]:
-        if available < order_quote:
+        if available < planned_cost:
             update_dashboard_schedule(None, "Waiting until the balance covers an order")
             LOG.info("Waiting for sufficient available balance: %s %s; minimum order %s %s.", available, quote, order_quote, quote)
             return check_interval
@@ -551,6 +544,12 @@ def _run_once(api, settings, check_interval, schedule_only=False):
         update_dashboard_schedule(None, "Submitting the order and waiting for its status check")
         try:
             result = api.buy_btc(quote, order_amount, pending["clientOrderId"])
+        except DefinitiveRejection as exc:
+            state.pop('pending_order',None)
+            state['last_rejection']={'action':'buy','reason':str(exc),'at':utc_iso_from_ms(int(time.time()*1000))}
+            save_state(state_path,state)
+            LOG.warning('Order rejected by %s: %s; no pending order remains.',settings['exchange'],exc)
+            return check_interval
         except requests.RequestException as exc:
             LOG.warning(
                 "%s order submission has an uncertain outcome: %s. It will not be resent; checking the saved reference in %ss.",
@@ -566,59 +565,38 @@ def _run_once(api, settings, check_interval, schedule_only=False):
         return wait
     else:
         LOG.info("DRY RUN: would market-buy %s %s (estimated %s %s at %s %s/%s); saved as simulated activity.", order_amount, "BTC", order_quote, quote, price, quote, "BTC")
-        added = persist_simulated_buy(api, settings, order_amount, price, order_quote)
+        added = persist_simulated_buy(api, settings, order_amount, price, order_quote, estimated_fee)
         LOG.info("Saved %s simulated purchase record(s) for the web UI; excluded from the Parqet CSV export.", added)
 
     settings["first_purchase_done"] = True
     settings["startup_last_buy_at"] = None
     # Debit budget for dry-run too, to make its monthly schedule representative.
-    state["spent"] = str(spent + order_quote)
+    state["spent"] = str(spent + order_quote + estimated_fee)
     state["last_order_at"] = datetime.now(timezone.utc).isoformat()
     state["last_order_quote"] = str(order_quote)
     state.pop("pending_order", None)
     save_state(state_path, state)
-    # Refresh balance, market minimum and price after recording the purchase,
-    # then return the newly calculated delay to the bot loop.
-    return run_once(api, settings, check_interval, schedule_only=True)
+    # Reuse this cycle's data for pure schedule recomputation after a simulation.
+    return _run_once(api, settings, check_interval, schedule_only=True, cycle_data=cycle_data)
+
+
+def make_worker(api, settings, interval):
+    from worker import Worker
+    def startup():
+        settings['startup_last_buy_at']=latest_recorded_buy_time()
+        update_dashboard_schedule(None,'Calculating purchase schedule')
+    update_dashboard_schedule(None,'Waiting for startup delay')
+    return Worker(lambda:run_once(api,settings,interval),manual_withdrawal_service(api,settings),
+                  startup,interval,settings['first_buy_delay_seconds'],
+                  on_error=lambda:update_dashboard_schedule(None,'Account check failed; waiting for retry'))
 
 
 def bot_loop(api, settings, interval):
-    update_dashboard_schedule(None, "Waiting for startup delay")
-    if settings["first_buy_delay_seconds"] > 0:
-        LOG.info(
-            "Waiting %s seconds after container startup before checking purchase history or calculating the first order.",
-            settings["first_buy_delay_seconds"],
-        )
-        time.sleep(settings["first_buy_delay_seconds"])
-
-    last_buy = latest_recorded_buy_time()
-    if last_buy is not None:
-        settings["startup_last_buy_at"] = last_buy
-        LOG.info(
-            "Found previous real %s purchase in persistent activity at %s; "
-            "the first purchase after startup will be aligned to the recalculated DCA interval.",
-            "BTC", last_buy.isoformat(timespec="seconds"),
-        )
-    else:
-        LOG.info(
-            "No previous real %s purchase is recorded in persistent activity; "
-            "the first purchase will be checked now.",
-            "BTC",
-        )
-    while True:
-        next_wait = interval
-        try:
-            calculated_wait = run_once(api, settings, interval)
-            if calculated_wait is not None:
-                next_wait = max(1, int(calculated_wait))
-        except requests.RequestException as exc:
-            LOG.error("%s request failed: %s", settings["exchange"], exc)
-            update_dashboard_schedule(None, "Exchange request failed; waiting for the next retry")
-        except Exception:
-            LOG.exception("Cycle failed")
-            update_dashboard_schedule(None, "Cycle failed; waiting for the next retry")
-        time.sleep(next_wait)
-
+    from worker import supervise
+    worker=make_worker(api,settings,interval)
+    worker.start()
+    threading.Thread(target=supervise,args=(worker,),daemon=True).start()
+    worker.thread.join()
 
 
 def manual_withdrawal_service(api, settings):
@@ -631,13 +609,17 @@ def manual_withdrawal_service(api, settings):
         api.validate_withdrawal_settings(settings)
         cycle, _, _ = cycle_dates(local_now(settings["timezone"]), settings["deposit_day"])
         state = read_state(Path("/data/state.json"), cycle)
-        if state.get("pending_order") or state.get("pending_withdrawal"):
+        if (state.get("pending_order") or state.get("pending_withdrawal") or
+            any(r.get('exchange')==settings['exchange'] and r.get('withdrawalStatus')=='submitted'
+                for r in withdrawal_records(unresolved=True))):
             raise ValueError("An order or withdrawal is unresolved. Check the exchange before continuing.")
         available = api.balance("BTC").quantize(Decimal("0.00000001"), rounding=ROUND_DOWN)
         if available <= 0:
             raise ValueError("No BTC is available to withdraw.")
         last = state.get("last_withdrawal", {})
-        if not state.get("withdrawal_armed", True) and available >= Decimal(last.get("balanceBefore", last.get("amount", "0"))):
+        last_record=get_activity_record(last.get('activityId',''))
+        failed=last_record and last_record.get('withdrawalStatus')=='failed'
+        if not failed and not state.get("withdrawal_armed", True) and available >= Decimal(last.get("balanceBefore", last.get("amount", "0"))):
             raise ValueError("Waiting for the exchange balance to reflect the previous withdrawal.")
         fingerprint = json.dumps(last, sort_keys=True)
         now = time.monotonic()
@@ -647,7 +629,7 @@ def manual_withdrawal_service(api, settings):
         if action == "preview":
             request = api.withdrawal_request(available, str(uuid.uuid4()), settings)
             key = str(uuid.uuid4())
-            previews[key] = {"session": session, "expires": now + 120, "request": request,
+            previews[key] = {"session": session, "expires": time.monotonic() + 120, "request": request,
                              "available": available, "fingerprint": fingerprint}
             return {"token": key, "availableBtc": format(available, "f"),
                     "netBtc": request["amount"] if settings["exchange"] == "KRAKEN" else None,
@@ -661,7 +643,7 @@ def manual_withdrawal_service(api, settings):
         maybe_withdraw_btc(api, state, settings, manual_request=preview["request"])
         if state.get("pending_withdrawal"):
             raise ValueError("Withdrawal outcome is uncertain. Check the exchange; do not submit again.")
-        return {"submitted": True, "message": "Withdrawal submitted and recorded in Activity. Blockchain settlement may still be pending."}
+        return {"submitted": True, "message": "Withdrawal submitted and recorded in Activity. It will be included in Parqet exports after exchange confirmation."}
     return handle
 
 
@@ -709,13 +691,17 @@ def main():
         port = int(os.getenv("WEB_UI_PORT", "6890"))
         if not 1 <= port <= 65535:
             raise ValueError("WEB_UI_PORT must be between 1 and 65535")
-        threading.Thread(target=bot_loop, args=(api, settings, interval), daemon=True).start()
+        from worker import supervise
+        worker=make_worker(api,settings,interval)
+        worker.start()
+        threading.Thread(target=supervise,args=(worker,),daemon=True).start()
         from web_ui import serve
-        serve(settings, port, manual_withdrawal_service(api, settings))
+        serve(settings,port,worker.submit,worker=worker)
     else:
         bot_loop(api, settings, interval)
 
 
 if __name__ == "__main__":
     main()
+
 

@@ -1,5 +1,6 @@
 """Bitcoin-only trading, legacy-history isolation, and configuration regressions."""
 import os
+import time
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -35,7 +36,7 @@ class BitcoinOnlyTests(unittest.TestCase):
     @staticmethod
     def record(identifier, kind='Buy', simulated=False):
         return {'id': identifier + ':' + kind + ':' + str(simulated), 'simulated': simulated,
-                'netWithdrawalAmount': True, 'row': {
+                'netWithdrawalAmount': True, 'withdrawalStatus': 'completed', 'row': {
                     'identifier': identifier, 'assetType': 'Crypto', 'type': kind,
                     'datetime': '2026-10-20T12:00:00Z', 'shares': '.001',
                     'amount': '80', 'fee': '.2', 'price': '80000', 'currency': 'EUR'}}
@@ -55,6 +56,7 @@ class BitcoinOnlyTests(unittest.TestCase):
         self.settings['base'] = 'ETH'
         api = Mock()
         api.balance.return_value = Decimal('100')
+        api.estimate_taker_fee.return_value = Decimal('.0025')
         api.market.return_value = {'status': 'trading', 'minOrderInQuoteAsset': '5',
                                    'minOrderInBaseAsset': '.0001', 'quantityDecimals': 8,
                                    'notionalDecimals': 2}
@@ -64,7 +66,7 @@ class BitcoinOnlyTests(unittest.TestCase):
                 patch.object(bot, 'save_state'), patch.object(bot, 'update_dashboard_schedule'), \
                 patch.object(bot, 'update_dashboard_snapshot'):
             self.assertEqual(bot.run_once(api, self.settings, 300), 30)
-        api.market.assert_called_once_with('BTC-EUR')
+        api.market.assert_called_once_with('BTC-EUR', refresh=True)
         api.price.assert_called_once_with('BTC-EUR')
         self.assertEqual(api.buy_btc.call_args.args[:2], ('EUR', Decimal('.0001')))
         api.buy_base.assert_not_called()
@@ -73,11 +75,12 @@ class BitcoinOnlyTests(unittest.TestCase):
         self.settings['live'] = False
         api = Mock()
         api.balance.return_value = Decimal('100')
+        api.estimate_taker_fee.return_value = Decimal('.0025')
         api.market.return_value = {'status': 'trading', 'minOrderInQuoteAsset': '5',
                                    'minOrderInBaseAsset': '.0001', 'quantityDecimals': 8,
                                    'notionalDecimals': 2}
         api.price.return_value = Decimal('80000')
-        api.estimate_taker_fee.return_value = Decimal('.02')
+        api.estimate_taker_fee.return_value = Decimal('.0025')
         state = {}
         with patch.object(bot, 'read_state', return_value=state), patch.object(bot, 'save_state'):
             wait = bot.run_once(api, self.settings, 300)
@@ -88,7 +91,7 @@ class BitcoinOnlyTests(unittest.TestCase):
         self.assertEqual(records[0]['row']['identifier'], 'BTC')
         api.buy_btc.assert_not_called()
         api.withdraw_btc.assert_not_called()
-        api.estimate_taker_fee.assert_called_once_with('BTC-EUR', Decimal('8.00'))
+        api.estimate_taker_fee.assert_called_once_with('BTC-EUR', Decimal('1'))
 
     def test_pending_other_market_blocks_bitcoin_purchase(self):
         api = Mock()
@@ -111,6 +114,7 @@ class BitcoinOnlyTests(unittest.TestCase):
         adapter._pairs = {
             'ETHPAIR': {'base': 'XETH', 'quote': 'ZEUR', 'altname': 'ETHEUR'},
             'XXBTZEUR': {'base': 'XXBT', 'quote': 'ZEUR', 'altname': 'XBTEUR'}}
+        adapter._pairs_at=time.monotonic()
         adapter.private = Mock(return_value={'txid': ['btc-order']})
         adapter.buy_btc('eur', Decimal('.001'), '00000000-0000-0000-0000-000000000001')
         self.assertEqual(adapter.private.call_args.args[0], 'AddOrder')
@@ -201,3 +205,4 @@ class BitcoinOnlyTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

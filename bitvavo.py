@@ -9,6 +9,9 @@ from decimal import Decimal
 from urllib.parse import urlencode
 
 import requests
+from contextlib import contextmanager
+from exchange_errors import DefinitiveRejection
+from read_cache import ReadCache
 
 BASE_URL = "https://api.bitvavo.com/v2"
 
@@ -22,6 +25,9 @@ class Bitvavo:
         self.session = requests.Session()
         self.exchange_name = "BITVAVO"
         self.supports_withdrawal_idempotency = True
+        self._reads = ReadCache()
+        self._markets = {}
+        self._fee_rate = None
 
     def request(self, method, path, params=None, body=None, private=False):
         payload = json.dumps(body, separators=(",", ":")) if body is not None else ""
@@ -37,42 +43,58 @@ class Bitvavo:
                 "Bitvavo-Access-Signature": signature,
                 "Bitvavo-Access-Window": "10000",
             })
+        if method != "GET": self._reads.invalidate()
         response = self.session.request(
             method, BASE_URL + path, params=params, data=payload if payload else None,
             headers=headers, timeout=15,
         )
+        try:
+            payload = response.json()
+        except ValueError:
+            response.raise_for_status()
+            if path=='/crypto/withdrawal' and response.status_code==201 and response.content==b'':
+                return {}  # Accepted; match destination/time/gross amount in history later.
+            raise
+        code = payload.get('errorCode') if isinstance(payload,dict) else None
+        safe = {102,200,201,202,203,204,205,206,210,211,212,213,215,216,217,219,
+                231,300,301,302,303,304,305,306,402,403,405,406,408,409,410,411,413,414,434,435,436,437,438,439}
+        if response.status_code < 500 and code in safe:
+            self.invalidate_market()
+            raise DefinitiveRejection(str(payload.get('error',code)))
         response.raise_for_status()
-        return response.json()
+        return payload
 
-    def market(self, symbol):
-        markets = self.request("GET", "/markets")
-        for market in markets:
-            if market.get("market", "").upper() == symbol:
-                return market
-        raise ValueError(f"Bitvavo market {symbol} does not exist")
+    @contextmanager
+    def balance_snapshot(self):
+        with self._reads.cycle(): yield
+
+    def invalidate_market(self):
+        self._markets = {}
+        self._fee_rate = None
+
+    def market(self, symbol, refresh=False):
+        cached = self._markets.get(symbol)
+        if refresh or cached is None or time.monotonic()-cached[0]>=60:
+            markets = self.request('GET','/markets',params={'market':symbol})
+            if isinstance(markets,dict): markets=[markets]
+            value=next((m for m in markets if m.get('market','').upper()==symbol),None)
+            if value is None: raise ValueError(f'Bitvavo market {symbol} does not exist')
+            self._markets[symbol]=(time.monotonic(),value)
+        return self._markets[symbol][1]
 
     def price(self, symbol):
-        ticker = self.request("GET", f"/{symbol}/ticker/price")
-        return Decimal(ticker["price"])
+        ticker = self._reads.read(('price',symbol), lambda:self.request('GET',f'/{symbol}/ticker/price'))
+        return Decimal(ticker['price'])
 
     def estimate_taker_fee(self, symbol, quote_amount):
-        account = self.request("GET", "/account", private=True)
-        rate = Decimal(str(account["fees"]["taker"]))
-        return Decimal(str(quote_amount)) * rate
+        if self._fee_rate is None or time.monotonic()-self._fee_rate[0]>=300:
+            account=self.request('GET','/account',private=True)
+            self._fee_rate=(time.monotonic(),Decimal(str(account['fees']['taker'])))
+        return Decimal(str(quote_amount))*self._fee_rate[1]
 
     def balance(self, currency):
-        accounts = self.request("GET", "/balance", private=True)
-        for account in accounts:
-            if account.get("symbol", "").upper() == currency:
-                return Decimal(account.get("available", "0"))
-        return Decimal("0")
-
-    def fiat_deposits(self, currency, start_ms, end_ms):
-        return self.request(
-            "GET", "/depositHistory",
-            params={"symbol": currency, "start": start_ms, "end": end_ms, "limit": 1000},
-            private=True,
-        )
+        accounts=self._reads.read('balances',lambda:self.request('GET','/balance',private=True))
+        return next((Decimal(a.get('available','0')) for a in accounts if a.get('symbol','').upper()==currency),Decimal(0))
 
     def validate_withdrawal_settings(self, settings):
         if not settings.get("withdraw_address"):
@@ -93,7 +115,9 @@ class Bitvavo:
     def withdraw_btc(self, withdrawal):
         if withdrawal.get("symbol") != "BTC":
             raise ValueError("Only Bitcoin withdrawals are supported")
-        return self.request("POST", "/crypto/withdrawal", body=withdrawal, private=True)
+        payload = dict(withdrawal)
+        payload['asset'] = payload.pop('symbol')
+        return self.request("POST", "/crypto/withdrawal", body=payload, private=True)
 
     def buy_btc(self, quote, amount, client_order_id):
         body = {
@@ -106,38 +130,11 @@ class Bitvavo:
         }
         return self.request("POST", "/order", body=body, private=True)
 
-    def account_history(self, start_ms, end_ms):
-        items = []
-        for transaction_type in ("buy", "convert_buy"):
-            page = 1
-            while True:
-                result = self.request(
-                    "GET", "/account/history",
-                    params={"fromDate": start_ms, "toDate": end_ms, "page": page, "maxItems": 100, "type": transaction_type},
-                    private=True,
-                )
-                items.extend(result.get("items", []))
-                if page >= int(result.get("totalPages", 1)):
-                    break
-                page += 1
-        return items
-
     def btc_withdrawals(self, start_ms=0, end_ms=None):
         params = {"symbol": "BTC", "start": start_ms, "limit": 1000}
         if end_ms is not None:
             params["end"] = end_ms
         return self.request("GET", "/withdrawalHistory", params=params, private=True)
-
-    def historical_price(self, market, timestamp_ms):
-        interval_ms = 60_000
-        start_ms = timestamp_ms - timestamp_ms % interval_ms
-        candles = self.request(
-            "GET", f"/{market}/candles",
-            params={"interval": "1m", "start": start_ms, "end": start_ms + interval_ms, "limit": 2},
-        )
-        if not candles:
-            raise ValueError(f"No historical {market} price available for withdrawal timestamp {timestamp_ms}")
-        return Decimal(candles[0][4])
 
     def get_order(self, symbol, client_order_id, exchange_order_id=None):
         return self.request("GET", "/order", params={"market": symbol, "clientOrderId": client_order_id}, private=True)
@@ -188,3 +185,4 @@ class Bitvavo:
                 "tax": "0",
             },
         }]
+

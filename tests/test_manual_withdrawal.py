@@ -14,10 +14,15 @@ class API:
     def price(self,s): return D('81000')
     def withdrawal_request(self,amount,key,s):
         if self.exchange=='KRAKEN': return {'asset':'XBT','amount':str(amount-D('.0001')),'fee':'.0001','key':'wallet'}
-        return {'symbol':'BTC','amount':str(amount),'idempotencyKey':key}
+        return {'symbol':'BTC','amount':str(amount),'idempotencyKey':key,'address':'bc1test'}
+    def btc_withdrawals(self,start,end):
+        if self.exchange=='KRAKEN':return [{'id':'test-1','status':'completed','amount':'.0044','fee':'.0001'}]
+        return [{'address':'bc1test','timestamp':self.timestamp,'status':'completed','amount':'.0044','fee':'.0001'}]
     def withdraw_btc(self,r):
         self.sent.append(r)
         if self.fail: raise requests.RequestException('timeout')
+        import time
+        self.timestamp=int(time.time()*1000)
         return {'id':'test-1','fee':'.0001'}
 
 class Tests(unittest.TestCase):
@@ -32,10 +37,16 @@ class Tests(unittest.TestCase):
     def test_both_exchanges_activity_and_export(self):
         for exchange in ['KRAKEN','BITVAVO']:
             with self.subTest(exchange=exchange):
-                self.state.clear();activity.ACTIVITY_PATH.unlink(missing_ok=True)
+                self.state.clear();activity.ACTIVITY_PATH.unlink(missing_ok=True);activity.ACTIVITY_PATH.with_suffix('.sqlite3').unlink(missing_ok=True)
                 service=self.service(exchange);p=service('preview','session');self.assertEqual(self.api.sent,[])
                 service('confirm','session',p['token']);self.assertEqual(len(self.api.sent),1)
                 record=activity.read_activity_records()[0];self.assertTrue(record['manual']);self.assertEqual(D(record['row']['shares']),D('.0044'));self.assertEqual(D(record['networkFeeBtc']),D('.0001'))
+                self.assertEqual(record['withdrawalStatus'],'submitted')
+                self.assertEqual(reporting.parqet_aggregate_rows([{'row':{'type':'Buy','identifier':'BTC','shares':'.0045','amount':'359','fee':'.8975','currency':'EUR','datetime':'2026-10-20T00:00:00Z'}},record],exchange),[])
+                from withdrawals import reconcile_withdrawals
+                reconcile_withdrawals(self.api,self.s,force=True)
+                record=activity.read_activity_records()[0]
+                self.assertEqual(record['withdrawalStatus'],'completed')
                 buys={'row':{'type':'Buy','identifier':'BTC','datetime':'2026-10-20T00:00:00Z','shares':'.0045','amount':'359','fee':'.8975','currency':'EUR'}}
                 exported=reporting.parqet_aggregate_rows([buys,record],exchange)[0];self.assertEqual(D(exported['amount']),D('359.8975'));self.assertEqual(D(exported['shares']),D('.0044'))
                 with self.assertRaises(ValueError):service('confirm','session',p['token'])
@@ -75,6 +86,29 @@ class Tests(unittest.TestCase):
         bot.maybe_withdraw_btc(self.api,self.state,self.s)
         self.assertEqual(len(self.api.sent),1);self.assertEqual(len(activity.read_activity_records()),1)
 
+    def test_recovery_after_activity_insert_is_idempotent(self):
+        service=self.service();preview=service('preview','session')
+        original=bot.persist_bot_withdrawal
+        def inserted_then_crashed(*args):
+            original(*args)
+            raise OSError('crash after ledger insert')
+        with patch.object(bot,'persist_bot_withdrawal',side_effect=inserted_then_crashed):
+            with self.assertRaises(OSError):service('confirm','session',preview['token'])
+        bot.maybe_withdraw_btc(self.api,self.state,self.s)
+        self.assertEqual(len(self.api.sent),1)
+        self.assertEqual(len(activity.read_activity_records()),1)
+        self.assertNotIn('pending_withdrawal',self.state)
+
+    def test_failed_withdrawal_rearms_and_allows_manual_preview(self):
+        service=self.service();preview=service('preview','session')
+        service('confirm','session',preview['token'])
+        record=activity.read_activity_records()[0]
+        record['withdrawalStatus']='failed';activity.update_activity_record(record)
+        self.assertIn('token',service('preview','session'))
+        bot.maybe_withdraw_btc(self.api,self.state,self.s)
+        self.assertTrue(self.state['withdrawal_armed'])
+        self.assertEqual(len(self.api.sent),1)
+
     def test_withdrawal_configuration_reports_missing_settings(self):
         for exchange, missing in [('KRAKEN', ['LIVE_TRADING', 'KRAKEN_WITHDRAW_KEY']),
                                   ('BITVAVO', ['LIVE_TRADING', 'WITHDRAW_ADDRESS', 'WITHDRAW_NETWORK'])]:
@@ -112,3 +146,4 @@ class Tests(unittest.TestCase):
         handler.headers={'Content-Type':'application/json','X-DCA-Action':'withdrawal','Content-Length':'2','Cookie':'dca_session=test'};handler.rfile=io.BytesIO(b'{}');handler.do_POST();self.assertEqual(statuses[-1],400)
 
 if __name__=='__main__':unittest.main()
+

@@ -1,0 +1,47 @@
+// Run with node tests/test_dashboard.cjs; stdlib only, no browser or exchange IO.
+const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
+const html=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',`import ast,json
+from pathlib import Path
+m=ast.parse(Path('web_ui.py').read_text());print(json.dumps(next(ast.literal_eval(n.value) for n in m.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='HTML' for t in n.targets))))`],{encoding:'utf8'}));
+const script=html.split('<script>')[1].split('</script>')[0];
+class Element{
+ constructor(){this.value='';this.children=[];this.handlers={};this.textContent='';this.disabled=false;this.classList={toggle(){},add(){},remove(){}}}
+ appendChild(e){this.children.push(e)} append(...e){this.children.push(...e)} replaceChildren(...e){this.children=e}
+ set innerHTML(v){this.children=[]} addEventListener(event,handler){this.handlers[event]=handler}
+}
+const elements={},get=id=>elements[id]??=new Element();get('pageSize').value='20';
+const records=Array.from({length:45},(_,i)=>({activityId:String(i),datetime:'2026-10-22T12:00:00Z',type:'Buy',identifier:'BTC',shares:'.001',currency:i<22?'EUR':'USD',price:i<22?'80000':'100000',amount:i<22?'80':'100',fee:i<22?'.2':'.25'}));
+const requests=[];let checks=0;
+const response=data=>({ok:true,json:async()=>data});
+const context={document:{getElementById:get,createElement:()=>new Element()},localStorage:{getItem:()=>null,setItem(){}},Intl,Date,URL,console,alert(){},confirm:()=>false,setInterval(){},setTimeout(fn){queueMicrotask(fn)},window:{location:{reload(){throw Error('Unexpected reload')}}},fetch:async(url,options)=>{
+ requests.push(url);const parsed=new URL(url,'http://example.test');
+ if(parsed.pathname==='/api/schedule')return response({nextPurchaseAt:new Date(Date.now()+3600000).toISOString(),serverTime:new Date().toISOString(),timezone:'Europe/Berlin'});
+ if(parsed.pathname==='/api/withdrawals')return response([{timestamp:Date.parse('2026-10-20T12:00:00Z')},{timestamp:Date.parse('2026-10-23T12:00:00Z')}]);
+ if(parsed.pathname==='/api/withdrawal/config')return response({enabled:true,destination:'fictional wallet'});
+ if(parsed.pathname==='/api/market-price')return response({price:'80000',conversionRate:'1',conversionRates:{EUR:1,USD:.9},updatedAt:Date.now()/1000});
+ if(parsed.pathname==='/api/analytics'){
+  const page=Math.max(1,Math.min(3,Number(parsed.searchParams.get('page'))||1));
+  return response({quote:'EUR',exchange:'KRAKEN',configuration:{liveTrading:true,buyAmount:0,depositDay:1,withdrawalsEnabled:false,withdrawalThreshold:1000},snapshot:{price:80000,balance:'.045',updatedAt:new Date().toISOString()},summary:{buyCount:45,boughtBtc:'.045',withdrawnBtc:0,withdrawalCount:0,pendingWithdrawalCount:0,netBtc:'.045'},summaryByCurrency:{EUR:{buyVolume:1760,tradeFees:4.4,withdrawalFees:0},USD:{buyVolume:2300,tradeFees:5.75,withdrawalFees:0}},activities:records.slice((page-1)*20,page*20),pagination:{page,pageSize:20,total:45,pages:3}});
+ }
+ if(parsed.pathname==='/api/withdrawal/preview')return response({jobId:'fictional-job'});
+ if(parsed.pathname==='/api/withdrawal/jobs/fictional-job')return response(++checks===1?{state:'queued'}:{state:'completed',result:{token:'single-use'}});
+ throw Error('Unexpected URL '+url);
+}};
+const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate)};
+(async()=>{
+ vm.createContext(context);vm.runInContext(script,context);await settle();
+ assert(get('start').value&&get('end').value,'Both dates must initialize for the selected interval');
+ assert(get('pageInfo').textContent.includes('1–20 of 45'));
+ assert.equal(get('activities').children.length,20);
+ assert.equal(get('buyVolume').textContent,'€3,830.00');
+ get('nextPage').handlers.click();await settle();
+ assert(get('pageInfo').textContent.includes('21–40 of 45'));
+ assert(get('activities').children[2].children[4].textContent.includes('90.00'),'USD rows use their own conversion rate');
+ get('nextPage').handlers.click();await settle();
+ assert(get('pageInfo').textContent.includes('41–45 of 45'));assert.equal(get('activities').children.length,5);assert(get('nextPage').disabled);
+ assert.equal(requests.filter(u=>u.startsWith('/api/analytics')).length,3,'Loading a page must not recursively reload reports');
+ const preview=await vm.runInContext("withdrawalPost('/api/withdrawal/preview',{})",context);
+ assert.equal(preview.token,'single-use');assert.equal(checks,2);
+ assert.equal(requests.filter(u=>u==='/api/withdrawal/preview').length,1);
+ console.log('Dashboard regressions passed: interval dates, server pages, mixed-currency rows/totals and queued preview polling');
+})().catch(e=>{console.error(e);process.exit(1)});

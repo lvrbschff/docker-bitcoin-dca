@@ -2,7 +2,6 @@
 import base64
 import hashlib
 import hmac
-import json
 import logging
 import os
 import threading
@@ -13,6 +12,8 @@ from decimal import Decimal
 from urllib.parse import urlencode
 
 import requests
+from exchange_errors import DefinitiveRejection
+from read_cache import ReadCache
 
 BASE_URL = "https://api.kraken.com/0"
 LOG = logging.getLogger("bitcoin-dca.kraken")
@@ -66,15 +67,27 @@ class Kraken:
         self._balance_cache_at = None
         self.quote_currency = _canonical_asset(quote_currency)
         self.withdraw_key = withdraw_key
-        self._assets = None
         self._pairs = None
+        self._pairs_at = 0
+        self._fee_rates = {}
+        self._reads = ReadCache()
 
     def _check_response(self, response):
         response.raise_for_status()
         payload = response.json()
         errors = payload.get("error", [])
         if errors:
-            raise KrakenAPIError("; ".join(errors))
+            message = "; ".join(errors)
+            definitive = ("EOrder:Insufficient funds", "EOrder:Order minimum", "EOrder:Cost minimum",
+                          "EOrder:Invalid", "EOrder:Tick size", "EAPI:Invalid key", "EAPI:Invalid signature",
+                          "EGeneral:Permission denied", "EGeneral:Invalid arguments", "EFunding:Insufficient funds",
+                          "EOrder:Orders limit exceeded", "EOrder:Rate limit exceeded",
+                          "EOrder:Domain rate limit exceeded", "EAPI:Rate limit exceeded",
+                          "EFunding:Max fee exceeded")
+            if not payload.get("result") and all(str(e).startswith(definitive) for e in errors):
+                self.invalidate_market()
+                raise DefinitiveRejection(message)
+            raise KrakenAPIError(message)
         return payload.get("result", {})
 
     def _reset_http_session(self):
@@ -95,6 +108,7 @@ class Kraken:
         if not retry_safe:
             self._balance_cache = None
             self._balance_cache_at = None
+            self._reads.invalidate()
         attempts = 3 if retry_safe else 1
         for attempt in range(1, attempts + 1):
             attempt_started = time.monotonic()
@@ -135,7 +149,8 @@ class Kraken:
             self._balance_cache_at = None
         self._balance_scope_depth += 1
         try:
-            yield
+            with self._reads.cycle():
+                yield
         finally:
             self._balance_scope_depth -= 1
             if self._balance_scope_depth == 0:
@@ -180,33 +195,18 @@ class Kraken:
             retry_safe=method in _READ_ONLY_PRIVATE_METHODS,
         )
 
-    def _asset_info(self):
-        if self._assets is None:
-            self._assets = self.public("Assets")
-        return self._assets
+    def invalidate_market(self):
+        self._pairs = None
+        self._pairs_at = 0
+        self._fee_rates = {}
 
-    def _display_asset(self, code):
-        code = str(code).upper()
-        info = self._asset_info().get(code)
-        if info:
-            alias = info.get("altname", code)
-            return "BTC" if alias.upper() == "XBT" else alias.upper()
-        return _canonical_asset(code)
-
-    def _internal_asset(self, symbol):
-        wanted = _canonical_asset(symbol)
-        for code, info in self._asset_info().items():
-            alias = info.get("altname", code).upper()
-            if _canonical_asset(code) == wanted or _canonical_asset(alias) == wanted:
-                return code
-        return symbol.upper()
-
-    def _pair_info(self, symbol):
+    def _pair_info(self, symbol, refresh=False):
         bitcoin, quote = symbol.upper().replace("/", "-").split("-", 1)
         if bitcoin != "BTC":
             raise ValueError("Only Bitcoin markets are supported")
-        if self._pairs is None:
-            self._pairs = self.public("AssetPairs", {"assetVersion": 1})
+        if refresh or self._pairs is None or time.monotonic() - getattr(self, '_pairs_at', 0) >= 60:
+            self._pairs = self.public("AssetPairs", {"pair": "XBT" + quote, "assetVersion": 1})
+            self._pairs_at = time.monotonic()
         for key, info in self._pairs.items():
             if _canonical_asset(info.get("base")) == "BTC" and _canonical_asset(info.get("quote")) == _canonical_asset(quote):
                 normalized = dict(info)
@@ -216,8 +216,8 @@ class Kraken:
                 return normalized
         raise ValueError(f"Kraken market {symbol} does not exist")
 
-    def market(self, symbol):
-        pair = self._pair_info(symbol)
+    def market(self, symbol, refresh=False):
+        pair = self._pair_info(symbol, refresh=refresh)
         return {
             "market": pair["market"],
             "status": "trading" if pair.get("status") == "online" else pair.get("status", "unknown"),
@@ -231,22 +231,23 @@ class Kraken:
 
     def price(self, symbol):
         pair = self._pair_info(symbol)
-        result = self.public("Ticker", {"pair": pair.get("altname", pair["_key"])})
+        result = self._reads.read(('price',symbol), lambda: self.public("Ticker", {"pair": pair.get("altname", pair["_key"])}))
         ticker = next(iter(result.values()))
         return Decimal(ticker["c"][0])
 
     def estimate_taker_fee(self, symbol, quote_amount):
-        pair = self._pair_info(symbol)
-        result = self.private("TradeVolume", {"pair": pair["_key"]})
-        fee_table = result.get("fees", {})
-        fee_info = fee_table.get(pair["_key"])
-        if fee_info is None and len(fee_table) == 1:
-            fee_info = next(iter(fee_table.values()))
-        if not isinstance(fee_info, dict) or "fee" not in fee_info:
-            raise ValueError(f"Kraken did not return a taker fee for {symbol}")
-        # Kraken returns percentage points (for example 0.2600 for 0.26%).
-        rate = Decimal(str(fee_info["fee"])) / Decimal(100)
-        return Decimal(str(quote_amount)) * rate
+        cached = self._fee_rates.get(symbol)
+        if cached is None or time.monotonic() - cached[0] >= 300:
+            pair = self._pair_info(symbol)
+            result = self.private("TradeVolume", {"pair": pair["_key"]})
+            table = result.get("fees", {})
+            info = table.get(pair["_key"])
+            if info is None and len(table)==1: info=next(iter(table.values()))
+            if not isinstance(info,dict) or 'fee' not in info:
+                raise ValueError(f"Kraken did not return a taker fee for {symbol}")
+            rate=Decimal(str(info['fee']))/100
+            self._fee_rates[symbol]=(time.monotonic(),rate)
+        return Decimal(str(quote_amount))*self._fee_rates[symbol][1]
 
     def balance(self, currency):
         if self._balance_scope_depth:
@@ -269,91 +270,6 @@ class Kraken:
                     - Decimal(str(item.get("hold_trade", "0"))),
                 )
         return Decimal(0)
-
-    def _ledgers(self, start_s, end_s, ledger_type, asset=None):
-        offset = 0
-        entries = []
-        while True:
-            params = {
-                "start": int(start_s),
-                "end": int(end_s),
-                "type": ledger_type,
-                "ofs": offset,
-            }
-            if asset:
-                params["asset"] = asset
-            result = self.private("Ledgers", params)
-            ledger = result.get("ledger", {})
-            page = list(ledger.values())
-            entries.extend(page)
-            count = int(result.get("count", len(entries)))
-            if len(page) < 50 or offset + len(page) >= count:
-                return entries
-            offset += len(page)
-
-    def fiat_deposits(self, currency, start_ms, end_ms):
-        internal = self._internal_asset(currency)
-        entries = self._ledgers(start_ms // 1000, end_ms // 1000, "deposit", internal)
-        deposits = []
-        for entry in entries:
-            if self._display_asset(entry.get("asset")) != _canonical_asset(currency):
-                continue
-            deposits.append({
-                "symbol": _canonical_asset(currency),
-                "amount": str(entry.get("amount", "0")),
-                "status": "completed",
-                "timestamp": int(float(entry.get("time", 0)) * 1000),
-                "refid": entry.get("refid"),
-            })
-        return deposits
-
-    def _pair_trade_history(self, pair, start_ms, end_ms):
-        params = {
-            "type": "all",
-            "trades": "true",
-            "pair": pair.get("altname", pair["_key"]),
-            "start": int(start_ms // 1000),
-            "end": int(end_ms // 1000),
-            "limit": 100,
-            "with_cursor": "true",
-        }
-        trades = []
-        while True:
-            result = self.private("TradesHistory", params)
-            trades.extend(result.get("trades", {}).items())
-            cursor = result.get("cursor", {})
-            next_cursor = cursor.get("next") if isinstance(cursor, dict) else None
-            if not next_cursor:
-                break
-            params = {"with_cursor": "true", "cursor": next_cursor, "limit": 100}
-        return trades
-
-    def account_history(self, start_ms, end_ms):
-        pair = self._pair_info(f"BTC-{self.quote_currency}")
-        rows = []
-        for trade_id, trade in self._pair_trade_history(pair, start_ms, end_ms):
-            if trade.get("type") != "buy":
-                continue
-            timestamp_ms = int(float(trade.get("time", 0)) * 1000)
-            if not (start_ms < timestamp_ms <= end_ms):
-                continue
-            volume = Decimal(trade.get("vol", "0"))
-            price = Decimal(trade.get("price", "0"))
-            cost = Decimal(trade.get("cost", "0"))
-            rows.append({
-                "transactionId": trade_id,
-                "executedAt": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(timestamp_ms / 1000)) + ".000Z",
-                "type": "buy",
-                "priceCurrency": self.quote_currency,
-                "priceAmount": str(cost if cost > 0 else volume * price),
-                "sentCurrency": self.quote_currency,
-                "sentAmount": str(cost),
-                "receivedCurrency": "BTC",
-                "receivedAmount": str(volume),
-                "feesCurrency": self.quote_currency,
-                "feesAmount": str(trade.get("fee", "0")),
-            })
-        return rows
 
     def btc_withdrawals(self, start_ms=0, end_ms=None):
         params = {
@@ -400,25 +316,11 @@ class Kraken:
                 "symbol": "BTC",
                 "amount": str(item.get("amount", "0")),
                 "fee": str(item.get("fee", "0")),
-                "status": "completed" if status in ("success", "settled") else status,
-                "txId": item.get("refid") or item.get("txid") or "",
+                "status": "completed" if status == "success" else ("failed" if status == "failure" else status),
+                "id": item.get("refid") or "",
+                "txId": item.get("txid") or "",
             })
         return withdrawals
-
-    def historical_price(self, market, timestamp_ms):
-        pair = self._pair_info(market)
-        timestamp_s = timestamp_ms // 1000
-        for interval in (1, 60, 1440):
-            result = self.public(
-                "OHLC",
-                {"pair": pair.get("altname", pair["_key"]), "interval": interval, "since": timestamp_s},
-            )
-            candles = next((value for key, value in result.items() if key != "last"), [])
-            for candle in candles:
-                candle_start = int(candle[0])
-                if candle_start <= timestamp_s < candle_start + interval * 60:
-                    return Decimal(str(candle[4]))
-        raise ValueError(f"No historical Kraken {market} price available at {timestamp_ms}")
 
     def buy_btc(self, quote, amount, client_order_id):
         pair = self._pair_info(f"BTC-{quote.upper()}")
@@ -438,7 +340,7 @@ class Kraken:
         for method, bucket in (("ClosedOrders", "closed"), ("OpenOrders", "open")):
             try:
                 result = self.private(method, {"userref": userref})
-            except KrakenAPIError as exc:
+            except (KrakenAPIError,DefinitiveRejection) as exc:
                 if "Permission denied" in str(exc):
                     continue
                 raise
@@ -539,3 +441,4 @@ class Kraken:
         }
         result = self.private("Withdraw", payload)
         return {"id": result.get("refid"), "refid": result.get("refid")}
+

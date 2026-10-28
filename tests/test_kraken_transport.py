@@ -11,6 +11,7 @@ import requests
 import activity
 import bot
 import kraken
+from exchange_errors import DefinitiveRejection
 
 
 class KrakenTransportTests(unittest.TestCase):
@@ -112,7 +113,7 @@ class KrakenTransportTests(unittest.TestCase):
     def test_definitive_api_error_is_not_retried(self):
         self.api.session.post.return_value = Mock()
         self.api.session.post.return_value.json.return_value = {'error': ['EAPI:Invalid key']}
-        with patch.object(kraken.time, 'sleep') as sleep, self.assertRaises(kraken.KrakenAPIError):
+        with patch.object(kraken.time, 'sleep') as sleep, self.assertRaises(DefinitiveRejection):
             self.api.private('BalanceEx')
         self.assertEqual(self.api.session.post.call_count, 1)
         sleep.assert_not_called()
@@ -153,7 +154,7 @@ class KrakenTransportTests(unittest.TestCase):
                     self.api.session.post.return_value = self.response({'txid': ['fictional-order']})
                     if failed:
                         self.api.session.post.return_value.json.return_value = {'error': ['EOrder:Insufficient funds']}
-                        with self.assertRaises(kraken.KrakenAPIError):
+                        with self.assertRaises(DefinitiveRejection):
                             self.api.private('AddOrder')
                     else:
                         self.api.private('AddOrder')
@@ -189,3 +190,4 @@ class KrakenTransportTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

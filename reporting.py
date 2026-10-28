@@ -6,7 +6,9 @@ from io import StringIO
 
 import requests
 
-from activity import bitcoin_activity_records
+from activity import bitcoin_activity_records, cache_get_many, cache_put_many
+from bisect import bisect_right
+import time
 
 
 def decimal_text(value):
@@ -26,25 +28,30 @@ def _usd_eur_rates(rows):
     if not usd_rows:
         return {}
 
-    trade_dates = [_parse_datetime(row).date() for row in usd_rows]
-    start_date = min(trade_dates) - timedelta(days=7)
-    end_date = max(trade_dates)
-    response = requests.get(
-        f"https://api.frankfurter.dev/v1/{start_date.isoformat()}..{end_date.isoformat()}",
-        params={"base": "USD", "symbols": "EUR"},
-        timeout=15,
-    )
+    trade_dates = sorted({_parse_datetime(row).date() for row in usd_rows})
+    keys = {day:f'fx:USD:EUR:{day.isoformat()}' for day in trade_dates}
+    cached = cache_get_many(list(keys.values()))
+    resolved = {day:Decimal(cached[keys[day]][0]['rate']) for day in trade_dates
+                if keys[day] in cached and time.time()-cached[keys[day]][1]<86400}
+    missing = [day for day in trade_dates if day not in resolved]
+    if not missing: return resolved
+    start_date = min(missing)-timedelta(days=7)
+    response=requests.get(f'https://api.frankfurter.dev/v1/{start_date.isoformat()}..{max(missing).isoformat()}',
+                          params={'base':'USD','symbols':'EUR'},timeout=15)
     response.raise_for_status()
-    payload = response.json()
-    raw_rates = payload.get("rates", {})
-    rates = {
-        datetime.strptime(day, "%Y-%m-%d").date(): Decimal(str(value["EUR"]))
-        for day, value in raw_rates.items()
-        if isinstance(value, dict) and value.get("EUR") is not None
-    }
-    if not rates:
-        raise ValueError("Could not load historical USD/EUR rates for the selected purchases")
-    return rates
+    rates={datetime.strptime(day,'%Y-%m-%d').date():Decimal(str(value['EUR']))
+           for day,value in response.json().get('rates',{}).items() if isinstance(value,dict) and 'EUR' in value}
+    dates=sorted(rates)
+    persisted={}
+    for day in missing:
+        index=bisect_right(dates,day)-1
+        if index<0: raise ValueError(f'No historical USD/EUR rate available for {day}')
+        rate=rates[dates[index]]
+        if not rate.is_finite() or rate<=0: raise ValueError('Invalid historical USD/EUR rate')
+        resolved[day]=rate
+        persisted[keys[day]]={'rate':str(rate),'referenceDate':dates[index].isoformat()}
+    cache_put_many(persisted)
+    return resolved
 
 
 def _purchase_cost_eur(row, rates):
@@ -55,10 +62,12 @@ def _purchase_cost_eur(row, rates):
     if currency != "USD":
         raise ValueError(f"Parqet export supports EUR or USD purchase records, got {currency or 'unknown'}")
     trade_date = _parse_datetime(row).date()
-    applicable = [day for day in rates if day <= trade_date]
-    if not applicable:
-        raise ValueError(f"No historical USD/EUR rate available for {trade_date.isoformat()}")
-    return cost * rates[max(applicable)]
+    if trade_date not in rates:
+        dates=sorted(rates)
+        index=bisect_right(dates,trade_date)-1
+        if index<0: raise ValueError(f'No historical USD/EUR rate available for {trade_date}')
+        rates[trade_date]=rates[dates[index]]
+    return cost*rates[trade_date]
 
 
 def _withdrawal_net_btc(record, exchange):
@@ -69,7 +78,7 @@ def _withdrawal_net_btc(record, exchange):
 
     # Older Bitvavo records stored the gross amount requested from the exchange.
     # Their fiat fee is converted back to BTC using the recorded withdrawal price.
-    if exchange == "BITVAVO":
+    if record.get("exchange", exchange) == "BITVAVO":
         price = Decimal(str(row.get("price", "0")))
         fee_quote = Decimal(str(row.get("fee", "0")))
         if price > 0 and fee_quote > 0:
@@ -95,6 +104,7 @@ def parqet_aggregate_rows(records, exchange):
         record for record in records
         if not record.get("simulated")
         and record.get("row", {}).get("type") == "TransferOut"
+        and record.get("withdrawalStatus") == "completed"
     ]
     if not purchases or not withdrawals:
         return []
@@ -135,3 +145,4 @@ def parqet_csv(rows):
     writer.writeheader()
     writer.writerows(rows)
     return output.getvalue()
+

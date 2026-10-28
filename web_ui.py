@@ -15,8 +15,12 @@ from urllib.parse import parse_qs, urlparse
 from secrets import token_urlsafe
 from threading import RLock
 import time
+from concurrent.futures import ThreadPoolExecutor
+import price_cache
+from analytics import report as build_report, totals_from_records
+from activity import activity_page, activity_totals, period_records, ledger_balance, withdrawal_records, read_report
 
-from activity import bitcoin_activity_records, delete_activity_record, read_bitcoin_activity_records, read_dashboard_snapshot, tracked_bitcoin_balance
+from activity import bitcoin_activity_records, delete_activity_record, read_dashboard_snapshot
 from reporting import parqet_aggregate_rows, parqet_csv
 
 LOG = logging.getLogger("bitcoin-dca.web")
@@ -138,7 +142,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 <div class="card"><label>Profit / loss on period purchases</label><div class="value" id="profitLoss">—</div><div class="small" id="profitLossBasis">Current value of BTC bought in this period minus purchase costs and trading fees</div></div>
 </div><div class="grid" style="margin-top:14px">
 <div class="card"><label>Withdrawal fees</label><div class="value" id="withdrawFees">—</div></div>
-<div class="card"><label>Net BTC in period</label><div class="value" id="netBtc">—</div><div class="small">Purchases minus withdrawals</div></div>
+<div class="card"><label>Net BTC in period</label><div class="value" id="netBtc">—</div><div class="small">Purchases minus gross BTC debits</div></div>
 <div class="card time-card"><label>Date range</label><div class="value time-value" id="periodLabel">—</div></div>
 <div class="card"><label>Last updated</label><div class="value" id="updated">—</div></div>
 </div></section>
@@ -149,17 +153,17 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 <footer class="dashboard-footnotes" aria-labelledby="notesHeading">
 <h2 id="notesHeading">Notes</h2>
 <ol>
-<li id="currency-note"><strong>Display currency and price data.</strong><p>Fiat values are converted to the selected display currency. The current BTC price is fetched from Kraken’s public BTC-to-fiat pages when the report loads. Parqet CSV exports use EUR.</p></li>
+<li id="currency-note"><strong>Display currency and price data.</strong><p>Historical fiat amounts are grouped by their original currency and converted separately to the selected display currency. The current BTC price is fetched from Kraken’s public BTC-to-fiat pages when the report loads. Parqet CSV exports use EUR.</p></li>
 <li id="schedule-note"><strong>Purchase schedule.</strong><p>The interval is the time until the next deposit day divided by the estimated number of purchases the current balance can cover, using the current market price and configured purchase amount or exchange minimum. Time elapsed since the last purchase is deducted to determine the next purchase time. The estimate is recalculated during bot checks; open or unconfirmed orders block further purchases.</p></li>
-<li id="report-note"><strong>Period analysis, Parqet export and local activity history.</strong><p>These notes apply to the date filters in Period analysis, the Activity table and the Download Parqet CSV button. Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The Parqet CSV consolidates the period into one purchase: all real purchase costs and trading fees in EUR, and net BTC received at withdrawals after network fees. The period must contain purchases and a bot-recorded withdrawal. Dry-run purchases are shown separately and excluded from the CSV. Delete removes a purchase from local history only; it cannot reverse an exchange order.</p></li>
-<li id="withdrawal-note"><strong>Manual BTC withdrawal.</strong><p id="withdrawalDestination">Loading withdrawal configuration…</p><p id="withdrawMessage" role="status" aria-live="polite"></p><p>The button withdraws the entire available BTC balance, less the exchange withdrawal fee. LIVE_TRADING must be enabled; automatic withdrawals may remain disabled and their threshold does not apply. Configure KRAKEN_WITHDRAW_KEY in .env for Kraken, or WITHDRAW_ADDRESS and WITHDRAW_NETWORK for Bitvavo. Kraken resolves the saved method to its destination address. A confirmation is required before submission. Submitted manual withdrawals appear in Activity and count toward Parqet exports like automatic withdrawals.</p></li>
+<li id="report-note"><strong>Period analysis, Parqet export and local activity history.</strong><p>These notes apply to the date filters in Period analysis, the Activity table and the Download Parqet CSV button. Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The Parqet CSV consolidates the period into one purchase: all real purchase costs and trading fees in EUR, and net BTC from confirmed withdrawals after network fees. The period must contain purchases and a bot-recorded withdrawal. Dry-run purchases are shown separately and excluded from the CSV. Delete removes a purchase from local history only; it cannot reverse an exchange order.</p></li>
+<li id="withdrawal-note"><strong>Manual BTC withdrawal.</strong><p id="withdrawalDestination">Loading withdrawal configuration…</p><p id="withdrawMessage" role="status" aria-live="polite"></p><p>The button withdraws the entire available BTC balance, less the exchange withdrawal fee. LIVE_TRADING must be enabled; automatic withdrawals may remain disabled and their threshold does not apply. Configure KRAKEN_WITHDRAW_KEY in .env for Kraken, or WITHDRAW_ADDRESS and WITHDRAW_NETWORK for Bitvavo. Kraken resolves the saved method to its destination address. A confirmation is required before submission. Submitted manual withdrawals appear in Activity immediately and count toward Parqet exports only after confirmation. Failed or unverified withdrawals are excluded.</p></li>
 <li id="local-access-note"><strong>Local access only.</strong><p>With the default Docker Compose port mapping, the dashboard is accessible only from the Docker host.</p></li>
 </ol>
 </footer>
 </main>
 <script>
 const $=id=>document.getElementById(id);
-let quote="EUR", displayCurrency="", fxRate=1, activityRows=[], currentPage=1;
+let quote="EUR", displayCurrency="", fxRate=1, activityRows=[], currentPage=1, activityTotal=0, activityPages=1, activityRates={};
 function localInput(ms){const d=new Date(ms);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
 function parseInput(el){return new Date(el.value).getTime()}
 function money(v,c){try{return new Intl.NumberFormat("en-GB",{style:"currency",currency:c,maximumFractionDigits:2}).format(Number(v||0))}catch(e){return Number(v||0).toFixed(2)+" "+c}}
@@ -207,22 +211,24 @@ refreshPurchaseSchedule();
 
 function showError(message){$("error").textContent=message||"";$("error").classList.toggle("hidden",!message)}
 function selectedPeriod(){const start=parseInput($("start")),end=parseInput($("end"));if(!Number.isFinite(start)||!Number.isFinite(end)||start>=end)throw new Error("Please choose a valid date range.");return {start:start,end:end}}
+function applySelectedInterval(){if(!$("interval").value)return;const p=$("interval").value.split(",").map(Number);$("start").value=localInput(p[0]);$("end").value=localInput(p[1])}
 async function loadIntervals(){
  const response=await fetch("/api/withdrawals");if(!response.ok)throw new Error("Could not load withdrawal history.");
  const withdrawals=await response.json();const select=$("interval");select.innerHTML="";
  const custom=document.createElement("option");custom.value="";custom.textContent="Custom date range";select.appendChild(custom);
  for(let i=1;i<withdrawals.length;i++){const a=withdrawals[i-1],b=withdrawals[i],o=document.createElement("option");o.value=a.timestamp+","+b.timestamp;o.textContent=dateLabel(a.timestamp)+" → "+dateLabel(b.timestamp);select.appendChild(o)}
- const now=Date.now();if(withdrawals.length>=2){select.value=withdrawals[withdrawals.length-2].timestamp+","+withdrawals[withdrawals.length-1].timestamp}
+ const now=Date.now();if(withdrawals.length>=2){select.value=withdrawals[withdrawals.length-2].timestamp+","+withdrawals[withdrawals.length-1].timestamp;applySelectedInterval()}
  else {select.value="";$("start").value=localInput(withdrawals.length===1?withdrawals[0].timestamp:now-90*86400000);$("end").value=localInput(now)}
 }
-$("interval").addEventListener("change",()=>{if(!$("interval").value)return;const p=$("interval").value.split(",").map(Number);$("start").value=localInput(p[0]);$("end").value=localInput(p[1]);loadAnalytics()});
+$("interval").addEventListener("change",()=>{applySelectedInterval();currentPage=1;loadAnalytics()});
 function renderActivities(){
  const body=$("activities");body.innerHTML="";
- const pageSize=Number($("pageSize").value),total=activityRows.length,totalPages=Math.max(1,Math.ceil(total/pageSize));
+ const pageSize=Number($("pageSize").value),total=activityTotal,totalPages=activityPages;
  currentPage=Math.min(Math.max(1,currentPage),totalPages);
  const start=(currentPage-1)*pageSize,end=Math.min(start+pageSize,total);
- for(const row of activityRows.slice(start,end)){
-  const tr=document.createElement("tr"),type=row.simulated?"Simulated buy (dry run)":(row.type==="TransferOut"?"Withdrawal":row.type),vals=[dateLabel(Date.parse(row.datetime)),type,btc(row.shares),money(Number(row.price)*fxRate,displayCurrency)+"/BTC",money(Number(row.amount)*fxRate,displayCurrency),(row.simulated?"~":"")+money(Number(row.fee)*fxRate,displayCurrency)];
+ for(const row of activityRows){
+  const rate=Number.isFinite(activityRates[row.currency])?activityRates[row.currency]:1,currency=Number.isFinite(activityRates[row.currency])?displayCurrency:row.currency;
+  const tr=document.createElement("tr"),type=row.simulated?"Simulated buy (dry run)":(row.type==="TransferOut"?"Withdrawal · "+(row.withdrawalStatus||"unverified"):row.type),vals=[dateLabel(Date.parse(row.datetime)),type,btc(row.shares),money(Number(row.price)*rate,currency)+"/BTC",money(Number(row.amount)*rate,currency),(row.simulated?"~":"")+money(Number(row.fee)*rate,currency)];
   vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i>=2)td.className="num";tr.appendChild(td)});
   const action=document.createElement("td");
   if(row.type==="Buy"){const button=document.createElement("button");button.className="secondary";button.textContent="Delete";button.addEventListener("click",async()=>{if(!confirm("Delete this purchase from local bot history? This does not reverse an exchange order."))return;try{const response=await fetch("/api/activity/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({activityId:row.activityId})});const result=await response.json();if(!response.ok)throw new Error(result.error||"Could not delete purchase.");await loadAnalytics()}catch(e){showError(e.message)}});action.appendChild(button)}
@@ -232,31 +238,39 @@ function renderActivities(){
  $("pageInfo").textContent=total?("Showing "+(start+1)+"–"+end+" of "+total+" · Page "+currentPage+" of "+totalPages):"No entries";
  $("previousPage").disabled=currentPage<=1;$("nextPage").disabled=currentPage>=totalPages;
 }
-$("pageSize").addEventListener("change",()=>{currentPage=1;renderActivities()});
-$("previousPage").addEventListener("click",()=>{if(currentPage>1){currentPage--;renderActivities()}});
-$("nextPage").addEventListener("click",()=>{currentPage++;renderActivities()});
+$("pageSize").addEventListener("change",()=>{currentPage=1;loadAnalytics()});
+$("previousPage").addEventListener("click",()=>{if(currentPage>1){currentPage--;loadAnalytics()}});
+$("nextPage").addEventListener("click",()=>{currentPage++;loadAnalytics()});
 $("displayCurrency").addEventListener("change",()=>{displayCurrency=$("displayCurrency").value;localStorage.setItem("bitcoinDcaDisplayCurrency",displayCurrency);loadAnalytics()});
 async function loadAnalytics(){
- try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end);const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load the report.");quote=d.quote;
+ try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end+"&page="+currentPage+"&limit="+$("pageSize").value);const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load the report.");quote=d.quote;
  if(!displayCurrency){const saved=localStorage.getItem("bitcoinDcaDisplayCurrency");displayCurrency=["EUR","USD"].includes(saved)?saved:(["EUR","USD"].includes(quote)?quote:"EUR")}
  $("displayCurrency").value=displayCurrency;
  const ex=d.exchange==="KRAKEN"?"Kraken":d.exchange==="BITVAVO"?"Bitvavo":d.exchange;document.title="Bitcoin DCA Bot";
- let livePrice=Number((d.snapshot||{}).price||0);
+ let livePrice=Number((d.snapshot||{}).price||0),currencyRates={[quote]:1};
+ const currencies=Object.keys(d.summaryByCurrency||{});
  try{
-  const priceResponse=await fetch("/api/market-price?currency="+displayCurrency);const market=await priceResponse.json();if(!priceResponse.ok)throw new Error(market.error||"Could not load current BTC price.");
-  fxRate=Number(market.conversionRate);livePrice=Number(market.price);
-  $("spotUpdated").textContent="Kraken public price page · fetched "+new Date(Number(market.updatedAt)*1000).toLocaleTimeString("en-GB");
+  const priceResponse=await fetch("/api/market-price?currency="+displayCurrency+"&currencies="+encodeURIComponent(currencies.join(",")));const market=await priceResponse.json();if(!priceResponse.ok)throw new Error(market.error||"Could not load current BTC price.");
+  fxRate=Number(market.conversionRate);livePrice=Number(market.price);currencyRates=market.conversionRates||{[quote]:fxRate};
+  $("spotUpdated").textContent=(market.stale?"Cached Kraken price · fetched ":"Kraken public price page · fetched ")+new Date(Number(market.updatedAt)*1000).toLocaleTimeString("en-GB");
  }catch(priceError){
   displayCurrency=quote;fxRate=1;$("displayCurrency").value=quote;
   $("spotUpdated").textContent=livePrice>0?"Last price saved by the bot":"Live price unavailable";
   showError("Could not fetch a live BTC price. Showing saved activity and values in "+quote+" where available.");
  }
  $("balance").textContent=btc(d.snapshot.balance);$("spot").textContent=livePrice>0?money(livePrice,displayCurrency)+"/BTC":"—";
+ const converted={buyVolume:0,tradeFees:0,withdrawalFees:0};
+ let moneyAvailable=true;
+ for(const [currency,values] of Object.entries(d.summaryByCurrency||{})){
+  if(!Number.isFinite(currencyRates[currency])){moneyAvailable=false;continue}
+  for(const key of Object.keys(converted))converted[key]+=Number(values[key]||0)*currencyRates[currency];
+ }
+ if(!moneyAvailable)showError("Historical totals contain multiple currencies. Price conversion is unavailable; monetary totals are hidden.");
  const currentPortfolioValue=Number(d.snapshot.balance)*livePrice;
  $("balanceValue").textContent=livePrice>0?money(currentPortfolioValue,displayCurrency):"—";
- if(livePrice>0){
+ if(livePrice>0&&moneyAvailable){
   const periodPurchaseValue=Number(d.summary.boughtBtc)*livePrice;
-  const periodPurchaseCosts=(Number(d.summary.buyVolume)+Number(d.summary.tradeFees))*fxRate;
+  const periodPurchaseCosts=converted.buyVolume+converted.tradeFees;
   const profitLoss=periodPurchaseValue-periodPurchaseCosts;
   $("profitLoss").textContent=money(profitLoss,displayCurrency);
   $("profitLoss").className="value "+(profitLoss>=0?"positive":"negative");
@@ -266,14 +280,14 @@ async function loadAnalytics(){
  $("depositDay").textContent=String(d.configuration.depositDay);$("withdrawEnabled").textContent=d.configuration.withdrawalsEnabled?"Enabled":"Disabled";
  $("threshold").textContent=money(Number(d.configuration.withdrawalThreshold)*fxRate,displayCurrency);$("thresholdNote").textContent="Threshold in "+quote+", shown in "+displayCurrency;
  $("buyCount").textContent=d.summary.buyCount;$("buyBtc").textContent=btc(d.summary.boughtBtc);
- $("buyVolume").textContent=money(Number(d.summary.buyVolume)*fxRate,displayCurrency);$("avgPrice").textContent="Average: "+money(Number(d.summary.averagePrice)*fxRate,displayCurrency)+"/BTC";
- $("tradeFees").textContent=money(Number(d.summary.tradeFees)*fxRate,displayCurrency);$("withdrawBtc").textContent=btc(d.summary.withdrawnBtc);$("withdrawCount").textContent=d.summary.withdrawalCount+" withdrawals";
- $("withdrawFees").textContent=money(Number(d.summary.withdrawalFees)*fxRate,displayCurrency);$("netBtc").textContent=btc(d.summary.netBtc);
+ $("buyVolume").textContent=moneyAvailable?money(converted.buyVolume,displayCurrency):"—";$("avgPrice").textContent=moneyAvailable?"Average: "+money(Number(d.summary.boughtBtc)>0?converted.buyVolume/Number(d.summary.boughtBtc):0,displayCurrency)+"/BTC":"Conversion unavailable";
+ $("tradeFees").textContent=moneyAvailable?money(converted.tradeFees,displayCurrency):"—";$("withdrawBtc").textContent=btc(d.summary.withdrawnBtc);$("withdrawCount").textContent=d.summary.withdrawalCount+" confirmed · "+(d.summary.pendingWithdrawalCount||0)+" pending";
+ $("withdrawFees").textContent=moneyAvailable?money(converted.withdrawalFees,displayCurrency):"—";$("netBtc").textContent=btc(d.summary.netBtc);
  renderPeriodLabel(p.start,p.end);$("updated").textContent=new Date(d.snapshot.updatedAt||Date.now()).toLocaleTimeString("en-GB");
- activityRows=d.activities.slice().reverse();currentPage=1;renderActivities();
+ activityRates=currencyRates;activityRows=d.activities;activityTotal=d.pagination.total;activityPages=d.pagination.pages;currentPage=d.pagination.page;renderActivities();
  }catch(e){showError(e.message)}
 }
-$("refresh").addEventListener("click",loadAnalytics);
+$("refresh").addEventListener("click",()=>{currentPage=1;loadAnalytics()});
 $("download").addEventListener("click",async()=>{
  const button=$("download"),message=$("exportMessage");
  message.textContent="";message.classList.add("hidden");
@@ -290,7 +304,17 @@ $("download").addEventListener("click",async()=>{
 
 async function withdrawalPost(path, body){
  const response=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json","X-DCA-Action":"withdrawal"},body:JSON.stringify(body)});
- const result=await response.json();if(!response.ok)throw new Error(result.error||"Withdrawal request failed.");return result;
+ const result=await response.json();if(!response.ok)throw new Error(result.error||"Withdrawal request failed.");
+ if(!result.jobId)return result;
+ $("withdrawMessage").textContent="Request queued. Waiting for the account worker…";
+ for(let i=0;i<600;i++){
+  const check=await fetch("/api/withdrawal/jobs/"+encodeURIComponent(result.jobId));const job=await check.json();
+  if(!check.ok)throw new Error(job.error||"Could not check the request. Check exchange status before trying again.");
+  if(job.state==="failed")throw new Error(job.error);
+  if(job.state==="completed")return job.result;
+  await new Promise(resolve=>setTimeout(resolve,1000));
+ }
+ throw new Error("The request is still unresolved. Check exchange status before starting another withdrawal.");
 }
 async function loadWithdrawalConfiguration(){
  const response=await fetch("/api/withdrawal/config");const d=await response.json();
@@ -313,7 +337,7 @@ $("manualWithdraw").addEventListener("click",async()=>{
  if(!confirm("Confirm BTC withdrawal?\\n\\n"+p.destination+"\\nAvailable balance to withdraw: "+p.availableBtc+" BTC\\n"+fee+"\\n\\nThis transfer cannot be reversed. Submit withdrawal?"))return;
  $("withdrawMessage").textContent="Submitting withdrawal…";
  const result=await withdrawalPost("/api/withdrawal/confirm",{token:p.token});showWithdrawalMessage(result.message);
- $("interval").value="";$("end").value=localInput(Date.now()+60000);await loadAnalytics();
+ $("interval").value="";$("end").value=localInput(Date.now()+60000);currentPage=1;await loadAnalytics();
  }catch(e){showWithdrawalMessage(e.message)}
  finally{button.disabled=false}
 });
@@ -412,24 +436,21 @@ def _kraken_public_btc_price(currency):
     raise RuntimeError(f"Could not find the BTC/{currency} price on Kraken’s public converter page")
 
 
-def _public_market_price(display_currency, quote_currency):
-    display_currency = display_currency.upper()
-    quote_currency = quote_currency.upper()
-    if display_currency not in ("EUR", "USD") or quote_currency not in ("EUR", "USD"):
-        raise ValueError("Display currency and QUOTE_CURRENCY must be EUR or USD")
-    prices = {
-        currency: _kraken_public_btc_price(currency)
-        for currency in ("EUR", "USD")
-    }
-    conversion = prices[display_currency] / prices[quote_currency]
-    return {
-        "currency": display_currency,
-        "quoteCurrency": quote_currency,
-        "price": str(prices[display_currency]),
-        "conversionRate": str(conversion),
-        "source": "Kraken public conversion page",
-        "updatedAt": int(datetime.now(timezone.utc).timestamp()),
-    }
+def _public_market_price(display_currency, quote_currency, currencies=()):
+    display_currency=display_currency.upper()
+    quote_currency=quote_currency.upper()
+    needed={display_currency,quote_currency,*currencies}
+    if not needed <= {'EUR','USD'}:
+        raise ValueError('Display and historical fiat currencies must be EUR or USD')
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures={c:executor.submit(price_cache.get_price,c,_kraken_public_btc_price) for c in needed}
+        prices={c:f.result() for c,f in futures.items()}
+    target=prices[display_currency][0]
+    return {'currency':display_currency,'quoteCurrency':quote_currency,'price':str(target),
+            'conversionRate':str(target/prices[quote_currency][0]),
+            'conversionRates':{c:str(target/v[0]) for c,v in prices.items()},
+            'source':'Kraken public conversion page','updatedAt':int(min(v[1] for v in prices.values())),
+            'stale':any(v[2] for v in prices.values())}
 
 
 def _period(query):
@@ -448,6 +469,7 @@ def _period(query):
 class Handler(BaseHTTPRequestHandler):
     settings = None
     withdrawal_service = None
+    worker = None
 
     def _send(self, status, body, content_type="application/json; charset=utf-8", filename=None):
         if isinstance(body, str):
@@ -569,7 +591,7 @@ class Handler(BaseHTTPRequestHandler):
                 if parsed.path.endswith("/confirm") and not isinstance(token, str):
                     raise ValueError("Confirmation token is required")
                 result = self.withdrawal_service("preview" if parsed.path.endswith("/preview") else "confirm", session, token)
-                self._json(200, result)
+                self._json(202 if "jobId" in result else 200, result)
             except (ValueError, UnicodeDecodeError) as exc:
                 self._json(400, {"error": str(exc)})
             except Exception:
@@ -596,6 +618,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
+        if parsed.path == '/healthz':
+            healthy=bool(self.worker and self.worker.healthy())
+            self._json(200 if healthy else 503,{'healthy':healthy})
+            return
         if parsed.path == "/favicon.svg":
             self._send(200, FAVICON_SVG, "image/svg+xml; charset=utf-8")
             return
@@ -606,6 +632,13 @@ class Handler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/":
             self._send(200, HTML, "text/html; charset=utf-8")
+            return
+        if parsed.path.startswith('/api/withdrawal/jobs/'):
+            session=SimpleCookie(self.headers.get('Cookie',''))['dca_session'].value
+            try:
+                self._json(200,self.worker.get_job(parsed.path.rsplit('/',1)[-1],session))
+            except (ValueError,AttributeError) as exc:
+                self._json(404,{'error':str(exc)})
             return
         if parsed.path == "/api/withdrawal/config":
             settings = self.settings
@@ -631,7 +664,7 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/market-price":
             currency = query.get("currency", ["EUR"])[0].upper()
             try:
-                market = _public_market_price(currency, self.settings["quote"])
+                market = _public_market_price(currency, self.settings["quote"], query.get("currencies",[""])[0].split(",") if query.get("currencies",[""])[0] else ())
                 self._json(200, market)
             except ValueError as exc:
                 self._json(400, {"error": str(exc)})
@@ -651,30 +684,27 @@ class Handler(BaseHTTPRequestHandler):
                     "serverTime": datetime.now(timezone.utc).isoformat(),
                 })
                 return
-            records = read_bitcoin_activity_records()
+            records = []
             if parsed.path == "/api/withdrawals":
                 withdrawals = [
                     {
                         "timestamp": _row_timestamp_ms(record["row"]),
                         "txId": record.get("id", ""),
                     }
-                    for record in records
-                    if record["row"].get("type") == "TransferOut"
+                    for record in withdrawal_records()
+                    if record.get('withdrawalStatus')=='completed' 
                 ]
                 withdrawals.sort(key=lambda item: item["timestamp"])
                 self._json(200, withdrawals)
                 return
             if parsed.path in ("/api/analytics", "/api/export.csv"):
                 start_ms, end_ms = _period(query)
-                selected_records = [
-                    record for record in records
-                    if start_ms < _row_timestamp_ms(record["row"]) <= end_ms
-                ]
                 if parsed.path == "/api/export.csv":
+                    selected_records=period_records(start_ms,end_ms)
                     real_records = [record for record in selected_records if not record.get("simulated")]
-                    if not any(record["row"].get("type") == "TransferOut" for record in real_records):
+                    if not any(record["row"].get("type") == "TransferOut" and record.get("withdrawalStatus")=="completed" for record in real_records):
                         raise ValueError(
-                            "No bot-recorded BTC withdrawal was found in the selected period. "
+                            "No confirmed bot-recorded BTC withdrawal was found in the selected period. "
                             "The Parqet export requires a purchase and a withdrawal. "
                             "Choose a period that includes a withdrawal, or export after your first withdrawal."
                         )
@@ -694,10 +724,14 @@ class Handler(BaseHTTPRequestHandler):
                     filename = "parqet_btc_" + str(start_ms) + "_" + str(end_ms) + ".csv"
                     self._send(200, parqet_csv(rows), "text/csv; charset=utf-8", filename)
                 else:
-                    snapshot = read_dashboard_snapshot()
-                    snapshot["trackedBtc"] = format(tracked_bitcoin_balance(records), "f")
-                    snapshot.pop("value", None)
-                    result = _analytics_from_rows(self.settings, selected_records, snapshot)
+                    page=int(query.get('page',['1'])[0]);limit=int(query.get('limit',['20'])[0])
+                    page_records,total,page,totals,balance=read_report(start_ms,end_ms,page,limit)
+                    snapshot=read_dashboard_snapshot()
+                    snapshot['trackedBtc']=str(balance)
+                    if snapshot.get('quote') not in (None,self.settings['quote']):snapshot['price']='0'
+                    result=build_report(self.settings,totals,snapshot,page_records)
+                    limit=max(1,min(1000,limit))
+                    result['pagination']={'page':page,'pageSize':limit,'total':total,'pages':max(1,(total+limit-1)//limit)}
                     self._json(200, result)
                 return
             self._json(404, {"error": "Not found"})
@@ -717,62 +751,14 @@ def _row_timestamp_ms(row):
 
 
 def _analytics_from_rows(settings, records, snapshot):
-    records = bitcoin_activity_records(records)
-    quote = settings["quote"]
-    actual_rows = [record["row"] for record in records if not record.get("simulated")]
-    simulated_rows = [record["row"] for record in records if record.get("simulated")]
-    buys = [row for row in actual_rows if row["type"] == "Buy"]
-    simulated_buys = [row for row in simulated_rows if row["type"] == "Buy"]
-    withdrawals = [row for row in actual_rows if row["type"] == "TransferOut"]
-    bought_btc = sum((Decimal(row["shares"]) for row in buys), Decimal(0))
-    buy_volume = sum((Decimal(row["amount"]) for row in buys), Decimal(0))
-    trade_fees = sum((Decimal(row["fee"]) for row in buys), Decimal(0))
-    withdrawn_btc = sum((Decimal(row["shares"]) for row in withdrawals), Decimal(0))
-    withdrawal_fees = sum((Decimal(row["fee"]) for row in withdrawals), Decimal(0))
-    balance = Decimal(str(snapshot.get("trackedBtc", "0")))
-    price = Decimal(str(snapshot.get("price", "0")))
-    value = Decimal(str(snapshot.get("value", balance * price)))
-    return {
-        "quote": quote,
-        "exchange": settings["exchange"],
-        "configuration": {
-            "liveTrading": bool(settings["live"]),
-            "buyAmount": str(settings["buy_amount"]),
-            "depositDay": int(settings["deposit_day"]),
-            "withdrawalsEnabled": bool(settings["withdrawals_enabled"]),
-            "withdrawalThreshold": str(settings["withdraw_threshold"]),
-        },
-        "snapshot": {
-            "balance": str(balance),
-            "price": str(price),
-            "value": str(value),
-            "quoteBalance": str(snapshot.get("quoteBalance", "0")),
-            "withdrawThreshold": str(snapshot.get("withdrawThreshold", settings["withdraw_threshold"])),
-            "updatedAt": snapshot.get("updatedAt"),
-        },
-        "summary": {
-            "buyCount": len(buys),
-            "boughtBtc": str(bought_btc),
-            "simulatedBuyCount": len(simulated_buys),
-            "simulatedBtc": str(sum((Decimal(row["shares"]) for row in simulated_buys), Decimal(0))),
-            "buyVolume": str(buy_volume),
-            "tradeFees": str(trade_fees),
-            "averagePrice": str(buy_volume / bought_btc if bought_btc else Decimal(0)),
-            "withdrawalCount": len(withdrawals),
-            "withdrawnBtc": str(withdrawn_btc),
-            "withdrawalFees": str(withdrawal_fees),
-            "netBtc": str(bought_btc - withdrawn_btc),
-        },
-        "activities": [
-            {**record["row"], "activityId": record.get("id", ""), "simulated": bool(record.get("simulated"))}
-            for record in records
-        ],
-    }
+    records=bitcoin_activity_records(records)
+    return build_report(settings,totals_from_records(records),snapshot,records)
 
 
-def serve(settings, port, withdrawal_service=None):
-    handler = type("ConfiguredHandler", (Handler,), {"settings": settings, "withdrawal_service": staticmethod(withdrawal_service)})
+def serve(settings, port, withdrawal_service=None, worker=None):
+    handler = type("ConfiguredHandler", (Handler,), {"settings": settings, "withdrawal_service": staticmethod(withdrawal_service), "worker":worker})
     server = ThreadingHTTPServer(("0.0.0.0", port), handler)
     LOG.info("Local portfolio web UI listening on container port %s.", port)
     server.serve_forever()
+
 
