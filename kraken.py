@@ -1,4 +1,4 @@
-"""Kraken Spot REST adapter used by the DCA bot."""
+"""Kraken Bitcoin spot trading and withdrawal adapter."""
 import base64
 import hashlib
 import hmac
@@ -14,7 +14,7 @@ from urllib.parse import urlencode
 import requests
 
 BASE_URL = "https://api.kraken.com/0"
-LOG = logging.getLogger("bitvavo-dca.kraken")
+LOG = logging.getLogger("bitcoin-dca.kraken")
 _NONCE_LOCK = threading.Lock()
 _LAST_NONCE = 0
 _READ_ONLY_PRIVATE_METHODS = frozenset({
@@ -39,8 +39,6 @@ def _canonical_asset(value):
     if value in ("XBT", "XXBT", "BTC"):
         return "BTC"
     if value.startswith("Z") and len(value) == 4:
-        return value[1:]
-    if value.startswith("X") and len(value) > 3:
         return value[1:]
     return value
 
@@ -149,16 +147,17 @@ class Kraken:
         return symbol.upper()
 
     def _pair_info(self, symbol):
-        base, quote = symbol.upper().replace("/", "-").split("-", 1)
+        bitcoin, quote = symbol.upper().replace("/", "-").split("-", 1)
+        if bitcoin != "BTC":
+            raise ValueError("Only Bitcoin markets are supported")
         if self._pairs is None:
             self._pairs = self.public("AssetPairs", {"assetVersion": 1})
         for key, info in self._pairs.items():
-            if _canonical_asset(info.get("base")) == _canonical_asset(base) and _canonical_asset(info.get("quote")) == _canonical_asset(quote):
+            if _canonical_asset(info.get("base")) == "BTC" and _canonical_asset(info.get("quote")) == _canonical_asset(quote):
                 normalized = dict(info)
                 normalized["_key"] = key
-                normalized["_base"] = _canonical_asset(info.get("base"))
                 normalized["_quote"] = _canonical_asset(info.get("quote"))
-                normalized["market"] = f"{normalized['_base']}-{normalized['_quote']}"
+                normalized["market"] = f"BTC-{normalized['_quote']}"
                 return normalized
         raise ValueError(f"Kraken market {symbol} does not exist")
 
@@ -359,8 +358,8 @@ class Kraken:
                     return Decimal(str(candle[4]))
         raise ValueError(f"No historical Kraken {market} price available at {timestamp_ms}")
 
-    def buy_base(self, symbol, amount, client_order_id):
-        pair = self._pair_info(symbol)
+    def buy_btc(self, quote, amount, client_order_id):
+        pair = self._pair_info(f"BTC-{quote.upper()}")
         userref = int(client_order_id.replace("-", "")[-8:], 16) % 2_147_483_647
         result = self.private("AddOrder", {
             "pair": pair.get("altname", pair["_key"]),
@@ -415,7 +414,7 @@ class Kraken:
         if order is not None:
             return order
         raise KrakenAPIError("Kraken could not find the order with the saved user reference")
-    def normalize_bot_buy(self, order, quote, base, event_id, fallback_timestamp_ms):
+    def normalize_bot_buy(self, order, quote, event_id, fallback_timestamp_ms):
         filled = Decimal(str(order.get("vol_exec", "0")))
         quote_amount = Decimal(str(order.get("cost", "0")))
         if filled <= 0:
@@ -434,7 +433,7 @@ class Kraken:
             "row": {
                 "datetime": timestamp,
                 "type": "Buy",
-                "identifier": base,
+                "identifier": "BTC",
                 "assetType": "Crypto",
                 "price": format(price, "f"),
                 "shares": format(filled, "f"),
@@ -468,7 +467,9 @@ class Kraken:
             "fee": format(fee, "f"),
         }
 
-    def withdraw_crypto(self, withdrawal):
+    def withdraw_btc(self, withdrawal):
+        if withdrawal.get("asset") != "XBT":
+            raise ValueError("Only Bitcoin withdrawals are supported")
         payload = {
             "asset": withdrawal["asset"],
             "key": withdrawal["key"],

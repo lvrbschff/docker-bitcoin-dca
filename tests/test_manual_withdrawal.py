@@ -13,9 +13,9 @@ class API:
     def balance(self,a): return self.available
     def price(self,s): return D('81000')
     def withdrawal_request(self,amount,key,s):
-        if self.exchange=='KRAKEN': return {'amount':str(amount-D('.0001')),'fee':'.0001','key':'wallet'}
-        return {'amount':str(amount),'idempotencyKey':key}
-    def withdraw_crypto(self,r):
+        if self.exchange=='KRAKEN': return {'asset':'XBT','amount':str(amount-D('.0001')),'fee':'.0001','key':'wallet'}
+        return {'symbol':'BTC','amount':str(amount),'idempotencyKey':key}
+    def withdraw_btc(self,r):
         self.sent.append(r)
         if self.fail: raise requests.RequestException('timeout')
         return {'id':'test-1','fee':'.0001'}
@@ -26,7 +26,7 @@ class Tests(unittest.TestCase):
         self.state={}
         self.patches=[patch.object(bot,'read_state',lambda *a:self.state),patch.object(bot,'save_state',lambda *a:None),patch.object(activity,'ACTIVITY_PATH',Path(self.tmp.name)/'activity.json'),patch.object(activity,'LEGACY_ACTIVITY_PATHS',())]
         for p in self.patches:p.start();self.addCleanup(p.stop)
-        self.s={'live':True,'base':'BTC','quote':'EUR','exchange':'KRAKEN','timezone':'Europe/Berlin','deposit_day':1,'withdrawals_enabled':False,'withdraw_threshold':D('1000'),'kraken_withdraw_key':'wallet','withdraw_address':'bc1test','withdraw_network':'BTC'}
+        self.s={'live':True,'quote':'EUR','exchange':'KRAKEN','timezone':'Europe/Berlin','deposit_day':1,'withdrawals_enabled':False,'withdraw_threshold':D('1000'),'kraken_withdraw_key':'wallet','withdraw_address':'bc1test','withdraw_network':'BTC'}
     def service(self, exchange='KRAKEN'):
         self.s['exchange']=exchange;self.api=API(exchange);return bot.manual_withdrawal_service(self.api,self.s)
     def test_both_exchanges_activity_and_export(self):
@@ -36,7 +36,7 @@ class Tests(unittest.TestCase):
                 service=self.service(exchange);p=service('preview','session');self.assertEqual(self.api.sent,[])
                 service('confirm','session',p['token']);self.assertEqual(len(self.api.sent),1)
                 record=activity.read_activity_records()[0];self.assertTrue(record['manual']);self.assertEqual(D(record['row']['shares']),D('.0044'));self.assertEqual(D(record['networkFeeBtc']),D('.0001'))
-                buys={'row':{'type':'Buy','datetime':'2026-10-20T00:00:00Z','shares':'.0045','amount':'359','fee':'.8975','currency':'EUR'}}
+                buys={'row':{'type':'Buy','identifier':'BTC','datetime':'2026-10-20T00:00:00Z','shares':'.0045','amount':'359','fee':'.8975','currency':'EUR'}}
                 exported=reporting.parqet_aggregate_rows([buys,record],exchange)[0];self.assertEqual(D(exported['amount']),D('359.8975'));self.assertEqual(D(exported['shares']),D('.0044'))
                 with self.assertRaises(ValueError):service('confirm','session',p['token'])
                 self.assertEqual(len(self.api.sent),1)

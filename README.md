@@ -1,6 +1,6 @@
-# DCA Crypto Bot for Bitvavo and Kraken
+# Bitcoin DCA Bot for Bitvavo and Kraken
 
-A Docker-based DCA bot for buying a configurable crypto asset with a selectable quote currency on Bitvavo or Kraken. Choose the exchange, crypto asset, quote currency, purchase amount, and deposit day. The bot recalculates purchase timing from the available balance and the selected exchange's current minimum order rules. Optional automatic BTC withdrawals to a configured external wallet are supported. A local web UI provides an activity and portfolio overview and can generate Parqet-compatible CSV exports.
+A Docker-based DCA bot exclusively for buying and withdrawing Bitcoin (BTC) on Bitvavo or Kraken. Choose the exchange, quote currency, BTC purchase amount, and deposit day. The bot recalculates purchase timing from the available balance and the selected exchange's current minimum order rules. Optional automatic BTC withdrawals to a configured external wallet are supported. A local web UI provides an activity and portfolio overview and can generate Parqet-compatible CSV exports.
 
 ### Example web UI (fictional data)
 
@@ -25,7 +25,7 @@ Create a key under **Settings → API**. Enable 2FA on your account.
 
 - Required for balances and history: **View access**
 - Required for live purchases: **Trade digital assets**
-- Required only for automatic withdrawals: **Withdraw digital assets**
+- Required for automatic or manual Bitcoin withdrawals: **Withdraw digital assets**
 
 Copy the key and secret into `BITVAVO_API_KEY` and `BITVAVO_API_SECRET` in your local .env file. See Bitvavo's [API key setup guide](https://docs.bitvavo.com/docs/get-started/).
 
@@ -37,7 +37,7 @@ Create a **Spot API key**. Enable the permissions needed for the bot's features:
 
 - Required for balances and order-status verification: **Query Funds**, **Query Open Orders & Trades**, and **Query Closed Orders & Trades**
 - Required for live purchases: **Modify Orders**
-- Required only for automatic withdrawals: **Withdraw Funds**
+- Required for automatic or manual Bitcoin withdrawals: **Withdraw Funds**
 
 Copy the key and secret into `KRAKEN_API_KEY` and `KRAKEN_API_SECRET` in your local .env file. See Kraken's [API key guide](https://support.kraken.com/in/articles/360000919966-how-to-create-an-api-key?mode=consumerapp).
 
@@ -64,16 +64,16 @@ Fill in only the credentials for the exchange selected with `EXCHANGE`:
 
 Leave the other exchange's credentials empty. Never commit .env or API credentials to the repository.
 
-### Optional automatic withdrawals
+### Optional Bitcoin withdrawals
 
-Set the destination details in .env only if you plan to enable automatic withdrawals:
+Set the destination details in .env if you plan to use automatic or manual Bitcoin withdrawals:
 
 | Exchange | Variables in .env |
 | --- | --- |
 | Bitvavo | `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK` |
 | Kraken | `KRAKEN_WITHDRAW_KEY` (the saved withdrawal method name) |
 
-Enable withdrawals and set their threshold with `WITHDRAWALS_ENABLED` and `WITHDRAW_THRESHOLD_QUOTE` in docker-compose.yml. See [Automatic Bitcoin withdrawals](#automatic-bitcoin-withdrawals) for the setup requirements.
+Enable automatic withdrawals and set their threshold with `WITHDRAWALS_ENABLED` and `WITHDRAW_THRESHOLD_QUOTE` in docker-compose.yml. See [Automatic Bitcoin withdrawals](#automatic-bitcoin-withdrawals) for the setup requirements.
 
 ### Web UI access
 
@@ -85,7 +85,7 @@ All other bot settings are configured directly in docker-compose.yml.
 
 Choose `EXCHANGE` in docker-compose.yml. Only credentials for that exchange are required; variables for the other exchange may stay empty. The adapters validate credentials only for the selected exchange.
 
-Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings below go in docker-compose.yml.
+Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings below go in docker-compose.yml. Every purchase uses the `BTC-QUOTE_CURRENCY` market; Bitcoin is fixed and has no asset-selection setting.
 
 ### Common settings
 
@@ -93,7 +93,6 @@ Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings 
 | --- | --- | --- |
 | `EXCHANGE` | `KRAKEN` | Exchange to use: `BITVAVO` or `KRAKEN`. |
 | `QUOTE_CURRENCY` | `EUR` | Fiat or quote currency for deposits and the BTC market. For the web UI display currency conversion, use `EUR` or `USD`; the selected exchange must support that currency and market. |
-| `BASE_ASSET` | `BTC` | Asset to buy. The market is formed as `BASE_ASSET-QUOTE_CURRENCY`. |
 | `BUY_AMOUNT` | `0` | Desired BTC amount per purchase. `0` uses the smallest amount currently allowed by the selected exchange's market rules; these rules are fetched dynamically on every execution. |
 | `DEPOSIT_DAY` | `1` | Day of the month that starts a new DCA scheduling period. If a month is shorter, its final day is used. |
 | `FIRST_BUY_DELAY_SECONDS` | `60` | Seconds the bot waits after every container startup before checking purchase history or calculating the first order. After the wait, if a prior real purchase exists, the bot recalculates the DCA interval and subtracts the time elapsed since that purchase to preserve the cadence. |
@@ -159,7 +158,7 @@ docker compose up -d --build
 - Before each purchase check, the bot reads the current available `QUOTE_CURRENCY` balance on the selected exchange. Existing funds are included, even if they were deposited before the current scheduling period.
 - Before each purchase, the bot fetches the selected market's current rules and price. The effective BTC order amount is the larger of `BUY_AMOUNT` and the minimum amount required by the exchange's minimum BTC quantity and minimum order value. If `BUY_AMOUNT` is zero or below that minimum, the exchange minimum is used; if it is above the minimum, the configured amount is used.
 - To estimate how many purchases remain until the next `DEPOSIT_DAY`, the bot divides the available balance by the quote-currency value of that effective order amount.
-- On every startup, the bot first waits `FIRST_BUY_DELAY_SECONDS`, then checks the persistent activity volume for the most recent real purchase of the configured asset. If there is none, it executes the first purchase immediately after the delay. If a previous purchase exists, it recalculates the interval from the current balance, market price, and next deposit day, then subtracts the time elapsed since that purchase (including the startup delay). It waits only for the remaining interval, or buys immediately if the interval has already elapsed. After that first purchase, the bot waits for each live order to reach a confirmed end status, records its fills, refreshes balance and BTC price, recalculates the next interval from the actual execution time, and waits until its estimated local purchase time. The log entry `Recalculated DCA schedule` shows the values used. `CHECK_INTERVAL_SECONDS` is used for retries when a purchase cannot proceed.
+- On every startup, the bot first waits `FIRST_BUY_DELAY_SECONDS`, then checks the persistent activity volume for the most recent real Bitcoin purchase. If there is none, it executes the first purchase immediately after the delay. If a previous purchase exists, it recalculates the interval from the current balance, market price, and next deposit day, then subtracts the time elapsed since that purchase (including the startup delay). It waits only for the remaining interval, or buys immediately if the interval has already elapsed. After that first purchase, the bot waits for each live order to reach a confirmed end status, records its fills, refreshes balance and BTC price, recalculates the next interval from the actual execution time, and waits until its estimated local purchase time. The log entry `Recalculated DCA schedule` shows the values used. `CHECK_INTERVAL_SECONDS` is used for retries when a purchase cannot proceed.
 - The schedule does not depend on finding a completed deposit record for the current period. In dry-run mode, simulated purchases appear in the web UI, are marked as simulated, and are subtracted from the balance for scheduling. Their fee is estimated from the selected exchange's current taker fee tier; simulated records are excluded from Parqet CSV exports.
 - Market orders do not guarantee an execution price. A configured `BUY_AMOUNT` can cost more or less than estimated as the market price changes.
 
@@ -186,15 +185,15 @@ Check the destination and network carefully before enabling automatic withdrawal
 
 Click **Withdraw BTC manually** in Bot configuration to review the available BTC balance and configured destination, then confirm the transfer. The button sends the entire available BTC balance less the exchange withdrawal fee. Kraken previews the fee and net amount; Bitvavo returns the fee on submission. The destination is also shown in the dashboard footnote: `KRAKEN_WITHDRAW_KEY` selects a saved Kraken withdrawal method, while `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK` select the Bitvavo destination. These values are configured in .env.
 
-Manual withdrawals require `LIVE_TRADING=true`, `BASE_ASSET=BTC`, and withdrawal permissions on the selected exchange's API key. They work independently of `WITHDRAWALS_ENABLED` and `WITHDRAW_THRESHOLD_QUOTE`. Confirmation expires after two minutes; a changed balance or intervening withdrawal requires a new preview. Unresolved orders or withdrawals block submission. Submitted withdrawals are recorded in Activity with net BTC and withdrawal fees and are included in Parqet exports. Submission does not confirm blockchain settlement. If the outcome is uncertain, check the exchange before taking further action.
+Manual withdrawals require `LIVE_TRADING=true` and withdrawal permissions on the selected exchange's API key. They work independently of `WITHDRAWALS_ENABLED` and `WITHDRAW_THRESHOLD_QUOTE`. Confirmation expires after two minutes; a changed balance or intervening withdrawal requires a new preview. Unresolved orders or withdrawals block submission. Submitted withdrawals are recorded in Activity with net BTC and withdrawal fees and are included in Parqet exports. Submission does not confirm blockchain settlement. If the outcome is uncertain, check the exchange before taking further action.
 
 ## Portfolio web UI
 
 The web UI reads current prices from Kraken’s public [BTC/EUR](https://www.kraken.com/convert/btc/eur) and [BTC/USD](https://www.kraken.com/convert/btc/usd) converter pages. No API credentials are required; the Docker host must have internet access.
 
-**Bot configuration** shows the next estimated purchase time in the configured `TIMEZONE` and a countdown that updates every second. The page refreshes the stored schedule every 30 seconds, including after purchases. If no purchase can currently be scheduled, it shows the reason instead of a purchase time.
+**Purchase schedule** shows the next estimated purchase time in the configured `TIMEZONE` and a countdown that updates every second. The page refreshes the stored schedule every 30 seconds, including after purchases. If no purchase can currently be scheduled, it shows the reason instead of a purchase time.
 
-The dashboard uses a styled login page with `WEB_UI_USERNAME` and `WEB_UI_PASSWORD` from .env (defaults: `admin` / `admin`). Change the default password before running it. After sign-in, an expiring session protects the dashboard and its API routes; use **Log out** to end the session. The dashboard displays purchases and withdrawals recorded when this bot places them. Select EUR or USD as the display currency; the page fetches current BTC prices in EUR and USD from Kraken’s public converter pages on load and converts historical fiat totals and fees using the same current price ratio. The displayed portfolio value is bot-tracked BTC multiplied by the selected live price. Its activity history is stored in `activity.json` and the dashboard snapshot in `dashboard.json` on the Docker-managed named volume `bitcoin-dca-webui-data`. Docker Compose creates and reattaches this same volume on redeploy. On first startup after updating, previously stored activity files under `./state` are copied into the named volume. Keep the volume when updating; `docker compose down -v` deletes it. The dashboard reads its activity and latest price snapshot from these local files; the web UI does not query Kraken or Bitvavo for transaction history. The displayed BTC amount is the net amount tracked from the bot's recorded purchases and withdrawals, not the full exchange-account balance.
+The dashboard uses a styled login page with `WEB_UI_USERNAME` and `WEB_UI_PASSWORD` from .env (defaults: `admin` / `admin`). Change the default password before running it. After sign-in, an expiring session protects the dashboard and its API routes; use **Log out** to end the session. The dashboard displays Bitcoin purchases and withdrawals recorded when this bot places them. Older records for other assets remain stored but are excluded from the dashboard, scheduling history, and Parqet exports. Select EUR or USD as the display currency; the page fetches current BTC prices in EUR and USD from Kraken’s public converter pages on load and converts historical fiat totals and fees using the same current price ratio. The displayed portfolio value is bot-tracked BTC multiplied by the selected live price. Its activity history is stored in `activity.json` and the dashboard snapshot in `dashboard.json` on the Docker-managed named volume `bitcoin-dca-webui-data`. Docker Compose creates and reattaches this same volume on redeploy. On first startup after updating, previously stored activity files under `./state` are copied into the named volume. Keep the volume when updating; `docker compose down -v` deletes it. The dashboard reads its activity and latest price snapshot from these local files; the web UI does not query Kraken or Bitvavo for transaction history. The displayed BTC amount is the net amount tracked from the bot's recorded purchases and withdrawals, not the full exchange-account balance.
 
 Choose an interval between bot-recorded Bitcoin withdrawals or enter custom start and end dates. The activity table distinguishes simulated dry-run purchases from real purchases. Simulated fees are estimates based on your current exchange taker fee tier and are prefixed with `~`. Use **Delete** to remove an individual purchase from the local activity history; this does not reverse an order on the exchange. Download the selected period as a Parqet-compatible CSV for import into Parqet. Simulated purchases are excluded. Activity from before local tracking is enabled is not imported automatically. Set `WEB_UI_ENABLED` to false to disable the dashboard.
 
@@ -258,10 +257,10 @@ The workflow in .github/workflows/publish.yml builds and publishes the image to 
 
 - The bot places spot market orders. The final execution price, spread, fill amount, and fees can differ from estimates. Exchange rules, market minimums, fee tiers, API behavior, and permissions can change.
 - Purchase timing is an estimate based on the available quote-currency balance, the current market price, the effective order size, and `DEPOSIT_DAY`. The bot cannot identify which part of the balance you intend to spend or verify that a new monthly deposit has arrived.
-- The bot supports only markets and quote currencies offered by the selected exchange. Check that the `BASE_ASSET`-`QUOTE_CURRENCY` market is available before enabling live trading.
+- The bot buys and withdraws Bitcoin only. Check that the `BTC-QUOTE_CURRENCY` market is available on the selected exchange before enabling live trading.
 - The activity database contains activity recorded by this bot. It does not import manual trades, deposits, transfers, or older account history. Dashboard totals and Parqet CSV exports are therefore not a complete exchange-account statement or tax report.
 - The portfolio value is based only on bot-recorded purchases and withdrawals. It may differ from the exchange account balance, especially when the account has other funds or activity.
-- Automatic withdrawals and Parqet exports currently support BTC activity only. A withdrawal address or saved method must be correct; crypto withdrawals may be irreversible. If a withdrawal or order has an uncertain result, check its status with the exchange before taking further action.
+- Automatic and manual withdrawals and Parqet exports use BTC activity. A withdrawal address or saved method must be correct; Bitcoin withdrawals may be irreversible. If a withdrawal or order has an uncertain result, check its status with the exchange before taking further action.
 - The UI's current BTC price comes from Kraken's public converter pages, not necessarily the selected exchange's executable price. The UI needs internet access, and a change to Kraken's page could interrupt price extraction. Stored activity remains local to the configured Docker volume.
 
 ### No warranty or financial advice

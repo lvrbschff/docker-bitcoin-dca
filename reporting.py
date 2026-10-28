@@ -6,6 +6,8 @@ from io import StringIO
 
 import requests
 
+from activity import bitcoin_activity_records
+
 
 def decimal_text(value):
     return format(value, "f")
@@ -75,12 +77,13 @@ def _withdrawal_net_btc(record, exchange):
     return max(amount, Decimal(0))
 
 
-def parqet_aggregate_rows(records, exchange, asset="BTC"):
+def parqet_aggregate_rows(records, exchange):
     """Represent a selected withdrawal period as one consolidated Parqet Buy row.
 
     The purchase cost is all real buys plus their trading fees, converted to EUR.
     The quantity is the net BTC that arrived at the configured withdrawal address.
     """
+    records = bitcoin_activity_records(records)
     exchange = str(exchange).upper()
     purchases = [
         record["row"] for record in records
@@ -113,7 +116,7 @@ def parqet_aggregate_rows(records, exchange, asset="BTC"):
     return [{
         "datetime": timestamp.isoformat(timespec="seconds").replace("+00:00", "Z"),
         "type": "Buy",
-        "identifier": str(asset).upper(),
+        "identifier": "BTC",
         "assetType": "Crypto",
         "price": decimal_text(unit_price),
         "shares": decimal_text(net_withdrawn_btc),

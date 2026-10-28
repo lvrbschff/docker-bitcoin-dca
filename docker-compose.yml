@@ -6,7 +6,6 @@ services:
     environment:
       EXCHANGE: ${EXCHANGE:-KRAKEN}
       QUOTE_CURRENCY: EUR
-      BASE_ASSET: BTC
       BUY_AMOUNT: "0"
       DEPOSIT_DAY: "1"
       FIRST_BUY_DELAY_SECONDS: "60"

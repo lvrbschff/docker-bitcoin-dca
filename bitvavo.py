@@ -1,4 +1,4 @@
-"""Bitvavo Spot API adapter implementing the bot exchange interface."""
+"""Bitvavo Bitcoin spot trading and withdrawal adapter."""
 import hashlib
 import hmac
 import json
@@ -90,12 +90,14 @@ class Bitvavo:
             "idempotencyKey": idempotency_key,
         }
 
-    def withdraw_crypto(self, withdrawal):
+    def withdraw_btc(self, withdrawal):
+        if withdrawal.get("symbol") != "BTC":
+            raise ValueError("Only Bitcoin withdrawals are supported")
         return self.request("POST", "/crypto/withdrawal", body=withdrawal, private=True)
 
-    def buy_base(self, symbol, amount, client_order_id):
+    def buy_btc(self, quote, amount, client_order_id):
         body = {
-            "market": symbol,
+            "market": f"BTC-{quote.upper()}",
             "side": "buy",
             "orderType": "market",
             "amount": str(amount),
@@ -140,7 +142,7 @@ class Bitvavo:
     def get_order(self, symbol, client_order_id, exchange_order_id=None):
         return self.request("GET", "/order", params={"market": symbol, "clientOrderId": client_order_id}, private=True)
 
-    def normalize_bot_buy(self, order, quote, base, event_id, fallback_timestamp_ms):
+    def normalize_bot_buy(self, order, quote, event_id, fallback_timestamp_ms):
         filled = Decimal(str(order.get("filledAmount", "0")))
         quote_amount = Decimal(str(order.get("filledAmountQuote", "0")))
         fills = order.get("fills") or []
@@ -163,12 +165,12 @@ class Bitvavo:
                 fee_currency = str(fill_fees[0].get("feeCurrency", fee_currency)).upper()
         if fee_currency == quote:
             fee_quote = fee
-        elif fee_currency == base:
+        elif fee_currency == "BTC":
             fee_quote = fee * price
         elif fee == 0:
             fee_quote = Decimal(0)
         else:
-            raise ValueError(f"Cannot store Bitvavo trade fee in {fee_currency}; expected {quote} or {base}")
+            raise ValueError(f"Cannot store Bitvavo trade fee in {fee_currency}; expected {quote} or BTC")
         timestamp_ms = int(order.get("updated") or order.get("created") or fallback_timestamp_ms)
         timestamp = datetime.fromtimestamp(timestamp_ms / 1000, timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
         return [{
@@ -176,7 +178,7 @@ class Bitvavo:
             "row": {
                 "datetime": timestamp,
                 "type": "Buy",
-                "identifier": base,
+                "identifier": "BTC",
                 "assetType": "Crypto",
                 "price": format(price, "f"),
                 "shares": format(filled, "f"),

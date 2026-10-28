@@ -1,4 +1,4 @@
-"""Exchange-configurable DCA bot. Starts in dry-run mode unless explicitly enabled."""
+"""Bitcoin DCA bot for Bitvavo and Kraken. Starts in dry-run mode unless explicitly enabled."""
 import json
 import logging
 import os
@@ -22,10 +22,10 @@ def serialized(function):
     return locked
 
 import requests
-from activity import append_activity_records, read_activity_records, read_dashboard_snapshot, write_dashboard_snapshot
+from activity import append_activity_records, read_bitcoin_activity_records, read_dashboard_snapshot, tracked_bitcoin_balance, write_dashboard_snapshot
 from exchange import create_exchange
 
-LOG = logging.getLogger("bitvavo-dca")
+LOG = logging.getLogger("bitcoin-dca")
 
 
 def env_decimal(name, default=None):
@@ -64,14 +64,14 @@ def local_now(timezone_name):
     return datetime.now(ZoneInfo(timezone_name))
 
 
-def latest_recorded_buy_time(base_asset):
-    """Return the newest real buy of the configured asset from persistent UI activity."""
+def latest_recorded_buy_time():
+    """Return the newest real Bitcoin buy from persistent UI activity."""
     buy_times = []
-    for record in read_activity_records():
+    for record in read_bitcoin_activity_records():
         if record.get("simulated"):
             continue
         row = record.get("row", {})
-        if row.get("type") != "Buy" or str(row.get("identifier", "")).upper() != base_asset.upper():
+        if row.get("type") != "Buy":
             continue
         value = row.get("datetime")
         if not value:
@@ -172,20 +172,8 @@ def persist_bot_withdrawal(api, withdrawal, result, settings, context):
 
 
 def update_dashboard_snapshot(settings, quote_balance, price):
-    records = read_activity_records()
-    rows = [
-        record["row"] for record in records
-        if not record.get("simulated")
-    ]
-    bought = sum(
-        (Decimal(row["shares"]) for row in rows if row.get("type") == "Buy"),
-        Decimal(0),
-    )
-    withdrawn = sum(
-        (Decimal(row["shares"]) for row in rows if row.get("type") == "TransferOut"),
-        Decimal(0),
-    )
-    tracked_btc = bought - withdrawn
+    records = read_bitcoin_activity_records()
+    tracked_btc = tracked_bitcoin_balance(records)
     previous = read_dashboard_snapshot()
     write_dashboard_snapshot({
         "exchange": settings["exchange"],
@@ -213,7 +201,7 @@ def update_dashboard_schedule(next_purchase_at, status):
 
 def persist_bot_buy(api, order, settings, event_id, fallback_timestamp_ms):
     records = api.normalize_bot_buy(
-        order, settings["quote"], settings["base"], event_id, fallback_timestamp_ms
+        order, settings["quote"], event_id, fallback_timestamp_ms
     )
     return records, append_activity_records(records)
 
@@ -224,13 +212,13 @@ def persist_simulated_buy(api, settings, amount, price, quote_amount):
     row = {
         "datetime": utc_iso_from_ms(timestamp_ms),
         "type": "Buy",
-        "identifier": settings["base"],
+        "identifier": "BTC",
         "assetType": "Crypto",
         "price": format(price, "f"),
         "shares": format(amount, "f"),
         "amount": format(quote_amount, "f"),
         "currency": settings["quote"],
-        "fee": format(api.estimate_taker_fee(f"{settings['base']}-{settings['quote']}", quote_amount), "f"),
+        "fee": format(api.estimate_taker_fee(f"BTC-{settings['quote']}", quote_amount), "f"),
         "tax": "0",
     }
     record = {"id": event_id, "simulated": True, "row": row}
@@ -252,6 +240,10 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
 
     pending = state.get("pending_withdrawal")
     if pending:
+        bitcoin_request = (pending.get("symbol") == "BTC" if settings["exchange"] == "BITVAVO"
+                           else pending.get("asset") == "XBT")
+        if not bitcoin_request:
+            raise ValueError("Saved withdrawal is not a Bitcoin request for the selected exchange; check its status before continuing")
         context = state.get("pending_withdrawal_context", {})
         result = context.get("result")
         if result is None:
@@ -259,7 +251,7 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
                 LOG.error("A previous withdrawal request has an unknown outcome. Verify its status with the exchange; it will not be resent.")
                 return
             try:
-                result = api.withdraw_crypto(pending)
+                result = api.withdraw_btc(pending)
             except requests.RequestException:
                 LOG.exception("Withdrawal outcome is uncertain; the same idempotent request will be retried next check.")
                 return
@@ -316,7 +308,7 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
     }
     save_state(Path("/data/state.json"), state)
     try:
-        result = api.withdraw_crypto(withdrawal)
+        result = api.withdraw_btc(withdrawal)
     except requests.RequestException:
         LOG.exception("Withdrawal outcome is uncertain; check the exchange before taking further action.")
         if not getattr(api, "supports_withdrawal_idempotency", False):
@@ -349,10 +341,10 @@ def defer_order_check(state, state_path, settings):
 
 def reconcile_pending_order(api, state, state_path, settings, check_interval):
     pending = state["pending_order"]
-    symbol = f"{settings['base']}-{settings['quote']}"
+    symbol = f"BTC-{settings['quote']}"
     delay = settings["order_status_check_seconds"]
     update_dashboard_schedule(None, "Waiting for confirmation that the previous order has ended")
-    if pending.get("exchange", settings["exchange"]) != settings["exchange"] or pending.get("symbol", symbol) != symbol:
+    if pending.get("exchange", settings["exchange"]) != settings["exchange"] or pending.get("symbol") != symbol:
         LOG.error("Pending order belongs to a different exchange or market; refusing another purchase.")
         return delay
     due_ms = int(pending.get("nextStatusCheckAt", int(pending.get("submittedAt", 0)) + delay * 1000))
@@ -413,8 +405,8 @@ def reconcile_pending_order(api, state, state_path, settings, check_interval):
 
 @serialized
 def run_once(api, settings, check_interval, schedule_only=False):
-    quote, base = settings["quote"], settings["base"]
-    symbol = f"{base}-{quote}"
+    quote = settings["quote"]
+    symbol = f"BTC-{quote}"
     state_path = Path("/data/state.json")
     now = local_now(settings["timezone"])
     cycle_key, _cycle_start, next_deposit = cycle_dates(now, settings["deposit_day"])
@@ -453,10 +445,10 @@ def run_once(api, settings, check_interval, schedule_only=False):
         LOG.info("Market %s is %s; waiting.", symbol, market.get("status"))
         return check_interval
     min_quote = Decimal(market["minOrderInQuoteAsset"])
-    min_base = Decimal(market["minOrderInBaseAsset"])
+    min_btc = Decimal(market["minOrderInBaseAsset"])
     quantity_decimals = int(market["quantityDecimals"])
     notional_decimals = int(market["notionalDecimals"])
-    order_amount = ceil_to_places(max(settings["buy_amount"], min_base, min_quote / price), quantity_decimals)
+    order_amount = ceil_to_places(max(settings["buy_amount"], min_btc, min_quote / price), quantity_decimals)
     order_quote = ceil_to_places(order_amount * price, notional_decimals)
     spendable = balance_after_simulated_spend
     available = balance if settings["live"] else balance_after_simulated_spend
@@ -474,8 +466,8 @@ def run_once(api, settings, check_interval, schedule_only=False):
         "price=%s %s/%s; estimated order=%s %s (%s %s); "
         "next deposit day=%s; amount of possible buys until next deposit=%s; "
         "purchase interval=%s minutes.",
-        balance, quote, affordable_budget, quote, price, quote, base,
-        order_amount, base, order_quote, quote, next_deposit.isoformat(),
+        balance, quote, affordable_budget, quote, price, quote, "BTC",
+        order_amount, "BTC", order_quote, quote, next_deposit.isoformat(),
         possible_buys, int(interval_seconds / 60),
     )
     startup_last_buy = settings.get("startup_last_buy_at")
@@ -506,7 +498,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
         LOG.info(
             "No previous real %s purchase is recorded; the first purchase follows "
             "the configured startup delay of %s seconds.",
-            base, settings["first_buy_delay_seconds"],
+            "BTC", settings["first_buy_delay_seconds"],
         )
     else:
         last_order = state.get("last_order_at")
@@ -548,7 +540,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
         save_state(state_path, state)
         update_dashboard_schedule(None, "Submitting the order and waiting for its status check")
         try:
-            result = api.buy_base(symbol, order_amount, pending["clientOrderId"])
+            result = api.buy_btc(quote, order_amount, pending["clientOrderId"])
         except requests.RequestException as exc:
             LOG.warning(
                 "%s order submission has an uncertain outcome: %s. It will not be resent; checking the saved reference in %ss.",
@@ -559,11 +551,11 @@ def run_once(api, settings, check_interval, schedule_only=False):
         wait = defer_order_check(state, state_path, settings)
         LOG.info(
             "Order submitted: %s %s (estimated %s %s); orderId=%s. Checking its status in %ss; no new purchase until it has ended.",
-            order_amount, base, order_quote, quote, pending.get("exchangeOrderId"), wait,
+            order_amount, "BTC", order_quote, quote, pending.get("exchangeOrderId"), wait,
         )
         return wait
     else:
-        LOG.info("DRY RUN: would market-buy %s %s (estimated %s %s at %s %s/%s); saved as simulated activity.", order_amount, base, order_quote, quote, price, quote, base)
+        LOG.info("DRY RUN: would market-buy %s %s (estimated %s %s at %s %s/%s); saved as simulated activity.", order_amount, "BTC", order_quote, quote, price, quote, "BTC")
         added = persist_simulated_buy(api, settings, order_amount, price, order_quote)
         LOG.info("Saved %s simulated purchase record(s) for the web UI; excluded from the Parqet CSV export.", added)
 
@@ -589,19 +581,19 @@ def bot_loop(api, settings, interval):
         )
         time.sleep(settings["first_buy_delay_seconds"])
 
-    last_buy = latest_recorded_buy_time(settings["base"])
+    last_buy = latest_recorded_buy_time()
     if last_buy is not None:
         settings["startup_last_buy_at"] = last_buy
         LOG.info(
             "Found previous real %s purchase in persistent activity at %s; "
             "the first purchase after startup will be aligned to the recalculated DCA interval.",
-            settings["base"], last_buy.isoformat(timespec="seconds"),
+            "BTC", last_buy.isoformat(timespec="seconds"),
         )
     else:
         LOG.info(
             "No previous real %s purchase is recorded in persistent activity; "
             "the first purchase will be checked now.",
-            settings["base"],
+            "BTC",
         )
     while True:
         next_wait = interval
@@ -624,8 +616,8 @@ def manual_withdrawal_service(api, settings):
 
     @serialized
     def handle(action, session, token=None):
-        if not settings["live"] or settings["base"] != "BTC":
-            raise ValueError("Manual withdrawals require LIVE_TRADING=true and BASE_ASSET=BTC.")
+        if not settings["live"]:
+            raise ValueError("Manual Bitcoin withdrawals require LIVE_TRADING=true.")
         api.validate_withdrawal_settings(settings)
         cycle, _, _ = cycle_dates(local_now(settings["timezone"]), settings["deposit_day"])
         state = read_state(Path("/data/state.json"), cycle)
@@ -677,7 +669,6 @@ def main():
     settings = {
         "exchange": os.getenv("EXCHANGE", "KRAKEN").upper(),
         "quote": os.getenv("QUOTE_CURRENCY", "EUR").upper(),
-        "base": os.getenv("BASE_ASSET", "BTC").upper(),
         "buy_amount": env_decimal("BUY_AMOUNT", 0),
         "deposit_day": deposit_day,
         "first_buy_delay_seconds": int(os.getenv("FIRST_BUY_DELAY_SECONDS", "60")),
@@ -697,14 +688,12 @@ def main():
         raise ValueError("ORDER_STATUS_CHECK_SECONDS must be greater than zero")
     api = create_exchange(settings)
     if settings["withdrawals_enabled"]:
-        if settings["base"] != "BTC":
-            raise ValueError("Automatic withdrawals currently support BASE_ASSET=BTC only")
         api.validate_withdrawal_settings(settings)
         if settings["withdraw_threshold"] <= 0:
             raise ValueError("WITHDRAW_THRESHOLD_QUOTE must be greater than zero")
     interval = max(60, int(os.getenv("CHECK_INTERVAL_SECONDS", "300")))
     buy_amount_mode = "exchange minimum will be used" if settings["buy_amount"] == 0 else "fixed requested amount"
-    LOG.info("Starting on %s: %s; live trading=%s; quote currency=%s; BUY_AMOUNT=%s %s (%s); deposit day=%s; first-buy delay=%ss; timezone=%s; check interval=%ss; order status check delay=%ss", settings["exchange"], f"{settings['base']}-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], settings["base"], buy_amount_mode, deposit_day, settings["first_buy_delay_seconds"], settings["timezone"], interval, settings["order_status_check_seconds"])
+    LOG.info("Starting on %s: %s; live trading=%s; quote currency=%s; BUY_AMOUNT=%s %s (%s); deposit day=%s; first-buy delay=%ss; timezone=%s; check interval=%ss; order status check delay=%ss", settings["exchange"], f"BTC-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], "BTC", buy_amount_mode, deposit_day, settings["first_buy_delay_seconds"], settings["timezone"], interval, settings["order_status_check_seconds"])
 
     if os.getenv("WEB_UI_ENABLED", "true").lower() == "true":
         port = int(os.getenv("WEB_UI_PORT", "6890"))

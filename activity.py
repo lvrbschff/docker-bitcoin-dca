@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 from threading import RLock
+from decimal import Decimal
 
 ACTIVITY_PATH = Path("/webui-data/activity.json")
 SNAPSHOT_PATH = Path("/webui-data/dashboard.json")
@@ -37,6 +38,24 @@ def read_activity_records():
         if not isinstance(records, list):
             raise ValueError("Stored activity data must be a list")
         return [record for record in records if isinstance(record, dict) and isinstance(record.get("row"), dict)]
+
+
+def bitcoin_activity_records(records):
+    """Select Bitcoin activity without modifying previously stored records."""
+    return [record for record in records
+            if str(record.get("row", {}).get("identifier", "")).upper() == "BTC"]
+
+
+def read_bitcoin_activity_records():
+    return bitcoin_activity_records(read_activity_records())
+
+
+def tracked_bitcoin_balance(records):
+    rows = [record["row"] for record in bitcoin_activity_records(records)
+            if not record.get("simulated")]
+    bought = sum((Decimal(row["shares"]) for row in rows if row.get("type") == "Buy"), Decimal(0))
+    withdrawn = sum((Decimal(row["shares"]) for row in rows if row.get("type") == "TransferOut"), Decimal(0))
+    return bought - withdrawn
 
 
 def read_activity_rows():

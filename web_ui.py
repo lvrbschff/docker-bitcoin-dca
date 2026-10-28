@@ -16,17 +16,17 @@ from secrets import token_urlsafe
 from threading import RLock
 import time
 
-from activity import delete_activity_record, read_activity_records, read_dashboard_snapshot
+from activity import bitcoin_activity_records, delete_activity_record, read_bitcoin_activity_records, read_dashboard_snapshot, tracked_bitcoin_balance
 from reporting import parqet_aggregate_rows, parqet_csv
 
-LOG = logging.getLogger("bitvavo-dca.web")
+LOG = logging.getLogger("bitcoin-dca.web")
 
 HTML = """<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DCA Crypto Bot</title>
+<title>Bitcoin DCA Bot</title>
 <style>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#26324a;--text:#edf2ff;--muted:#9ba9c4;--accent:#8bafff;--green:#61d7ae;--red:#ff8f9e}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#1b2a49 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
@@ -78,7 +78,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 </style>
 </head>
 <body><main>
-<header class="top"><div><h1>DCA Crypto Bot</h1><p class="sub">Portfolio overview, bot configuration and activity analysis, with optional Parqet CSV export</p></div><div class="top-actions"><form method="post" action="/logout"><button class="secondary" type="submit">Log out</button></form><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
+<header class="top"><div><h1>Bitcoin DCA Bot</h1><p class="sub">Portfolio overview, bot configuration and activity analysis, with optional Parqet CSV export</p></div><div class="top-actions"><form method="post" action="/logout"><button class="secondary" type="submit">Log out</button></form><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
 <section class="panel"><h2>Bot-tracked portfolio <a class="footnote-ref" href="#currency-note" aria-label="Read note 1 about display currency and prices"><sup>1</sup></a></h2><div class="grid">
 <div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
 <div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
@@ -91,7 +91,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 <p id="withdrawMessage" class="notice" role="status"></p>
 <div class="grid">
 <div class="card"><label>Exchange</label><div class="value" id="settingExchange">—</div></div>
-<div class="card"><label>Cryptocurrency</label><div class="value" id="baseAsset">—</div></div>
+<div class="card"><label>Bitcoin</label><div class="value">BTC</div></div>
 <div class="card"><label>Quote currency</label><div class="value" id="settingQuoteCurrency">—</div></div>
 <div class="card"><label>Trading mode</label><div class="value" id="tradingMode">—</div></div>
 <div class="card"><label>Purchase amount</label><div class="value" id="buyAmount">—</div></div>
@@ -225,7 +225,7 @@ async function loadAnalytics(){
  try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end);const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load the report.");quote=d.quote;
  if(!displayCurrency){const saved=localStorage.getItem("bitcoinDcaDisplayCurrency");displayCurrency=["EUR","USD"].includes(saved)?saved:(["EUR","USD"].includes(quote)?quote:"EUR")}
  $("displayCurrency").value=displayCurrency;
- const ex=d.exchange==="KRAKEN"?"Kraken":d.exchange==="BITVAVO"?"Bitvavo":d.exchange;document.title=ex+" DCA · Crypto Bot";
+ const ex=d.exchange==="KRAKEN"?"Kraken":d.exchange==="BITVAVO"?"Bitvavo":d.exchange;document.title="Bitcoin DCA Bot";
  let livePrice=Number((d.snapshot||{}).price||0);
  try{
   const priceResponse=await fetch("/api/market-price?currency="+displayCurrency);const market=await priceResponse.json();if(!priceResponse.ok)throw new Error(market.error||"Could not load current BTC price.");
@@ -246,7 +246,7 @@ async function loadAnalytics(){
   $("profitLoss").textContent=money(profitLoss,displayCurrency);
   $("profitLoss").className="value "+(profitLoss>=0?"positive":"negative");
  }else{$("profitLoss").textContent="—";$("profitLoss").className="value"}
- $("settingExchange").textContent=ex;$("baseAsset").textContent=d.configuration.baseAsset;$("settingQuoteCurrency").textContent=quote;$("tradingMode").textContent=d.configuration.liveTrading?"Live":"Dry run";
+ $("settingExchange").textContent=ex;$("settingQuoteCurrency").textContent=quote;$("tradingMode").textContent=d.configuration.liveTrading?"Live":"Dry run";
  $("buyAmount").textContent=Number(d.configuration.buyAmount)===0?"Exchange minimum":btc(d.configuration.buyAmount);
  $("depositDay").textContent=String(d.configuration.depositDay);$("withdrawEnabled").textContent=d.configuration.withdrawalsEnabled?"Enabled":"Disabled";
  $("threshold").textContent=money(Number(d.configuration.withdrawalThreshold)*fxRate,displayCurrency);$("thresholdNote").textContent="Threshold in "+quote+", shown in "+displayCurrency;
@@ -267,7 +267,7 @@ $("download").addEventListener("click",async()=>{
   const p=selectedPeriod(),response=await fetch("/api/export.csv?start="+p.start+"&end="+p.end);
   if(!response.ok){const d=await response.json();throw new Error(d.error||"Could not generate the CSV export.")}
   const blob=await response.blob(),url=URL.createObjectURL(blob),a=document.createElement("a");
-  a.href=url;a.download="parqet_crypto_"+new Date(p.start).toISOString().slice(0,10)+"_"+new Date(p.end).toISOString().slice(0,10)+".csv";
+  a.href=url;a.download="parqet_btc_"+new Date(p.start).toISOString().slice(0,10)+"_"+new Date(p.end).toISOString().slice(0,10)+".csv";
   a.click();URL.revokeObjectURL(url);
  }catch(e){message.textContent=e.message;message.classList.remove("hidden")}
  finally{button.disabled=false;button.textContent="Download Parqet CSV"}
@@ -306,7 +306,7 @@ LOGIN_HTML = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DCA Crypto Bot</title>
+<title>Bitcoin DCA Bot</title>
 <style>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#26324a;--text:#edf2ff;--muted:#9ba9c4;--accent:#8bafff;--red:#ff8f9e}
 *{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:22px;background:radial-gradient(ellipse at 15% 0%,#1b2a49 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
@@ -320,7 +320,7 @@ button{width:100%;margin-top:22px;padding:12px;border:1px solid var(--accent);bo
 </head>
 <body><main class="card">
 <div class="eyebrow">Local access only</div>
-<h1>DCA Crypto Bot</h1>
+<h1>Bitcoin DCA Bot</h1>
 <p class="sub">Sign in to view your portfolio and activity.</p>
 <form method="post" action="/login">
 <label for="username">Username</label>
@@ -584,7 +584,7 @@ class Handler(BaseHTTPRequestHandler):
             kraken = settings["exchange"] == "KRAKEN"
             destination = ("Kraken saved withdrawal method: " + (settings.get("kraken_withdraw_key") or "not configured")) if kraken else ("Bitvavo address: " + (settings.get("withdraw_address") or "not configured") + "; network: " + settings.get("withdraw_network", "BTC"))
             configured = bool(settings.get("kraken_withdraw_key")) if kraken else bool(settings.get("withdraw_address") and settings.get("withdraw_network"))
-            self._json(200, {"destination": destination, "enabled": bool(settings["live"] and settings["base"] == "BTC" and configured and self.withdrawal_service)})
+            self._json(200, {"destination": destination, "enabled": bool(settings["live"] and configured and self.withdrawal_service)})
             return
         query = parse_qs(parsed.query)
         if parsed.path == "/api/market-price":
@@ -610,7 +610,7 @@ class Handler(BaseHTTPRequestHandler):
                     "serverTime": datetime.now(timezone.utc).isoformat(),
                 })
                 return
-            records = read_activity_records()
+            records = read_bitcoin_activity_records()
             if parsed.path == "/api/withdrawals":
                 withdrawals = [
                     {
@@ -643,19 +643,20 @@ class Handler(BaseHTTPRequestHandler):
                             "The Parqet export requires a real purchase and a withdrawal; dry-run purchases are excluded."
                         )
                     rows = parqet_aggregate_rows(
-                        selected_records, self.settings["exchange"], self.settings["base"]
+                        selected_records, self.settings["exchange"]
                     )
                     if not rows:
                         raise ValueError(
                             "The selected period must contain at least one real purchase "
                             "and one bot-recorded BTC withdrawal."
                         )
-                    filename = "parqet_" + self.settings["base"].lower() + "_" + str(start_ms) + "_" + str(end_ms) + ".csv"
+                    filename = "parqet_btc_" + str(start_ms) + "_" + str(end_ms) + ".csv"
                     self._send(200, parqet_csv(rows), "text/csv; charset=utf-8", filename)
                 else:
-                    result = _analytics_from_rows(
-                        self.settings, selected_records, read_dashboard_snapshot()
-                    )
+                    snapshot = read_dashboard_snapshot()
+                    snapshot["trackedBtc"] = format(tracked_bitcoin_balance(records), "f")
+                    snapshot.pop("value", None)
+                    result = _analytics_from_rows(self.settings, selected_records, snapshot)
                     self._json(200, result)
                 return
             self._json(404, {"error": "Not found"})
@@ -675,6 +676,7 @@ def _row_timestamp_ms(row):
 
 
 def _analytics_from_rows(settings, records, snapshot):
+    records = bitcoin_activity_records(records)
     quote = settings["quote"]
     actual_rows = [record["row"] for record in records if not record.get("simulated")]
     simulated_rows = [record["row"] for record in records if record.get("simulated")]
@@ -695,7 +697,6 @@ def _analytics_from_rows(settings, records, snapshot):
         "configuration": {
             "liveTrading": bool(settings["live"]),
             "buyAmount": str(settings["buy_amount"]),
-            "baseAsset": settings["base"],
             "depositDay": int(settings["deposit_day"]),
             "withdrawalsEnabled": bool(settings["withdrawals_enabled"]),
             "withdrawalThreshold": str(settings["withdraw_threshold"]),
