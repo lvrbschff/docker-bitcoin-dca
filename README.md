@@ -53,11 +53,33 @@ Copy the example file and fill in the credentials for the selected exchange:
 cp .env.example .env
 ~~~
 
-The web UI reads current prices from Kraken’s public [BTC/EUR](https://www.kraken.com/convert/btc/eur) and [BTC/USD](https://www.kraken.com/convert/btc/usd) converter pages. No API credentials are required; the Docker host must have internet access.
+### Exchange API credentials
 
-For Bitvavo, fill in `BITVAVO_API_KEY` and `BITVAVO_API_SECRET`. For Kraken, fill in `KRAKEN_API_KEY` and `KRAKEN_API_SECRET`. Leave the other exchange's credentials empty. Never commit .env or API credentials to the repository.
+Fill in only the credentials for the exchange selected with `EXCHANGE`:
 
-`WEB_UI_PORT`, `WEB_UI_USERNAME`, `WEB_UI_PASSWORD`, exchange API credentials, and withdrawal settings (`KRAKEN_WITHDRAW_KEY` for Kraken; `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK` for Bitvavo) are set in .env. The other bot settings are configured directly in docker-compose.yml.
+| Exchange | Variables in .env |
+| --- | --- |
+| Bitvavo | `BITVAVO_API_KEY` and `BITVAVO_API_SECRET` |
+| Kraken | `KRAKEN_API_KEY` and `KRAKEN_API_SECRET` |
+
+Leave the other exchange's credentials empty. Never commit .env or API credentials to the repository.
+
+### Optional automatic withdrawals
+
+Set the destination details in .env only if you plan to enable automatic withdrawals:
+
+| Exchange | Variables in .env |
+| --- | --- |
+| Bitvavo | `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK` |
+| Kraken | `KRAKEN_WITHDRAW_KEY` (the saved withdrawal method name) |
+
+Enable withdrawals and set their threshold with `WITHDRAWALS_ENABLED` and `WITHDRAW_THRESHOLD_QUOTE` in docker-compose.yml. See [Automatic Bitcoin withdrawals](#automatic-bitcoin-withdrawals) for the setup requirements.
+
+### Web UI access
+
+Set `WEB_UI_PORT`, `WEB_UI_USERNAME`, and `WEB_UI_PASSWORD` in .env. Change the default password before starting the bot. See [Web UI access](#web-ui-access) below for details.
+
+All other bot settings are configured directly in docker-compose.yml.
 
 ## 3. Configure the bot
 
@@ -161,6 +183,8 @@ The bot checks the available BTC balance and its value in `QUOTE_CURRENCY`. When
 Check the destination and network carefully before enabling automatic withdrawals on either exchange. If a withdrawal request has an ambiguous response, retry behavior differs: Bitvavo may retry the identical request using the same idempotency key, while Kraken withdrawals are not retried automatically. For Kraken, check the withdrawal status in Kraken before taking further action. For Bitvavo, the idempotency key is intended to prevent duplicate withdrawals, but verify the status in Bitvavo before taking manual action.
 
 ## Portfolio web UI
+
+The web UI reads current prices from Kraken’s public [BTC/EUR](https://www.kraken.com/convert/btc/eur) and [BTC/USD](https://www.kraken.com/convert/btc/usd) converter pages. No API credentials are required; the Docker host must have internet access.
 
 **Bot configuration** shows the next estimated purchase time in the configured `TIMEZONE` and a countdown that updates every second. The page refreshes the stored schedule every 30 seconds, including after purchases. If no purchase can currently be scheduled, it shows the reason instead of a purchase time.
 
