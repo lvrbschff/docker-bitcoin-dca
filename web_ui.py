@@ -64,14 +64,12 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
  th,td{padding:10px 8px;font-size:13px}.bottom-actions button{width:100%;white-space:normal}
 }
 @media(max-width:360px){.grid{grid-template-columns:minmax(0,1fr)}.time-card{grid-column:auto}}
-.purchase-schedule{margin-top:24px;padding-top:20px;border-top:1px solid #354564}
-.purchase-schedule h3{font-size:14px;color:var(--accent);margin:0 0 12px;font-weight:600}
 .schedule-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .schedule-grid .card{border-color:#354b70;background:#111f36}
 .report-section{margin-top:38px;padding-top:28px;border-top:1px solid #354564;min-width:0}
 .report-heading{margin-bottom:18px}.report-heading h2{font-size:21px;margin:0 0 5px}
 .report-heading .sub{font-size:14px}.report-controls{border-color:#354b70;background:linear-gradient(145deg,#17243b,#111a2d)}
-@media(max-width:600px){.schedule-grid{grid-template-columns:minmax(0,1fr)}.purchase-schedule{margin-top:20px;padding-top:17px}.report-section{margin-top:28px;padding-top:22px}.report-heading h2{font-size:19px}}
+@media(max-width:600px){.schedule-grid{grid-template-columns:minmax(0,1fr)}.report-section{margin-top:28px;padding-top:22px}.report-heading h2{font-size:19px}}
 .footnote-ref{color:var(--accent);text-decoration:none;margin-left:3px}.footnote-ref:hover{text-decoration:underline}.footnote-ref:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
 .dashboard-footnotes{margin-top:30px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
 .dashboard-footnotes h2{font-size:14px;margin:0 0 12px}.dashboard-footnotes ol{margin:0;padding-left:20px}.dashboard-footnotes li{padding-left:4px;margin-bottom:14px;scroll-margin-top:20px}.dashboard-footnotes strong{color:var(--text);font-weight:600}.dashboard-footnotes p{margin:4px 0 0}
@@ -98,13 +96,15 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 <div class="card"><label>Deposit day</label><div class="value" id="depositDay">—</div></div>
 <div class="card"><label>Automatic withdrawals</label><div class="value" id="withdrawEnabled">—</div></div>
 <div class="card"><label>Withdrawal threshold</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured threshold</div></div>
-</div><div class="purchase-schedule" aria-labelledby="scheduleHeading"><h3 id="scheduleHeading">Purchase schedule</h3><div class="grid schedule-grid">
+</div>
+</section>
+<section class="panel purchase-schedule" aria-labelledby="scheduleHeading"><h2 id="scheduleHeading">Purchase schedule <a class="footnote-ref" href="#schedule-note" aria-label="Read note 2 about purchase timing"><sup>2</sup></a></h2><div class="grid schedule-grid">
 <div class="card time-card"><label>Next purchase</label><div class="value time-value" id="nextPurchaseAt">—</div><div class="small" id="nextPurchaseStatus">Waiting for the bot schedule</div></div>
 <div class="card time-card"><label>Time until next purchase</label><div class="value countdown-value" id="nextPurchaseCountdown">—</div><div class="small">Updates every second</div></div>
-</div></div>
+</div>
 </section>
 <section class="report-section" aria-labelledby="reportHeading">
-<header class="report-heading"><h2 id="reportHeading">Period analysis <a class="footnote-ref" href="#report-note" aria-label="Read note 2 about reports, CSV exports and activity deletion"><sup>2</sup></a></h2><p class="sub">Choose a date range to review activity and prepare a Parqet export.</p></header>
+<header class="report-heading"><h2 id="reportHeading">Period analysis <a class="footnote-ref" href="#report-note" aria-label="Read note 3 about reports, CSV exports and activity deletion"><sup>3</sup></a></h2><p class="sub">Choose a date range to review activity and prepare a Parqet export.</p></header>
 <section class="panel report-controls">
 <div class="controls">
 <div class="field"><label for="interval">Withdrawal interval</label><select id="interval"></select></div>
@@ -133,6 +133,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 <h2 id="notesHeading">Notes</h2>
 <ol>
 <li id="currency-note"><strong>Display currency and price data.</strong><p>Fiat values are converted to the selected display currency. The current BTC price is fetched from Kraken’s public BTC-to-fiat pages when the report loads. Parqet CSV exports use EUR.</p></li>
+<li id="schedule-note"><strong>Purchase schedule.</strong><p>The interval is the time until the next deposit day divided by the estimated number of purchases the current balance can cover, using the current market price and configured purchase amount or exchange minimum. Time elapsed since the last purchase is deducted to determine the next purchase time. The estimate is recalculated during bot checks; open or unconfirmed orders block further purchases.</p></li>
 <li id="report-note"><strong>Period analysis, Parqet export and local activity history.</strong><p>These notes apply to the date filters in Period analysis, the Activity table and the Download Parqet CSV button. Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The Parqet CSV consolidates the period into one purchase: all real purchase costs and trading fees in EUR, and net BTC received at withdrawals after network fees. The period must contain purchases and a bot-recorded withdrawal. Dry-run purchases are shown separately and excluded from the CSV. Delete removes a purchase from local history only; it cannot reverse an exchange order.</p></li>
 <li id="local-access-note"><strong>Local access only.</strong><p>With the default Docker Compose port mapping, the dashboard is accessible only from the Docker host.</p></li>
 </ol>
