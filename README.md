@@ -179,9 +179,15 @@ The portfolio covers bot-recorded activity, not the full exchange account. Data 
 
 ## Parqet CSV exports
 
-The bot does not create Parqet CSV files automatically. To export, select a period in the web UI and click **Download Parqet CSV**. The selected period is condensed into exactly one Parqet **Buy** row: its total purchase cost is the sum of all real bot purchases plus their trading fees, converted to EUR using the historical daily USD/EUR reference rate when a purchase was made in USD. Its BTC quantity is the sum of net BTC from confirmed bot-recorded withdrawals, after network fees. Submitted, failed and legacy-unverified withdrawals are excluded. The row is dated at the latest confirmed withdrawal in the selected period. A period must contain at least one real purchase and one confirmed bot-recorded BTC withdrawal to produce a row. Simulated purchases are excluded. The CSV uses Parqet's semicolon-separated activity format and can be imported with Parqet's [CSV activity import](https://faq.parqet.com/de/articles/870989-csv-import-aktivitaten-aus-einer-eigenen-csv-datei-importieren).
+Select a period in the web UI and click **Download Parqet CSV**. The export creates one consolidated **Buy** row for [Parqet’s CSV import](https://faq.parqet.com/de/articles/870989-csv-import-aktivitaten-aus-einer-eigenen-csv-datei-importieren):
 
-Existing local activity is retained during migration. Earlier orders not previously recorded by this bot are not backfilled automatically. Purchase amounts and fees come from stored bot activity. When USD purchases need conversion, export fetches missing historical daily rates from the public Frankfurter API, resolves non-business days to the latest earlier reference day, and persists the result per trade day for 24 hours. Repeated exports reuse those rates. Generating the export does not query Kraken or Bitvavo for transaction history. Trading fees are included in the exported cost, so the CSV fee field is zero to avoid counting them twice. Withdrawal fees reduce the net BTC quantity instead of being added again as a separate fiat fee. The existing consolidation rule remains unchanged: all real purchase costs in the selected period are assigned to its confirmed withdrawals, dated at the latest one. Choose the period accordingly; overlapping exports can contain the same activity.
+- **Cost:** all real purchases plus trading fees in the period. USD costs are converted to EUR using historical daily reference rates.
+- **BTC quantity:** net BTC from confirmed withdrawals, after network fees.
+- **Date:** the latest confirmed withdrawal in the period.
+
+A period needs at least one real purchase and one confirmed withdrawal. Simulations and unconfirmed or failed withdrawals are excluded. Fees are already reflected in the cost and net quantity; the CSV fee field is zero.
+
+Choose periods carefully: purchases after the latest withdrawal are still included, and overlapping exports can duplicate activity. See [Prices and Parqet exports](#prices-and-parqet-exports) for limitations.
 
 ## Worker health and updating
 
