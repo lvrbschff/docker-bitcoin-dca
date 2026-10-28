@@ -51,7 +51,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
  main{padding:22px 12px 36px}.panel{padding:15px;margin:14px 0;border-radius:14px}
  .top{flex-direction:column;gap:18px;margin-bottom:20px}h1{font-size:26px}.sub{font-size:14px}
  .top-actions{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center}
- .top-actions .badge{justify-self:start}.top-actions form{justify-self:end}.top-actions .field{grid-column:1/-1;min-width:0}
+ .top-actions form{grid-column:1/-1;justify-self:end}.top-actions .field{grid-column:1/-1;min-width:0}
  .controls{grid-template-columns:minmax(0,1fr)}.controls .field:first-child{grid-column:auto}
  input,select{font-size:16px}input,select,button{min-height:44px}
  .grid{gap:10px}.card{padding:13px}.card label{line-height:1.5;margin-bottom:7px}
@@ -78,7 +78,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 </style>
 </head>
 <body><main>
-<header class="top"><div><div class="eyebrow" id="exchangeName">Exchange</div><h1>DCA Crypto Bot</h1><p class="sub">Portfolio overview and activity analysis, with optional Parqet CSV export</p></div><div class="top-actions"><div class="badge">Local access only</div><form method="post" action="/logout"><button class="secondary" type="submit">Log out</button></form><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
+<header class="top"><div><div class="eyebrow" id="exchangeName">Exchange</div><h1>DCA Crypto Bot</h1><p class="sub">Portfolio overview and activity analysis, with optional Parqet CSV export</p></div><div class="top-actions"><form method="post" action="/logout"><button class="secondary" type="submit">Log out</button></form><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
 <section class="panel"><h2>Bot-tracked portfolio <a class="footnote-ref" href="#currency-note" aria-label="Read note 1 about display currency and prices"><sup>1</sup></a></h2><div class="grid">
 <div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
 <div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
@@ -131,6 +131,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 <ol>
 <li id="currency-note"><strong>Display currency and price data.</strong><p>Fiat values are converted to the selected display currency. The current BTC price is fetched from Kraken’s public BTC-to-fiat pages when the report loads. Parqet CSV exports use EUR.</p></li>
 <li id="report-note"><strong>Period analysis, Parqet export and local activity history.</strong><p>These notes apply to the date filters in Period analysis, the Activity table and the Download Parqet CSV button. Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The Parqet CSV consolidates the period into one purchase: all real purchase costs and trading fees in EUR, and net BTC received at withdrawals after network fees. The period must contain purchases and a bot-recorded withdrawal. Dry-run purchases are shown separately and excluded from the CSV. Delete removes a purchase from local history only; it cannot reverse an exchange order.</p></li>
+<li id="local-access-note"><strong>Local access only.</strong><p>With the default Docker Compose port mapping, the dashboard is accessible only from the Docker host.</p></li>
 </ol>
 </footer>
 </main>
