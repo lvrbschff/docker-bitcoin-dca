@@ -35,7 +35,7 @@ For withdrawals, add and verify the destination address in Bitvavo first, then s
 
 Create a **Spot API key**. Enable the permissions needed for the bot's features:
 
-- Required for balances and bot-order fill details: **Query Funds** and **Query Closed Orders & Trades**
+- Required for balances and order-status verification: **Query Funds**, **Query Open Orders & Trades**, and **Query Closed Orders & Trades**
 - Required for live purchases: **Modify Orders**
 - Required only for automatic withdrawals: **Withdraw Funds**
 
@@ -57,7 +57,7 @@ The web UI reads current prices from Kraken’s public [BTC/EUR](https://www.kra
 
 For Bitvavo, fill in `BITVAVO_API_KEY` and `BITVAVO_API_SECRET`. For Kraken, fill in `KRAKEN_API_KEY` and `KRAKEN_API_SECRET`. Leave the other exchange's credentials empty. Never commit .env or API credentials to the repository.
 
-`WEB_UI_PORT`, `WEB_UI_USERNAME`, `WEB_UI_PASSWORD`, exchange API credentials, and withdrawal settings (`KRAKEN_WITHDRAW_KEY` for Kraken; `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK` for Bitvavo) are set in .env. The other bot settings are configured directly in docker-compose.yml.
+`WEB_UI_PORT`, `WEB_UI_USERNAME`, `WEB_UI_PASSWORD`, `ORDER_STATUS_CHECK_SECONDS`, exchange API credentials, and withdrawal settings (`KRAKEN_WITHDRAW_KEY` for Kraken; `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK` for Bitvavo) are set in .env. The other bot settings are configured directly in docker-compose.yml.
 
 ## 3. Configure the bot
 
@@ -78,6 +78,7 @@ Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings 
 | `TIMEZONE` | `Europe/Berlin` | Time zone used to calculate the deposit-cycle boundary. |
 | `LIVE_TRADING` | `false` | Set to `true` to submit real orders. Keep `false` to run in dry-run mode. |
 | `CHECK_INTERVAL_SECONDS` | `300` | Retry delay when a purchase cannot proceed, for example because funds are insufficient or the market is unavailable. Values below 60 are raised to 60 seconds. |
+| `ORDER_STATUS_CHECK_SECONDS` | `30` | Set in .env. Delay after a live-order submission before its first status check, and between subsequent checks while it is open or unresolved. Must be greater than zero; applies to both exchanges. |
 | `WITHDRAWALS_ENABLED` | `false` | Enables automatic Bitcoin withdrawals. Also requires `LIVE_TRADING=true`. |
 | `WITHDRAW_THRESHOLD_QUOTE` | `1000` | Withdraw when the available BTC balance reaches this value in `QUOTE_CURRENCY`. |
 | `WEB_UI_ENABLED` | `true` | Enables the local portfolio dashboard. |
@@ -136,9 +137,15 @@ docker compose up -d --build
 - Before each purchase check, the bot reads the current available `QUOTE_CURRENCY` balance on the selected exchange. Existing funds are included, even if they were deposited before the current scheduling period.
 - Before each purchase, the bot fetches the selected market's current rules and price. The effective BTC order amount is the larger of `BUY_AMOUNT` and the minimum amount required by the exchange's minimum BTC quantity and minimum order value. If `BUY_AMOUNT` is zero or below that minimum, the exchange minimum is used; if it is above the minimum, the configured amount is used.
 - To estimate how many purchases remain until the next `DEPOSIT_DAY`, the bot divides the available balance by the quote-currency value of that effective order amount.
-- On every startup, the bot first waits `FIRST_BUY_DELAY_SECONDS`, then checks the persistent activity volume for the most recent real purchase of the configured asset. If there is none, it executes the first purchase immediately after the delay. If a previous purchase exists, it recalculates the interval from the current balance, market price, and next deposit day, then subtracts the time elapsed since that purchase (including the startup delay). It waits only for the remaining interval, or buys immediately if the interval has already elapsed. After that first purchase, the existing schedule continues: the bot records each purchase, refreshes balance and BTC price, recalculates the next interval, and waits until its estimated local purchase time. The log entry `Recalculated DCA schedule` shows the values used. `CHECK_INTERVAL_SECONDS` is used for retries when a purchase cannot proceed.
+- On every startup, the bot first waits `FIRST_BUY_DELAY_SECONDS`, then checks the persistent activity volume for the most recent real purchase of the configured asset. If there is none, it executes the first purchase immediately after the delay. If a previous purchase exists, it recalculates the interval from the current balance, market price, and next deposit day, then subtracts the time elapsed since that purchase (including the startup delay). It waits only for the remaining interval, or buys immediately if the interval has already elapsed. After that first purchase, the bot waits for each live order to reach a confirmed end status, records its fills, refreshes balance and BTC price, recalculates the next interval from the actual execution time, and waits until its estimated local purchase time. The log entry `Recalculated DCA schedule` shows the values used. `CHECK_INTERVAL_SECONDS` is used for retries when a purchase cannot proceed.
 - The schedule does not depend on finding a completed deposit record for the current period. In dry-run mode, simulated purchases appear in the web UI, are marked as simulated, and are subtracted from the balance for scheduling. Their fee is estimated from the selected exchange's current taker fee tier; simulated records are excluded from Parqet CSV exports.
 - Market orders do not guarantee an execution price. A configured `BUY_AMOUNT` can cost more or less than estimated as the market price changes.
+
+### Order verification
+
+After each live-order submission, the bot waits `ORDER_STATUS_CHECK_SECONDS` before checking the order using its saved exchange order ID or client reference. It records confirmed fills only after the order has ended, then recalculates the next purchase from the actual execution time. Open and partially filled orders block new purchases and are checked again after the configured delay. A canceled or expired order with a partial fill records only the final executed amount.
+
+If submission times out, the bot does not submit another order: it looks up the existing request by its saved reference. An order that cannot be found or whose status remains unclear continues to block purchases, including after a restart. A confirmed terminal order with no fill is cleared without recording a purchase. This verification applies to Bitvavo and Kraken. Kraken's three short network retries are read retries; they never submit another purchase.
 
 ## Automatic Bitcoin withdrawals
 
@@ -183,14 +190,14 @@ The logs include:
 - **Startup configuration:** selected exchange and market, live or dry-run mode, quote currency, configured `BUY_AMOUNT` and whether the exchange minimum will be used, deposit day, startup delay, timezone, and retry interval.
 - **Startup and purchase timing:** the wait for `FIRST_BUY_DELAY_SECONDS`, whether a previous real purchase was found in persistent activity, recalculated purchase interval, and estimated next purchase time in local time.
 - **Schedule inputs:** available and spendable quote balance, current BTC price, effective order size and estimated quote cost, estimated number of possible buys, and next deposit date. These appear in the `Recalculated DCA schedule` entry.
-- **Orders:** dry-run messages say what the bot would buy and confirm the simulated activity record. Live-order messages include the submitted amount, estimated cost, order status and exchange order ID, plus the number of activity records saved.
+- **Orders:** dry-run messages say what the bot would buy and confirm the simulated activity record. Live-order logs show submission and exchange order ID, the configured status-check delay, open or unresolved status checks, and confirmation of the final status and activity records saved.
 - **Withdrawals:** threshold checks, submitted BTC amount, estimated value, withdrawal ID, and warnings when a request's outcome needs checking.
 - **Waiting and errors:** reasons a purchase cannot proceed, such as insufficient balance or a market that is not trading, along with exchange/API errors and reconciliation messages for unresolved orders. Transient Kraken read failures include the endpoint, attempt count, and short retry delay in the logs.
 - **Web UI requests:** HTTP requests to the local dashboard and its API endpoints.
 
 For example, a `Recalculated DCA schedule` line tells you the balance and current market price used for the calculation, the estimated order size and cost, how many buys the balance could cover, and the calculated interval. A following `Next purchase` or restart-alignment line reports the wait and estimated local purchase time.
 
-Kraken balance, market-data, and other read-only queries use a 10-second connection timeout and a 30-second read timeout. A timeout or connection failure triggers up to three total attempts, with 1- and 2-second pauses between attempts. Kraken order and withdrawal submissions are sent once; uncertain outcomes follow the existing pending-order or withdrawal handling. If all read attempts fail, the bot falls back to `CHECK_INTERVAL_SECONDS` before the next cycle.
+Kraken balance, market-data, and other read-only queries use a 10-second connection timeout and a 30-second read timeout. A timeout or connection failure triggers up to three total attempts, with 1- and 2-second pauses between attempts. Kraken order and withdrawal submissions are sent once; uncertain outcomes follow the existing pending-order or withdrawal handling. If market or balance read attempts fail, the bot falls back to `CHECK_INTERVAL_SECONDS` before the next cycle. Failed order-status checks keep the order pending and use `ORDER_STATUS_CHECK_SECONDS` before checking again.
 
 Logs may contain account balances, trade amounts, prices, and exchange order or withdrawal IDs. Review them before sharing publicly.
 

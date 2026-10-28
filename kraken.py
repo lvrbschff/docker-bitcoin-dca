@@ -401,15 +401,10 @@ class Kraken:
     def get_order(self, symbol, client_order_id, exchange_order_id=None):
         userref = int(client_order_id.replace("-", "")[-8:], 16) % 2_147_483_647
         if exchange_order_id:
-            # Kraken can accept an order before it becomes visible to QueryOrders.
-            # Retry briefly, then search the open/closed order lists by its txid.
-            for attempt in range(3):
-                result = self.private("QueryOrders", {"txid": exchange_order_id})
-                order = result.get(exchange_order_id)
-                if order is not None:
-                    return order
-                if attempt < 2:
-                    time.sleep(1)
+            result = self.private("QueryOrders", {"txid": exchange_order_id})
+            order = result.get(exchange_order_id)
+            if order is not None:
+                return order
             order = self._find_order(userref, exchange_order_id)
             if order is not None:
                 return order

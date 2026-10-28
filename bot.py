@@ -319,6 +319,77 @@ def maybe_withdraw_btc(api, state, settings):
     LOG.warning("BTC withdrawal submitted: amount=%s BTC (fee deducted from amount), value at submission=%s %s, withdrawalId=%s", withdrawal["amount"], value, settings["quote"], result.get("id"))
 
 
+def defer_order_check(state, state_path, settings):
+    delay = settings["order_status_check_seconds"]
+    state["pending_order"]["nextStatusCheckAt"] = int(time.time() * 1000) + delay * 1000
+    save_state(state_path, state)
+    return delay
+
+
+def reconcile_pending_order(api, state, state_path, settings, check_interval):
+    pending = state["pending_order"]
+    symbol = f"{settings['base']}-{settings['quote']}"
+    delay = settings["order_status_check_seconds"]
+    update_dashboard_schedule(None, "Waiting for confirmation that the previous order has ended")
+    if pending.get("exchange", settings["exchange"]) != settings["exchange"] or pending.get("symbol", symbol) != symbol:
+        LOG.error("Pending order belongs to a different exchange or market; refusing another purchase.")
+        return delay
+    due_ms = int(pending.get("nextStatusCheckAt", int(pending.get("submittedAt", 0)) + delay * 1000))
+    remaining_ms = due_ms - int(time.time() * 1000)
+    if remaining_ms > 0:
+        return max(1, (remaining_ms + 999) // 1000)
+
+    try:
+        order = api.get_order(symbol, pending["clientOrderId"], pending.get("exchangeOrderId"))
+    except requests.RequestException as exc:
+        LOG.warning(
+            "%s order %s could not be confirmed: %s. No new order will be sent; checking again in %ss.",
+            settings["exchange"], pending.get("exchangeOrderId") or pending["clientOrderId"], exc, delay,
+        )
+        return defer_order_check(state, state_path, settings)
+
+    status = str(order.get("status", "")).lower()
+    if status not in ("closed", "filled", "canceled", "cancelled", "expired", "rejected"):
+        LOG.info(
+            "%s order %s exists but has not ended (status=%s); no new purchase; checking again in %ss.",
+            settings["exchange"], pending.get("exchangeOrderId") or pending["clientOrderId"], status or "unknown", delay,
+        )
+        return defer_order_check(state, state_path, settings)
+
+    records, added = persist_bot_buy(
+        api, order, settings, pending["clientOrderId"], int(pending.get("submittedAt", 0))
+    )
+    if not records:
+        filled_raw = order.get("vol_exec", order.get("filledAmount"))
+        filled = Decimal(str(filled_raw)) if filled_raw is not None else None
+        if filled is None or filled > 0 or status == "filled":
+            LOG.warning("Order %s ended but its fill details are incomplete; keeping it pending.", pending["clientOrderId"])
+            return defer_order_check(state, state_path, settings)
+        state.pop("pending_order", None)
+        save_state(state_path, state)
+        LOG.warning("Order %s ended without a fill (status=%s); no purchase recorded.", pending["clientOrderId"], status)
+        return check_interval
+
+    order_cost = sum(
+        (Decimal(record["row"]["amount"]) + Decimal(record["row"].get("fee", "0")) for record in records),
+        Decimal(0),
+    )
+    state["spent"] = str(Decimal(state.get("spent", "0")) + order_cost)
+    state["last_order_at"] = max(
+        datetime.fromisoformat(record["row"]["datetime"].replace("Z", "+00:00")) for record in records
+    ).isoformat()
+    state["last_order_quote"] = str(order_cost)
+    state.pop("pending_order", None)
+    save_state(state_path, state)
+    settings["first_purchase_done"] = True
+    settings["startup_last_buy_at"] = None
+    LOG.info(
+        "Confirmed %s order %s ended (status=%s); saved %s activity record(s). Recalculating the purchase schedule.",
+        settings["exchange"], pending.get("exchangeOrderId") or pending["clientOrderId"], status, added,
+    )
+    return None
+
+
 def run_once(api, settings, check_interval, schedule_only=False):
     quote, base = settings["quote"], settings["base"]
     symbol = f"{base}-{quote}"
@@ -330,35 +401,10 @@ def run_once(api, settings, check_interval, schedule_only=False):
     spent = Decimal(state.get("spent", "0"))
     pending = state.get("pending_order")
     if settings["live"] and pending:
-        update_dashboard_schedule(None, "Waiting for confirmation of the previous order")
-        try:
-            result = api.get_order(symbol, pending["clientOrderId"], pending.get("exchangeOrderId"))
-        except requests.RequestException as exc:
-            LOG.error("Previous order %s is unresolved; refusing another order until it can be checked: %s", pending["clientOrderId"], exc)
-            return check_interval
-        event_id = pending["clientOrderId"]
-        records, added = persist_bot_buy(
-            api, result, settings, event_id, int(pending.get("submittedAt", int(time.time() * 1000)))
-        )
-        if not records:
-            status = str(result.get("status", "")).lower()
-            if status in ("closed", "filled", "expired", "canceled"):
-                state.pop("pending_order", None)
-                save_state(state_path, state)
-                LOG.warning("Previous %s order %s ended without a recorded fill (status=%s).", settings["exchange"], event_id, status)
-            else:
-                LOG.info("Previous %s order %s has no confirmed fill yet (status=%s); waiting before another purchase.", settings["exchange"], event_id, result.get("status", "unknown"))
-            return check_interval
-        order_quote = Decimal(pending["amountQuote"])
-        state["spent"] = str(spent + order_quote)
-        state["last_order_at"] = datetime.now(timezone.utc).isoformat()
-        state["last_order_quote"] = str(order_quote)
-        state.pop("pending_order", None)
-        save_state(state_path, state)
-        settings["first_purchase_done"] = True
-        settings["startup_last_buy_at"] = None
-        LOG.info("Reconciled previous %s order %s; status=%s; saved %s bot activity record(s). Recalculating the next purchase schedule now.", settings["exchange"], event_id, result.get("status", "found"), added)
-        now = local_now(settings["timezone"])
+        wait = reconcile_pending_order(api, state, state_path, settings, check_interval)
+        if wait is not None:
+            return wait
+        return run_once(api, settings, check_interval, schedule_only=True)
     try:
         maybe_withdraw_btc(api, state, settings)
     except requests.RequestException as exc:
@@ -470,31 +516,30 @@ def run_once(api, settings, check_interval, schedule_only=False):
             return check_interval
         pending = {
             "clientOrderId": str(uuid.uuid4()),
+            "exchange": settings["exchange"],
+            "symbol": symbol,
             "amountQuote": str(order_quote),
             "amountBase": str(order_amount),
             "submittedAt": int(time.time() * 1000),
         }
         state["pending_order"] = pending
         save_state(state_path, state)
-        update_dashboard_schedule(None, "Submitting the order and confirming its fill")
-        result = api.buy_base(symbol, order_amount, pending["clientOrderId"])
-        status = result.get("status", "submitted")
-        pending["exchangeOrderId"] = result.get("orderId")
-        save_state(state_path, state)
+        update_dashboard_schedule(None, "Submitting the order and waiting for its status check")
         try:
-            order_details = api.get_order(
-                symbol, pending["clientOrderId"], pending.get("exchangeOrderId")
+            result = api.buy_base(symbol, order_amount, pending["clientOrderId"])
+        except requests.RequestException as exc:
+            LOG.warning(
+                "%s order submission has an uncertain outcome: %s. It will not be resent; checking the saved reference in %ss.",
+                settings["exchange"], exc, settings["order_status_check_seconds"],
             )
-        except requests.RequestException:
-            LOG.exception("Kraken accepted the order, but fill details are not visible yet; it remains pending and will be reconciled before another purchase.")
-            return check_interval
-        records, added = persist_bot_buy(
-            api, order_details, settings, pending["clientOrderId"], pending["submittedAt"]
+            return defer_order_check(state, state_path, settings)
+        pending["exchangeOrderId"] = result.get("orderId")
+        wait = defer_order_check(state, state_path, settings)
+        LOG.info(
+            "Order submitted: %s %s (estimated %s %s); orderId=%s. Checking its status in %ss; no new purchase until it has ended.",
+            order_amount, base, order_quote, quote, pending.get("exchangeOrderId"), wait,
         )
-        if not records:
-            LOG.warning("Order response had no confirmed BTC fill yet (status=%s); keeping it pending for reconciliation.", order_details.get("status", status))
-            return check_interval
-        LOG.info("Order submitted: %s %s (estimated %s %s); status=%s orderId=%s; saved %s bot activity record(s).", order_amount, base, order_quote, quote, status, result.get("orderId"), added)
+        return wait
     else:
         LOG.info("DRY RUN: would market-buy %s %s (estimated %s %s at %s %s/%s); saved as simulated activity.", order_amount, base, order_quote, quote, price, quote, base)
         added = persist_simulated_buy(api, settings, order_amount, price, order_quote)
@@ -564,6 +609,7 @@ def main():
         "deposit_day": deposit_day,
         "first_buy_delay_seconds": int(os.getenv("FIRST_BUY_DELAY_SECONDS", "60")),
         "first_purchase_done": False,
+        "order_status_check_seconds": int(os.getenv("ORDER_STATUS_CHECK_SECONDS", "30")),
         "timezone": os.getenv("TIMEZONE", "Europe/Berlin"),
         "live": os.getenv("LIVE_TRADING", "false").lower() == "true",
         "withdrawals_enabled": os.getenv("WITHDRAWALS_ENABLED", "false").lower() == "true",
@@ -574,6 +620,8 @@ def main():
     }
     if settings["first_buy_delay_seconds"] < 0:
         raise ValueError("FIRST_BUY_DELAY_SECONDS must be zero or greater")
+    if settings["order_status_check_seconds"] < 1:
+        raise ValueError("ORDER_STATUS_CHECK_SECONDS must be greater than zero")
     api = create_exchange(settings)
     if settings["withdrawals_enabled"]:
         if settings["base"] != "BTC":
@@ -584,6 +632,8 @@ def main():
     interval = max(60, int(os.getenv("CHECK_INTERVAL_SECONDS", "300")))
     buy_amount_mode = "exchange minimum will be used" if settings["buy_amount"] == 0 else "fixed requested amount"
     LOG.info("Starting on %s: %s; live trading=%s; quote currency=%s; BUY_AMOUNT=%s %s (%s); deposit day=%s; first-buy delay=%ss; timezone=%s; check interval=%ss", settings["exchange"], f"{settings['base']}-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], settings["base"], buy_amount_mode, deposit_day, settings["first_buy_delay_seconds"], settings["timezone"], interval)
+
+    LOG.info("Order status check delay=%ss; open or unconfirmed orders block further purchases.", settings["order_status_check_seconds"])
 
     if os.getenv("WEB_UI_ENABLED", "true").lower() == "true":
         port = int(os.getenv("WEB_UI_PORT", "6890"))
