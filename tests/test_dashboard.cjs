@@ -9,7 +9,7 @@ class Element{
  appendChild(e){this.children.push(e)} append(...e){this.children.push(...e)} replaceChildren(...e){this.children=e}
  set innerHTML(v){this.children=[]} addEventListener(event,handler){this.handlers[event]=handler}
 }
-const elements={},get=id=>elements[id]??=new Element();get('pageSize').value=html.match(/<option selected>(\d+)<\/option>/)[1];
+const elements={},get=id=>{assert(!["balance","balanceValue"].includes(id),"Removed portfolio element must not be accessed");return elements[id]??=new Element()};get('pageSize').value=html.match(/<option selected>(\d+)<\/option>/)[1];
 const records=Array.from({length:45},(_,i)=>({activityId:String(i),datetime:'2026-10-22T12:00:00Z',type:'Buy',identifier:'BTC',shares:'.001',currency:i<22?'EUR':'USD',price:i<22?'80000':'100000',amount:i<22?'80':'100',fee:i<22?'.2':'.25'}));
 const requests=[];let checks=0,eurOnly=false,priceUnavailable=false,invalidUsdRate=false,withdrawalUnavailable=false;
 const response=data=>({ok:true,json:async()=>data});

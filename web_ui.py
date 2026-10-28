@@ -89,7 +89,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
  th,td{padding:10px 8px;font-size:13px}.bottom-actions button{width:100%;white-space:normal}
 }
 @media(max-width:360px){.grid{grid-template-columns:minmax(0,1fr)}.time-card{grid-column:auto}}
-.schedule-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.schedule-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 .schedule-grid .card{border-color:#354b70;background:#111f36}
 .report-section{margin-top:38px;padding-top:28px;border-top:1px solid #354564;min-width:0}
 .report-heading{margin-bottom:18px}.report-heading h2{font-size:21px;margin:0 0 5px}
@@ -104,12 +104,6 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 </head>
 <body><main>
 <header class="top"><div><h1>Bitcoin DCA Bot</h1><p class="sub">Portfolio overview, bot configuration and activity analysis, with optional Parqet CSV export</p></div><div class="top-actions"><form method="post" action="/logout"><button class="secondary" type="submit">Log out</button></form><div class="withdraw-action"><button class="secondary" id="manualWithdraw" type="button" aria-describedby="withdrawal-note withdrawalFeedback">Withdraw BTC manually <sup>4</sup></button><p id="withdrawalFeedback" class="export-feedback withdraw-feedback hidden" role="alert"></p></div><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
-<section class="panel"><h2>Bot-tracked portfolio <sup class="footnote-ref" aria-describedby="currency-note">1</sup></h2><div class="grid">
-<div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
-<div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
-<div class="card"><label>Value in fiat currency</label><div class="value" id="balanceValue">—</div></div>
-
-</div></section>
 <section class="panel">
 <h2>Bot configuration</h2>
 <div class="grid">
@@ -123,6 +117,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 </div>
 </section>
 <section class="panel purchase-schedule" aria-labelledby="scheduleHeading"><h2 id="scheduleHeading">Purchase schedule <sup class="footnote-ref" aria-describedby="schedule-note">2</sup></h2><div class="grid schedule-grid">
+<div class="card"><label>Current BTC price <sup class="footnote-ref" aria-describedby="currency-note">1</sup></label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
 <div class="card time-card"><label>Next purchase</label><div class="value time-value" id="nextPurchaseAt">—</div><div class="small" id="nextPurchaseStatus">Waiting for the bot schedule</div></div>
 <div class="card time-card"><label>Time until next purchase</label><div class="value countdown-value" id="nextPurchaseCountdown">—</div><div class="small">Updates every second</div></div>
 </div>
@@ -255,7 +250,7 @@ async function loadAnalytics(){
   $("spotUpdated").textContent=livePrice>0?"Last price saved by the bot":"Live price unavailable";
   showError("Could not fetch a live BTC price. Showing saved activity and values in "+quote+" where available.");
  }
- $("balance").textContent=btc(d.snapshot.balance);$("spot").textContent=livePrice>0?money(livePrice,displayCurrency)+"/BTC":"—";
+ $("spot").textContent=livePrice>0?money(livePrice,displayCurrency)+"/BTC":"—";
  const converted={buyVolume:0,tradeFees:0,withdrawalFees:0};
  let moneyAvailable=true;
  for(const [currency,values] of Object.entries(d.summaryByCurrency||{})){
@@ -263,8 +258,6 @@ async function loadAnalytics(){
   for(const key of Object.keys(converted))converted[key]+=Number(values[key]||0)*currencyRates[currency];
  }
  if(!moneyAvailable)showError("A required currency conversion is unavailable; monetary totals are hidden.");
- const currentPortfolioValue=Number(d.snapshot.balance)*livePrice;
- $("balanceValue").textContent=livePrice>0?money(currentPortfolioValue,displayCurrency):"—";
  if(livePrice>0&&moneyAvailable){
   const periodPurchaseValue=Number(d.summary.boughtBtc)*livePrice;
   const periodPurchaseCosts=converted.buyVolume+converted.tradeFees;

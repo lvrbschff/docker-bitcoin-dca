@@ -34,8 +34,8 @@ p=Parser();p.feed(page)
 main=p.root.find(lambda n:n.tag=='main')[0]
 by_id={n.attrs['id']:n for n in main.find(lambda n:'id' in n.attrs)}
 sections=[n for n in main.children if isinstance(n,Node) and n.tag=='section']
-assert len(sections)==4
-portfolio,configuration,schedule,report=sections
+assert len(sections)==3
+configuration,schedule,report=sections
 
 BG='#0b1020';PANEL='#121a2d';LINE='#26324a';TEXT='#edf2ff';MUTED='#9ba9c4';ACCENT='#8bafff';GREEN='#61d7ae';CARD='#0c1425'
 image=Image.new('RGB',(1440,3400),BG);draw=ImageDraw.Draw(image)
@@ -78,8 +78,8 @@ def heading(x,y,label,reference=None):
  text(x,y,label,17,TEXT,True)
  if reference is not None:text(x+draw.textlength(label,font=font(17,True))+5,y-5,str(reference),11,'#fff',True)
 
-values={'balance':'0.001 BTC','spot':'€84,000.00/BTC','spotUpdated':'Kraken public price page · fetched 12:00:00',
-'balanceValue':'€84.00','settingExchange':'Kraken','settingQuoteCurrency':'EUR','tradingMode':'Live',
+values={'spot':'€84,000.00/BTC','spotUpdated':'Kraken public price page · fetched 12:00:00',
+'settingExchange':'Kraken','settingQuoteCurrency':'EUR','tradingMode':'Live',
 'buyAmount':'Exchange minimum','depositDay':'1','withdrawEnabled':'Enabled','threshold':'€1,000.00','thresholdNote':'Threshold in EUR, shown in EUR',
 'nextPurchaseAt':'28/10/2026, 14:34:56 CET','nextPurchaseStatus':'Scheduled','nextPurchaseCountdown':'02h 34m 56s',
 'buyCount':'4','buyBtc':'0.0055 BTC','buyVolume':'€440.00','avgPrice':'Average: €80,000.00/BTC','tradeFees':'€1.10',
@@ -92,10 +92,14 @@ def grid(node,x,y,width,cols,height):
  for i,card in enumerate(cards):
   cx=x+(i%cols)*(cw+gap);cy=y+(i//cols)*(height+gap)
   rect(round(cx,2),cy,round(cw,2),height,CARD,LINE,14)
-  label=card.find(lambda n:n.tag=='label')[0].text()
+  label_node=card.find(lambda n:n.tag=='label')[0]
+  references=label_node.find(lambda n:n.tag=='sup')
+  label=label_node.text()
+  if references:label=label.rsplit(' ',1)[0]
   label_lines=wrap(label,cw-34,12)
   baseline=cy+28
   for row in label_lines:text(cx+17,baseline,row,12,MUTED);baseline+=17
+  if references:text(cx+21+draw.textlength(label_lines[-1],font=font(12)),baseline-22,references[0].text(),9,'#fff')
   value_node=card.find(lambda n:n.cls('value'))[0]
   identifier=value_node.attrs.get('id')
   value=values.get(identifier,value_node.text());size=22
@@ -118,14 +122,11 @@ text(X+W-170,164,'Display currency',12,MUTED)
 rect(X+W-170,174,170,45,CARD,LINE,10);text(X+W-157,202,'Euro (EUR)',15);text(X+W-21,202,'⌄',15,MUTED)
 
 Y=245
-rect(X,Y,W,186);heading(CX,Y+33,'Bot-tracked portfolio',1)
-grid(portfolio.find(lambda n:n.cls('grid'))[0],CX,Y+55,CW,4,108)
-Y+=204
 rect(X,Y,W,298);heading(CX,Y+34,'Bot configuration')
 grid(configuration.find(lambda n:n.cls('grid'))[0],CX,Y+55,CW,4,104)
 Y+=316
 rect(X,Y,W,180);heading(CX,Y+34,'Purchase schedule',2)
-grid(schedule.find(lambda n:n.cls('grid'))[0],CX,Y+55,CW,2,102)
+grid(schedule.find(lambda n:n.cls('grid'))[0],CX,Y+55,CW,3,102)
 Y+=218
 line(X,Y,X+W,Y);text(X,Y+48,'Period analysis',21,TEXT,True);text(X+draw.textlength('Period analysis',font=font(21,True))+5,Y+39,'3',11,'#fff',True)
 text(X,Y+75,report.find(lambda n:n.cls('report-heading'))[0].find(lambda n:n.cls('sub'))[0].text(),14,MUTED)
@@ -183,7 +184,7 @@ for index,note in enumerate(notes,1):
 H=Y+30
 svg=f'''<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="{H}" viewBox="0 0 1440 {H}" role="img" aria-labelledby="title desc">
 <title id="title">Bitcoin DCA Bot — current web UI illustration</title>
-<desc id="desc">Illustration of the current dashboard using fictional data: Bitcoin portfolio, manual withdrawal below Log out, bot configuration, purchase schedule, period analysis, activity table, Parqet export and configuration footnotes. This is not a live account screenshot.</desc>
+<desc id="desc">Illustration of the current dashboard using fictional data: manual withdrawal below Log out, bot configuration, purchase schedule with current Bitcoin price, period analysis, activity table, Parqet export and configuration footnotes. This is not a live account screenshot.</desc>
 <style>text{{font-family:Arial,Helvetica,sans-serif}}</style>
 <rect width="1440" height="{H}" fill="{BG}"/>
 '''+''.join(parts)+'\n</svg>\n'
