@@ -75,9 +75,16 @@ Set the destination details in .env if you plan to use automatic or manual Bitco
 
 Enable automatic withdrawals and set their threshold with `WITHDRAWALS_ENABLED` and `WITHDRAW_THRESHOLD_QUOTE` in docker-compose.yml. See [Automatic Bitcoin withdrawals](#automatic-bitcoin-withdrawals) for the setup requirements.
 
-### Dashboard login settings
+### Web UI access
 
-Set `WEB_UI_PORT`, `WEB_UI_USERNAME`, and `WEB_UI_PASSWORD` in .env. Change the default password before starting the bot. See [Web UI access](#web-ui-access) below for details.
+| .env variable | Default | Description |
+| --- | --- | --- |
+| `WEB_UI_PORT` | `6890` | Host and container port for the dashboard. |
+| `WEB_UI_USERNAME` | `admin` | Username on the dashboard login page. |
+| `WEB_UI_PASSWORD` | `admin` | Password on the dashboard login page. |
+
+Change `WEB_UI_PASSWORD` before running the bot. The dashboard displays a styled login page and creates a 12-hour session after successful sign-in; the **Log out** button ends that session. By default, the port is bound to the Docker host's loopback address. HTTP does not encrypt the password during sign-in, so do not expose the port directly to a network or the internet.
+
 
 All other bot settings are configured directly in docker-compose.yml.
 
@@ -104,16 +111,6 @@ Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings 
 | `WITHDRAW_THRESHOLD_QUOTE` | `1000` | Withdraw when the available BTC balance reaches this value in `QUOTE_CURRENCY`. |
 | `WEB_UI_ENABLED` | `true` | Enables the local portfolio dashboard. |
 | `LOG_LEVEL` | `INFO` | Python log level, such as `INFO`, `WARNING`, or `DEBUG`. |
-
-### Web UI access
-
-| .env variable | Default | Description |
-| --- | --- | --- |
-| `WEB_UI_PORT` | `6890` | Host and container port for the dashboard. |
-| `WEB_UI_USERNAME` | `admin` | Username on the dashboard login page. |
-| `WEB_UI_PASSWORD` | `admin` | Password on the dashboard login page. |
-
-Change `WEB_UI_PASSWORD` before running the bot. The dashboard displays a styled login page and creates a 12-hour session after successful sign-in; the **Log out** button ends that session. By default, the port is bound to the Docker host's loopback address. HTTP does not encrypt the password during sign-in, so do not expose the port directly to a network or the internet.
 
 ## 4. Start with dry-run mode
 
