@@ -525,10 +525,10 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
             anchor = last_buy.replace(tzinfo=last_buy.tzinfo or timezone.utc)
             elapsed = max(0, int((now.astimezone(timezone.utc) - anchor.astimezone(timezone.utc)).total_seconds()))
             LOG.info(
-                "Restart alignment: last purchase=%s; elapsed since purchase=%ss (including startup delay); "
-                "calculated purchase interval=%ss; next purchase=%s; remaining wait=%ss; %s.",
-                anchor.astimezone(local_zone).isoformat(timespec='seconds'), elapsed, interval_seconds,
-                due.astimezone(local_zone).isoformat(timespec='seconds'), remaining,
+                "Restart alignment: last purchase=%s; elapsed since purchase=%.1f minutes (including startup delay); "
+                "calculated purchase interval=%.1f minutes; next purchase=%s; remaining wait=%.1f minutes; %s.",
+                anchor.astimezone(local_zone).isoformat(timespec='seconds'), elapsed / 60, interval_seconds / 60,
+                due.astimezone(local_zone).isoformat(timespec='seconds'), remaining / 60,
                 'saved due time retained for unchanged inputs' if previous_plan.get('fingerprint') == fingerprint
                 else 'due time calculated from last purchase',
             )

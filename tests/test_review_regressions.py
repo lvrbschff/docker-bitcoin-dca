@@ -177,7 +177,7 @@ class ReviewTests(unittest.TestCase):
         lines=[line for line in logs.output if 'Restart alignment:' in line]
         self.assertEqual(len(lines),1)
         self.assertIn('last purchase=2026-10-28T12:00:00+01:00',lines[0])
-        self.assertIn('elapsed since purchase=3600s',lines[0])
+        self.assertIn('elapsed since purchase=60.0 minutes',lines[0])
         self.assertIn('calculated purchase interval=',lines[0])
         self.assertIn('next purchase=',lines[0]);self.assertIn('remaining wait=',lines[0])
         api.buy_btc.assert_not_called()
