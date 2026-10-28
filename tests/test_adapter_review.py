@@ -105,7 +105,7 @@ class AdapterReviewTests(unittest.TestCase):
             p=Path(folder)/'health.json'
             self.assertFalse(healthcheck.healthy(p))
             import json,time
-            for state,expected in [({'running':True,'heartbeat':time.time()},True),({'running':True,'heartbeat':time.time()-601},False),({'running':False,'heartbeat':time.time()},False)]:
+            for state,expected in [({'running':True,'heartbeat':time.time()},True),({'running':True,'heartbeat':time.time()-601},True),({'running':True,'heartbeat':time.time()-901},False),({'running':False,'heartbeat':time.time()},False)]:
                 p.write_text(json.dumps(state));self.assertEqual(healthcheck.healthy(p),expected)
 
 

@@ -5,16 +5,16 @@ import worker
 
 
 class HeartbeatTests(unittest.TestCase):
-    def test_first_write_is_immediate_and_subsequent_writes_are_one_minute_apart(self):
+    def test_first_write_is_immediate_and_subsequent_writes_are_five_minutes_apart(self):
         account=worker.Worker(Mock(),Mock(),Mock(),300,60)
         account.running=True
         with patch.object(worker,'write_json_atomic') as write,patch.object(worker.time,'time',return_value=1000):
             with patch.object(worker.time,'monotonic',return_value=0):account.heartbeat()
             self.assertEqual(write.call_count,1)
-            with patch.object(worker.time,'monotonic',return_value=59):account.heartbeat()
+            with patch.object(worker.time,'monotonic',return_value=299):account.heartbeat()
             self.assertEqual(write.call_count,1)
-            self.assertEqual(account.beat,59)
-            with patch.object(worker.time,'monotonic',return_value=60):account.heartbeat()
+            self.assertEqual(account.beat,299)
+            with patch.object(worker.time,'monotonic',return_value=300):account.heartbeat()
             self.assertEqual(write.call_count,2)
             self.assertTrue(write.call_args.args[1]['running'])
 

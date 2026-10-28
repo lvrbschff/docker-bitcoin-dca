@@ -10,7 +10,7 @@ from activity import write_json_atomic
 
 LOG=logging.getLogger('bitcoin-dca.worker')
 HEALTH_PATH=Path('/data/worker-health.json')
-HEARTBEAT_WRITE_INTERVAL_SECONDS=60
+HEARTBEAT_WRITE_INTERVAL_SECONDS=300
 
 
 class Worker:
