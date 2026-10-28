@@ -142,7 +142,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="card"><label>Purchase volume</label><div class="value" id="buyVolume">—</div><div class="small" id="avgPrice"></div></div>
 <div class="card"><label>Trading fees</label><div class="value" id="tradeFees">—</div></div>
 <div class="card"><label>Withdrawals</label><div class="value" id="withdrawBtc">—</div><div class="small" id="withdrawCount"></div></div>
-<div class="card"><label>Profit / loss on period purchases</label><div class="value" id="profitLoss">—</div><div class="small" id="profitLossBasis">Current value of BTC bought in this period minus purchase costs and trading fees</div></div>
+<div class="card"><label>Profit / loss on period purchases</label><div class="value" id="profitLoss">—</div><div class="small" id="profitLossBasis">Current value of BTC bought in this period minus trading fees</div></div>
 </div><div class="grid summary-secondary-grid" style="margin-top:14px">
 <div class="card"><label>Withdrawal fees</label><div class="value" id="withdrawFees">—</div></div>
 <div class="card"><label>Net BTC in period</label><div class="value" id="netBtc">—</div><div class="small">Purchases minus gross BTC debits</div></div>
