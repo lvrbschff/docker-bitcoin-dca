@@ -192,6 +192,26 @@ class ReviewTests(unittest.TestCase):
         self.assertTrue(any('latest recorded real Bitcoin purchase=2026-10-28T12:00:00+01:00' in line for line in logs.output))
         self.assertTrue(self.settings['startup_schedule_log_pending'])
 
+    def test_each_periodic_check_logs_actual_due_time_and_remaining_minutes(self):
+        now=datetime(2026,10,28,12,tzinfo=timezone.utc)
+        state={'last_order_at':(now-timedelta(hours=1)).isoformat()}
+        settings={**self.settings,'first_purchase_done':True}
+        api=self.cycle_api()
+        with patch.object(bot,'read_state',return_value=state),patch.object(bot,'save_state'),patch.object(bot,'update_dashboard_snapshot'),patch.object(bot,'update_dashboard_schedule'):
+            with self.assertLogs(bot.LOG,level='INFO') as logs:
+                with patch.object(bot,'local_now',return_value=now):bot.run_once(api,settings,300)
+                first=state['schedule']['dueAt']
+                with patch.object(bot,'local_now',return_value=now+timedelta(minutes=5)):bot.run_once(api,settings,300)
+        lines=[line for line in logs.output if 'Purchase schedule:' in line]
+        self.assertEqual(len(lines),2)
+        self.assertIn('elapsed since purchase=60.0 minutes',lines[0])
+        self.assertIn('elapsed since purchase=65.0 minutes',lines[1])
+        self.assertIn('remaining wait=',lines[1])
+        self.assertIn('saved due time retained for unchanged inputs',lines[1])
+        due=datetime.fromisoformat(first).astimezone(bot.ZoneInfo('Europe/Berlin')).isoformat(timespec='seconds')
+        self.assertTrue(all('next purchase='+due in line for line in lines))
+        api.buy_btc.assert_not_called()
+
     def test_worker_enqueues_without_waiting_for_slow_account_cycle(self):
         entered=threading.Event();release=threading.Event();finished=threading.Event()
         def cycle():entered.set();release.wait(2);return 100

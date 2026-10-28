@@ -519,21 +519,24 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
     save_state(state_path,state)
     remaining=max(0,int((due.astimezone(timezone.utc)-now.astimezone(timezone.utc)).total_seconds()))
     update_dashboard_schedule(due,'Scheduled' if remaining else 'Due now')
-    if settings.pop('startup_schedule_log_pending', False):
-        local_zone = ZoneInfo(settings['timezone'])
-        if last_buy:
-            anchor = last_buy.replace(tzinfo=last_buy.tzinfo or timezone.utc)
-            elapsed = max(0, int((now.astimezone(timezone.utc) - anchor.astimezone(timezone.utc)).total_seconds()))
-            LOG.info(
-                "Restart alignment: last purchase=%s; elapsed since purchase=%.1f minutes (including startup delay); "
-                "calculated purchase interval=%.1f minutes; next purchase=%s; remaining wait=%.1f minutes; %s.",
-                anchor.astimezone(local_zone).isoformat(timespec='seconds'), elapsed / 60, interval_seconds / 60,
-                due.astimezone(local_zone).isoformat(timespec='seconds'), remaining / 60,
-                'saved due time retained for unchanged inputs' if previous_plan.get('fingerprint') == fingerprint
-                else 'due time calculated from last purchase',
-            )
-        else:
-            LOG.info("Restart alignment: no previous purchase time available; first purchase is due now after startup delay.")
+    startup_alignment = settings.pop('startup_schedule_log_pending', False)
+    log_label = 'Restart alignment' if startup_alignment else 'Purchase schedule'
+    local_zone = ZoneInfo(settings['timezone'])
+    if last_buy:
+        anchor = last_buy.replace(tzinfo=last_buy.tzinfo or timezone.utc)
+        elapsed = max(0, int((now.astimezone(timezone.utc) - anchor.astimezone(timezone.utc)).total_seconds()))
+        LOG.info(
+            "%s: last purchase=%s; elapsed since purchase=%.1f minutes%s; "
+            "calculated purchase interval=%.1f minutes; next purchase=%s; remaining wait=%.1f minutes; %s.",
+            log_label, anchor.astimezone(local_zone).isoformat(timespec='seconds'), elapsed / 60,
+            ' (including startup delay)' if startup_alignment else '', interval_seconds / 60,
+            due.astimezone(local_zone).isoformat(timespec='seconds'), remaining / 60,
+            'saved due time retained for unchanged inputs' if previous_plan.get('fingerprint') == fingerprint
+            else 'due time calculated from last purchase',
+        )
+    else:
+        LOG.info("%s: no previous purchase time available; next purchase=%s; remaining wait=%.1f minutes; first purchase due now.",
+                 log_label, due.astimezone(local_zone).isoformat(timespec='seconds'), remaining / 60)
     if remaining: return remaining
 
     if schedule_only:
