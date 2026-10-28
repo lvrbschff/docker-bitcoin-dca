@@ -72,11 +72,14 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 .report-heading{margin-bottom:18px}.report-heading h2{font-size:21px;margin:0 0 5px}
 .report-heading .sub{font-size:14px}.report-controls{border-color:#354b70;background:linear-gradient(145deg,#17243b,#111a2d)}
 @media(max-width:600px){.schedule-grid{grid-template-columns:minmax(0,1fr)}.purchase-schedule{margin-top:20px;padding-top:17px}.report-section{margin-top:28px;padding-top:22px}.report-heading h2{font-size:19px}}
+.footnote-ref{color:var(--accent);text-decoration:none;margin-left:3px}.footnote-ref:hover{text-decoration:underline}.footnote-ref:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
+.dashboard-footnotes{margin-top:30px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
+.dashboard-footnotes h2{font-size:14px;margin:0 0 12px}.dashboard-footnotes ol{margin:0;padding-left:20px}.dashboard-footnotes li{padding-left:4px;margin-bottom:14px;scroll-margin-top:20px}.dashboard-footnotes strong{color:var(--text);font-weight:600}.dashboard-footnotes p{margin:4px 0 0}
 </style>
 </head>
 <body><main>
 <header class="top"><div><div class="eyebrow" id="exchangeName">Exchange</div><h1>DCA Crypto Bot</h1><p class="sub">Portfolio overview and activity analysis, with optional Parqet CSV export</p></div><div class="top-actions"><div class="badge">Local access only</div><form method="post" action="/logout"><button class="secondary" type="submit">Log out</button></form><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
-<section class="panel"><h2>Bot-tracked portfolio</h2><div class="grid">
+<section class="panel"><h2>Bot-tracked portfolio <a class="footnote-ref" href="#currency-note" aria-label="Read note 1 about display currency and prices"><sup>1</sup></a></h2><div class="grid">
 <div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
 <div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
 <div class="card"><label>Value in fiat currency</label><div class="value" id="balanceValue">—</div></div>
@@ -96,17 +99,17 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 </div><div class="purchase-schedule" aria-labelledby="scheduleHeading"><h3 id="scheduleHeading">Purchase schedule</h3><div class="grid schedule-grid">
 <div class="card time-card"><label>Next purchase</label><div class="value time-value" id="nextPurchaseAt">—</div><div class="small" id="nextPurchaseStatus">Waiting for the bot schedule</div></div>
 <div class="card time-card"><label>Time until next purchase</label><div class="value countdown-value" id="nextPurchaseCountdown">—</div><div class="small">Updates every second</div></div>
-</div></div><div class="notice">Fiat values are converted to the selected display currency. The current BTC price is fetched from Kraken’s public BTC-to-fiat pages when the report loads. Parqet CSV exports use EUR.</div>
+</div></div>
 </section>
 <section class="report-section" aria-labelledby="reportHeading">
-<header class="report-heading"><h2 id="reportHeading">Period analysis</h2><p class="sub">Choose a date range to review activity and prepare a Parqet export.</p></header>
+<header class="report-heading"><h2 id="reportHeading">Period analysis <a class="footnote-ref" href="#report-note" aria-label="Read note 2 about reports, CSV exports and activity deletion"><sup>2</sup></a></h2><p class="sub">Choose a date range to review activity and prepare a Parqet export.</p></header>
 <section class="panel report-controls">
 <div class="controls">
 <div class="field"><label for="interval">Withdrawal interval</label><select id="interval"></select></div>
 <div class="field"><label for="start">From</label><input id="start" type="datetime-local"></div>
 <div class="field"><label for="end">To</label><input id="end" type="datetime-local"></div>
 <button id="refresh">Load report</button>
-</div><div id="error" class="error hidden"></div><div class="notice">Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The Parqet CSV consolidates the period into one purchase: all real purchase costs and trading fees in EUR, and net BTC received at withdrawals after network fees. The period must contain purchases and a bot-recorded withdrawal. Dry-run purchases are shown separately and excluded from the CSV. Delete removes a purchase from local history only; it cannot reverse an exchange order.</div>
+</div><div id="error" class="error hidden"></div>
 </section>
 <section class="panel"><h2>Selected period summary</h2><div class="grid period-summary-grid">
 <div class="card"><label>BTC purchases</label><div class="value" id="buyCount">—</div><div class="small" id="buyBtc"></div></div>
@@ -123,6 +126,13 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 <section class="panel"><div class="activity-heading"><h2>Activity</h2><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>10</option><option selected>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th><th>Action</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><button class="secondary" id="previousPage">Previous</button><span id="pageInfo" class="notice"></span><button class="secondary" id="nextPage">Next</button></div></section>
 <div class="bottom-actions"><button class="secondary" id="download">Download Parqet CSV</button></div>
 </section>
+<footer class="dashboard-footnotes" aria-labelledby="notesHeading">
+<h2 id="notesHeading">Notes</h2>
+<ol>
+<li id="currency-note"><strong>Display currency and price data.</strong><p>Fiat values are converted to the selected display currency. The current BTC price is fetched from Kraken’s public BTC-to-fiat pages when the report loads. Parqet CSV exports use EUR.</p></li>
+<li id="report-note"><strong>Period analysis, Parqet export and local activity history.</strong><p>These notes apply to the date filters in Period analysis, the Activity table and the Download Parqet CSV button. Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The Parqet CSV consolidates the period into one purchase: all real purchase costs and trading fees in EUR, and net BTC received at withdrawals after network fees. The period must contain purchases and a bot-recorded withdrawal. Dry-run purchases are shown separately and excluded from the CSV. Delete removes a purchase from local history only; it cannot reverse an exchange order.</p></li>
+</ol>
+</footer>
 </main>
 <script>
 const $=id=>document.getElementById(id);
