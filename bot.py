@@ -86,6 +86,8 @@ def read_state(path, cycle_key):
             fresh["pending_withdrawal_context"] = state["pending_withdrawal_context"]
         if state.get("last_withdrawal"):
             fresh["last_withdrawal"] = state["last_withdrawal"]
+        if state.get("last_order_at"):
+            fresh["last_order_at"] = state["last_order_at"]
         if "withdrawal_armed" in state:
             fresh["withdrawal_armed"] = state["withdrawal_armed"]
         return fresh
@@ -493,8 +495,14 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
         LOG.info("Waiting: available balance %s %s; minimum order %s %s.", affordable_budget, quote, order_quote, quote)
         return check_interval
 
-    seconds_left = max(60, (next_deposit.astimezone(timezone.utc) - now.astimezone(timezone.utc)).total_seconds())
-    interval_seconds = max(60, int(seconds_left / possible_buys))
+    last_buy = settings.get('startup_last_buy_at')
+    if last_buy is None and state.get('last_order_at'):
+        last_buy = datetime.fromisoformat(state['last_order_at'])
+    if last_buy is not None:
+        last_buy = last_buy.replace(tzinfo=last_buy.tzinfo or timezone.utc).astimezone(timezone.utc)
+    interval_anchor = last_buy if last_buy is not None else now.astimezone(timezone.utc)
+    seconds_to_deposit = max(60, (next_deposit.astimezone(timezone.utc) - interval_anchor).total_seconds())
+    interval_seconds = max(60, int(seconds_to_deposit / possible_buys))
     LOG.info(
         "Recalculated DCA schedule: balance=%s %s; spendable=%s %s; "
         "price=%s %s/%s; estimated order=%s %s (%s %s); "
@@ -504,17 +512,13 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
         order_amount, "BTC", order_quote, quote, next_deposit.isoformat(),
         possible_buys, int(interval_seconds / 60),
     )
-    last_buy = settings.get('startup_last_buy_at')
-    if last_buy is None and state.get('last_order_at'):
-        last_buy = datetime.fromisoformat(state['last_order_at'])
-    fingerprint = [str(affordable_budget),str(planned_cost),next_deposit.isoformat(),
+    fingerprint = ['last-purchase-interval-v2',str(affordable_budget),str(planned_cost),next_deposit.isoformat(),
                    last_buy.isoformat() if last_buy else None]
     previous_plan = state.get('schedule',{})
     if previous_plan.get('fingerprint')==fingerprint:
         due = datetime.fromisoformat(previous_plan['dueAt'])
     else:
-        due = (last_buy + timedelta(seconds=interval_seconds)) if last_buy else now
-        if last_buy and not last_buy.tzinfo: due=due.replace(tzinfo=timezone.utc)
+        due = interval_anchor + timedelta(seconds=interval_seconds) if last_buy else now
     state['schedule']={'fingerprint':fingerprint,'dueAt':due.isoformat()}
     save_state(state_path,state)
     remaining=max(0,int((due.astimezone(timezone.utc)-now.astimezone(timezone.utc)).total_seconds()))

@@ -212,6 +212,45 @@ class ReviewTests(unittest.TestCase):
         self.assertTrue(all('next purchase='+due in line for line in lines))
         api.buy_btc.assert_not_called()
 
+    def test_interval_uses_last_purchase_to_deposit_including_dst_boundary(self):
+        now=datetime(2026,10,28,12,tzinfo=timezone.utc)
+        for last in (now-timedelta(hours=2),now-timedelta(days=4)):
+            with self.subTest(last=last):
+                state={'last_order_at':last.isoformat()};api=self.cycle_api()
+                with patch.object(bot,'read_state',return_value=state),patch.object(bot,'save_state'),patch.object(bot,'update_dashboard_snapshot'),patch.object(bot,'update_dashboard_schedule'),patch.object(bot,'local_now',return_value=now.astimezone(bot.ZoneInfo('Europe/Berlin'))):
+                    bot.run_once(api,self.settings,300,schedule_only=True)
+                deposit=bot.cycle_dates(now.astimezone(bot.ZoneInfo('Europe/Berlin')),1)[2]
+                # Available budget 100 / (8 + .02 fee, buffered and rounded to 8.07) = 12 buys.
+                seconds=int((deposit.astimezone(timezone.utc)-last).total_seconds()/12)
+                self.assertEqual(datetime.fromisoformat(state['schedule']['dueAt']),last+timedelta(seconds=seconds))
+                api.buy_btc.assert_not_called()
+
+    def test_interval_without_previous_purchase_starts_now(self):
+        now=datetime(2026,10,28,12,tzinfo=timezone.utc);state={};api=self.cycle_api()
+        with patch.object(bot,'read_state',return_value=state),patch.object(bot,'save_state'),patch.object(bot,'update_dashboard_snapshot'),patch.object(bot,'update_dashboard_schedule'),patch.object(bot,'local_now',return_value=now.astimezone(bot.ZoneInfo('Europe/Berlin'))):
+            with self.assertLogs(bot.LOG,level='INFO') as logs:
+                bot.run_once(api,self.settings,300,schedule_only=True)
+        self.assertEqual(datetime.fromisoformat(state['schedule']['dueAt']),now)
+        self.assertTrue(any('no previous purchase time available' in line for line in logs.output))
+
+    def test_old_saved_due_time_is_recalculated_with_new_interval_rule(self):
+        now=datetime(2026,10,28,12,tzinfo=timezone.utc);last=now-timedelta(hours=2)
+        state={'last_order_at':last.isoformat()};api=self.cycle_api()
+        with patch.object(bot,'read_state',return_value=state),patch.object(bot,'save_state'),patch.object(bot,'update_dashboard_snapshot'),patch.object(bot,'update_dashboard_schedule'),patch.object(bot,'local_now',return_value=now.astimezone(bot.ZoneInfo('Europe/Berlin'))):
+            bot.run_once(api,self.settings,300,schedule_only=True)
+            expected=state['schedule']['dueAt']
+            state['schedule']['fingerprint']=state['schedule']['fingerprint'][1:]
+            state['schedule']['dueAt']=(now+timedelta(days=1)).isoformat()
+            bot.run_once(api,self.settings,300,schedule_only=True)
+        self.assertEqual(state['schedule']['dueAt'],expected)
+
+    def test_monthly_state_reset_preserves_last_purchase_anchor(self):
+        path=self.root/'state.json'
+        path.write_text(json.dumps({'cycle':'2026-09-01','spent':'50','last_order_at':'2026-09-30T12:00:00+00:00'}))
+        state=bot.read_state(path,'2026-10-01')
+        self.assertEqual(state['spent'],'0')
+        self.assertEqual(state['last_order_at'],'2026-09-30T12:00:00+00:00')
+
     def test_worker_enqueues_without_waiting_for_slow_account_cycle(self):
         entered=threading.Event();release=threading.Event();finished=threading.Event()
         def cycle():entered.set();release.wait(2);return 100
