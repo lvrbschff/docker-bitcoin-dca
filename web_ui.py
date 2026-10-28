@@ -57,14 +57,13 @@ main{max-width:1180px;margin:0 auto;padding:36px 22px 64px}.top{display:flex;jus
 .controls input[type="datetime-local"]::-webkit-datetime-edit{min-width:0;padding:0}
 .controls input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper{min-width:0;padding:0}
 .controls input[type="datetime-local"]::-webkit-date-and-time-value{min-width:0;text-align:left}
-.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.period-summary-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.card{padding:17px;border:1px solid var(--line);border-radius:14px;background:#0c1425a8}.card label{display:block;color:var(--muted);font-size:12px;margin-bottom:9px}.value{font-size:22px;font-weight:700;letter-spacing:-.02em}.small{font-size:12px;color:var(--muted);margin-top:4px}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.period-summary-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.summary-secondary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.card{padding:17px;border:1px solid var(--line);border-radius:14px;background:#0c1425a8}.card label{display:block;color:var(--muted);font-size:12px;margin-bottom:9px}.value{font-size:22px;font-weight:700;letter-spacing:-.02em}.small{font-size:12px;color:var(--muted);margin-top:4px}
 h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:740px}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}td.num{text-align:right;font-variant-numeric:tabular-nums}.positive{color:var(--green)}.negative{color:var(--red)}.notice{color:var(--muted);font-size:13px;margin-top:12px}.error{color:var(--red);margin:12px 0}.hidden{display:none}.activity-heading,.pagination,.settings-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.settings-heading h2{margin:0}.settings-heading .field{min-width:160px}.activity-heading h2{margin:0}.page-size{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}.page-size select{width:auto;padding:7px 10px}.pagination{margin-top:12px}.pagination button{padding:8px 12px}.pagination .notice{margin:0;text-align:center}
 main,.panel,.grid,.card,.field,.top>div{min-width:0}
 main{width:100%}.top-actions{flex-shrink:0}.controls>*{min-width:0}
 input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overflow-wrap:anywhere}
 .value{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .time-value{font-size:16px;line-height:1.5;letter-spacing:0;overflow-wrap:normal}
-.date-point{display:flex;flex-wrap:wrap;gap:0 .35em}.date-point span{white-space:nowrap}
 .countdown-value{font-size:clamp(16px,1.6vw,20px);white-space:nowrap;letter-spacing:0}
 .tablewrap{width:100%;max-width:100%;min-width:0;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
 #activities td{padding:5px 10px}#activities button{padding:3px 9px;line-height:1.4;font-size:13px;border-radius:7px}
@@ -144,11 +143,9 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="card"><label>Trading fees</label><div class="value" id="tradeFees">—</div></div>
 <div class="card"><label>Withdrawals</label><div class="value" id="withdrawBtc">—</div><div class="small" id="withdrawCount"></div></div>
 <div class="card"><label>Profit / loss on period purchases</label><div class="value" id="profitLoss">—</div><div class="small" id="profitLossBasis">Current value of BTC bought in this period minus purchase costs and trading fees</div></div>
-</div><div class="grid" style="margin-top:14px">
+</div><div class="grid summary-secondary-grid" style="margin-top:14px">
 <div class="card"><label>Withdrawal fees</label><div class="value" id="withdrawFees">—</div></div>
 <div class="card"><label>Net BTC in period</label><div class="value" id="netBtc">—</div><div class="small">Purchases minus gross BTC debits</div></div>
-<div class="card time-card"><label>Date range</label><div class="value time-value" id="periodLabel">—</div></div>
-<div class="card"><label>Last updated</label><div class="value" id="updated">—</div></div>
 </div>
 <section class="panel activity-panel"><div class="activity-heading"><h2>Activity</h2><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th><th>Action</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><button class="secondary" id="previousPage">Previous</button><span id="pageInfo" class="notice"></span><button class="secondary" id="nextPage">Next</button><form class="page-jump" id="pageJump" aria-label="Jump to activity page"><label for="pageNumber">Go to page</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><button class="secondary" id="goToPage" type="submit">Go</button></form></div></section></section>
 <div class="bottom-actions"><button class="secondary" id="download" aria-describedby="exportMessage">Download Parqet CSV</button></div>
@@ -173,18 +170,6 @@ function parseInput(el){return new Date(el.value).getTime()}
 function money(v,c){try{return new Intl.NumberFormat("en-GB",{style:"currency",currency:c,maximumFractionDigits:2}).format(Number(v||0))}catch(e){return Number(v||0).toFixed(2)+" "+c}}
 function btc(v){return Number(v||0).toLocaleString("en-GB",{minimumFractionDigits:0,maximumFractionDigits:8})+" BTC"}
 function dateLabel(ms){return new Date(ms).toLocaleString("en-GB")}
-function renderPeriodLabel(start,end){
- const points=[start,end].map((timestamp,index)=>{
-  const point=document.createElement("time");
-  point.className="date-point";point.dateTime=new Date(timestamp).toISOString();
-  const date=document.createElement("span"),clock=document.createElement("span");
-  date.textContent=(index?"To: ":"From: ")+new Date(timestamp).toLocaleDateString("en-GB");
-  clock.textContent=new Date(timestamp).toLocaleTimeString("en-GB");
-  point.append(date,clock);return point;
- });
- $("periodLabel").replaceChildren(...points);
-}
-
 let nextPurchaseTimestamp=null, scheduleClockOffset=0;
 function renderPurchaseCountdown(){
  const output=$("nextPurchaseCountdown");
@@ -296,7 +281,6 @@ async function loadAnalytics(){
  $("buyVolume").textContent=moneyAvailable?money(converted.buyVolume,displayCurrency):"—";$("avgPrice").textContent=moneyAvailable?"Average: "+money(Number(d.summary.boughtBtc)>0?converted.buyVolume/Number(d.summary.boughtBtc):0,displayCurrency)+"/BTC":"Conversion unavailable";
  $("tradeFees").textContent=moneyAvailable?money(converted.tradeFees,displayCurrency):"—";$("withdrawBtc").textContent=btc(d.summary.withdrawnBtc);$("withdrawCount").textContent=d.summary.withdrawalCount+" confirmed · "+(d.summary.pendingWithdrawalCount||0)+" pending";
  $("withdrawFees").textContent=moneyAvailable?money(converted.withdrawalFees,displayCurrency):"—";$("netBtc").textContent=btc(d.summary.netBtc);
- renderPeriodLabel(p.start,p.end);$("updated").textContent=new Date(d.snapshot.updatedAt||Date.now()).toLocaleTimeString("en-GB");
  activityRates=currencyRates;activityRows=d.activities;activityTotal=d.pagination.total;activityPages=d.pagination.pages;currentPage=d.pagination.page;renderActivities();
  }catch(e){showError(e.message)}
 }

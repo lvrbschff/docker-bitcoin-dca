@@ -84,7 +84,7 @@ values={'balance':'0.001 BTC','spot':'€84,000.00/BTC','spotUpdated':'Kraken pu
 'nextPurchaseAt':'28/10/2026, 14:34:56 CET','nextPurchaseStatus':'Scheduled','nextPurchaseCountdown':'02h 34m 56s',
 'buyCount':'4','buyBtc':'0.0055 BTC','buyVolume':'€440.00','avgPrice':'Average: €80,000.00/BTC','tradeFees':'€1.10',
 'withdrawBtc':'0.0044 BTC','withdrawCount':'1 confirmed · 0 pending','profitLoss':'€20.90',
-'withdrawFees':'€8.10','netBtc':'0.001 BTC','updated':'12:00:00'}
+'withdrawFees':'€8.10','netBtc':'0.001 BTC'}
 
 def grid(node,x,y,width,cols,height):
  gap=14;cw=(width-gap*(cols-1))/cols
@@ -98,19 +98,15 @@ def grid(node,x,y,width,cols,height):
   for row in label_lines:text(cx+17,baseline,row,12,MUTED);baseline+=17
   value_node=card.find(lambda n:n.cls('value'))[0]
   identifier=value_node.attrs.get('id')
-  if identifier=='periodLabel':
-   text(cx+17,cy+62,'From: 20/10/2026',16,TEXT,True);text(cx+17,cy+84,'00:00:00',16,TEXT,True)
-   text(cx+17,cy+106,'To: 28/10/2026',16,TEXT,True);text(cx+17,cy+128,'12:00:00',16,TEXT,True)
-  else:
-   value=values.get(identifier,value_node.text());size=22
-   if value_node.cls('time-value'):size=16
-   if value_node.cls('countdown-value'):size=20
-   # CSS wraps long values; use the same width boundary for the illustration.
-   value_y=baseline+15
-   for row in wrap(value,cw-34,size,True):text(cx+17,value_y,row,size,GREEN if identifier=='profitLoss' else TEXT,True);value_y+=29
-   value_y-=9
-   for small in card.find(lambda n:n.cls('small')):
-    for row in wrap(values.get(small.attrs.get('id'),small.text()),cw-34,12):text(cx+17,value_y,row,12,MUTED);value_y+=18
+  value=values.get(identifier,value_node.text());size=22
+  if value_node.cls('time-value'):size=16
+  if value_node.cls('countdown-value'):size=20
+  # CSS wraps long values; use the same width boundary for the illustration.
+  value_y=baseline+15
+  for row in wrap(value,cw-34,size,True):text(cx+17,value_y,row,size,GREEN if identifier=='profitLoss' else TEXT,True);value_y+=29
+  value_y-=9
+  for small in card.find(lambda n:n.cls('small')):
+   for row in wrap(values.get(small.attrs.get('id'),small.text()),cw-34,12):text(cx+17,value_y,row,12,MUTED);value_y+=18
  return y+((len(cards)+cols-1)//cols)*(height+gap)-gap
 
 X=152;W=1136;CX=X+20;CW=W-40
@@ -142,11 +138,11 @@ text(CX+239,Y+69,'⌄',15,MUTED)
 button(CX+831,Y+42,265,'Load report',True)
 Y+=137
 summary=report.find(lambda n:n.tag=='section' and n.cls('panel'))[1]
-rect(X,Y,W,805);heading(CX,Y+33,'Selected period summary')
+rect(X,Y,W,761);heading(CX,Y+33,'Selected period summary')
 grids=summary.find(lambda n:n.cls('grid'))
 grid(grids[0],CX,Y+55,CW,5,166)
-grid(grids[1],CX,Y+235,CW,4,148)
-Y+=423
+grid(grids[1],CX,Y+235,CW,2,104)
+Y+=379
 outer_geometry=(X,W,CX,CW)
 X+=20;W-=40;CX+=20;CW-=40
 rect(X,Y,W,360);heading(CX,Y+34,'Activity')
