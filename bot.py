@@ -519,6 +519,21 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
     save_state(state_path,state)
     remaining=max(0,int((due.astimezone(timezone.utc)-now.astimezone(timezone.utc)).total_seconds()))
     update_dashboard_schedule(due,'Scheduled' if remaining else 'Due now')
+    if settings.pop('startup_schedule_log_pending', False):
+        local_zone = ZoneInfo(settings['timezone'])
+        if last_buy:
+            anchor = last_buy.replace(tzinfo=last_buy.tzinfo or timezone.utc)
+            elapsed = max(0, int((now.astimezone(timezone.utc) - anchor.astimezone(timezone.utc)).total_seconds()))
+            LOG.info(
+                "Restart alignment: last purchase=%s; elapsed since purchase=%ss (including startup delay); "
+                "calculated purchase interval=%ss; next purchase=%s; remaining wait=%ss; %s.",
+                anchor.astimezone(local_zone).isoformat(timespec='seconds'), elapsed, interval_seconds,
+                due.astimezone(local_zone).isoformat(timespec='seconds'), remaining,
+                'saved due time retained for unchanged inputs' if previous_plan.get('fingerprint') == fingerprint
+                else 'due time calculated from last purchase',
+            )
+        else:
+            LOG.info("Restart alignment: no previous purchase time available; first purchase is due now after startup delay.")
     if remaining: return remaining
 
     if schedule_only:
@@ -584,7 +599,16 @@ def make_worker(api, settings, interval):
     from worker import Worker
     def startup():
         settings['startup_last_buy_at']=latest_recorded_buy_time()
+        settings['startup_schedule_log_pending'] = True
+        last_buy = settings['startup_last_buy_at']
+        if last_buy:
+            LOG.info("Startup history: latest recorded real Bitcoin purchase=%s; aligning the next purchase to this execution time.",
+                     last_buy.astimezone(ZoneInfo(settings['timezone'])).isoformat(timespec='seconds'))
+        else:
+            LOG.info("Startup history: no recorded real Bitcoin purchase found; using saved execution time if available.")
         update_dashboard_schedule(None,'Calculating purchase schedule')
+    LOG.info('Startup: waiting %ss before checking purchase history and calculating the schedule.',
+             settings['first_buy_delay_seconds'])
     update_dashboard_schedule(None,'Waiting for startup delay')
     return Worker(lambda:run_once(api,settings,interval),manual_withdrawal_service(api,settings),
                   startup,interval,settings['first_buy_delay_seconds'],

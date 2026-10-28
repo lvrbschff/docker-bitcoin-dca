@@ -165,6 +165,33 @@ class ReviewTests(unittest.TestCase):
         self.assertGreater(datetime.fromisoformat(state['schedule']['dueAt']),now)
         api.buy_btc.assert_not_called()
 
+    def test_restart_logs_purchase_anchor_elapsed_due_and_wait_once(self):
+        now=datetime(2026,10,28,12,tzinfo=timezone.utc)
+        last=now-timedelta(hours=1)
+        settings={**self.settings,'startup_last_buy_at':last,'startup_schedule_log_pending':True}
+        state={};api=self.cycle_api()
+        with patch.object(bot,'read_state',return_value=state),patch.object(bot,'save_state'),patch.object(bot,'update_dashboard_snapshot'),patch.object(bot,'update_dashboard_schedule'),patch.object(bot,'local_now',return_value=now):
+            with self.assertLogs(bot.LOG,level='INFO') as logs:
+                bot.run_once(api,settings,300)
+                bot.run_once(api,settings,300)
+        lines=[line for line in logs.output if 'Restart alignment:' in line]
+        self.assertEqual(len(lines),1)
+        self.assertIn('last purchase=2026-10-28T12:00:00+01:00',lines[0])
+        self.assertIn('elapsed since purchase=3600s',lines[0])
+        self.assertIn('calculated purchase interval=',lines[0])
+        self.assertIn('next purchase=',lines[0]);self.assertIn('remaining wait=',lines[0])
+        api.buy_btc.assert_not_called()
+
+    def test_startup_logs_history_and_delay(self):
+        last=datetime(2026,10,28,11,tzinfo=timezone.utc)
+        with patch.object(bot,'latest_recorded_buy_time',return_value=last),patch.object(bot,'update_dashboard_schedule'):
+            with self.assertLogs(bot.LOG,level='INFO') as logs:
+                account=bot.make_worker(self.cycle_api(),self.settings,300)
+                account.startup()
+        self.assertTrue(any('Startup: waiting 0s' in line for line in logs.output))
+        self.assertTrue(any('latest recorded real Bitcoin purchase=2026-10-28T12:00:00+01:00' in line for line in logs.output))
+        self.assertTrue(self.settings['startup_schedule_log_pending'])
+
     def test_worker_enqueues_without_waiting_for_slow_account_cycle(self):
         entered=threading.Event();release=threading.Event();finished=threading.Event()
         def cycle():entered.set();release.wait(2);return 100
