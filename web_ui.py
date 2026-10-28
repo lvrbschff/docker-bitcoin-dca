@@ -64,18 +64,18 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
  th,td{padding:10px 8px;font-size:13px}.bottom-actions button{width:100%;white-space:normal}
 }
 @media(max-width:360px){.grid{grid-template-columns:minmax(0,1fr)}.time-card{grid-column:auto}}
+.purchase-schedule{margin-top:24px;padding-top:20px;border-top:1px solid #354564}
+.purchase-schedule h3{font-size:14px;color:var(--accent);margin:0 0 12px;font-weight:600}
+.schedule-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.schedule-grid .card{border-color:#354b70;background:#111f36}
+.report-section{margin-top:38px;padding-top:28px;border-top:1px solid #354564;min-width:0}
+.report-heading{margin-bottom:18px}.report-heading h2{font-size:21px;margin:0 0 5px}
+.report-heading .sub{font-size:14px}.report-controls{border-color:#354b70;background:linear-gradient(145deg,#17243b,#111a2d)}
+@media(max-width:600px){.schedule-grid{grid-template-columns:minmax(0,1fr)}.purchase-schedule{margin-top:20px;padding-top:17px}.report-section{margin-top:28px;padding-top:22px}.report-heading h2{font-size:19px}}
 </style>
 </head>
 <body><main>
 <header class="top"><div><div class="eyebrow" id="exchangeName">Exchange</div><h1>DCA Crypto Bot</h1><p class="sub">Portfolio overview and activity analysis, with optional Parqet CSV export</p></div><div class="top-actions"><div class="badge">Local access only</div><form method="post" action="/logout"><button class="secondary" type="submit">Log out</button></form><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
-<section class="panel">
-<div class="controls">
-<div class="field"><label for="interval">Withdrawal interval</label><select id="interval"></select></div>
-<div class="field"><label for="start">From</label><input id="start" type="datetime-local"></div>
-<div class="field"><label for="end">To</label><input id="end" type="datetime-local"></div>
-<button id="refresh">Load report</button>
-</div><div id="error" class="error hidden"></div><div class="notice">Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The Parqet CSV consolidates the period into one purchase: all real purchase costs and trading fees in EUR, and net BTC received at withdrawals after network fees. The period must contain purchases and a bot-recorded withdrawal. Dry-run purchases are shown separately and excluded from the CSV. Delete removes a purchase from local history only; it cannot reverse an exchange order.</div>
-</section>
 <section class="panel"><h2>Bot-tracked portfolio</h2><div class="grid">
 <div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
 <div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
@@ -83,19 +83,30 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 
 </div></section>
 <section class="panel">
-<h2>Bot settings</h2>
+<h2>Bot configuration</h2>
 <div class="grid">
 <div class="card"><label>Exchange</label><div class="value" id="settingExchange">—</div></div>
-<div class="card"><label>Cryptocurrency (BASE_ASSET)</label><div class="value" id="baseAsset">—</div></div>
-<div class="card"><label>Quote currency (QUOTE_CURRENCY)</label><div class="value" id="settingQuoteCurrency">—</div></div>
-<div class="card"><label>Trading mode (LIVE_TRADING)</label><div class="value" id="tradingMode">—</div></div>
-<div class="card"><label>Purchase amount (BUY_AMOUNT)</label><div class="value" id="buyAmount">—</div></div>
-<div class="card"><label>Deposit day (DEPOSIT_DAY)</label><div class="value" id="depositDay">—</div></div>
-<div class="card"><label>Automatic withdrawals (WITHDRAWALS_ENABLED)</label><div class="value" id="withdrawEnabled">—</div></div>
-<div class="card"><label>Withdrawal threshold (WITHDRAW_THRESHOLD_QUOTE)</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured environment variable</div></div>
-<div class="card time-card"><label>Next purchase (estimated)</label><div class="value time-value" id="nextPurchaseAt">—</div><div class="small" id="nextPurchaseStatus">Waiting for the bot schedule</div></div>
+<div class="card"><label>Cryptocurrency</label><div class="value" id="baseAsset">—</div></div>
+<div class="card"><label>Quote currency</label><div class="value" id="settingQuoteCurrency">—</div></div>
+<div class="card"><label>Trading mode</label><div class="value" id="tradingMode">—</div></div>
+<div class="card"><label>Purchase amount</label><div class="value" id="buyAmount">—</div></div>
+<div class="card"><label>Deposit day</label><div class="value" id="depositDay">—</div></div>
+<div class="card"><label>Automatic withdrawals</label><div class="value" id="withdrawEnabled">—</div></div>
+<div class="card"><label>Withdrawal threshold</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured threshold</div></div>
+</div><div class="purchase-schedule" aria-labelledby="scheduleHeading"><h3 id="scheduleHeading">Purchase schedule</h3><div class="grid schedule-grid">
+<div class="card time-card"><label>Next purchase</label><div class="value time-value" id="nextPurchaseAt">—</div><div class="small" id="nextPurchaseStatus">Waiting for the bot schedule</div></div>
 <div class="card time-card"><label>Time until next purchase</label><div class="value countdown-value" id="nextPurchaseCountdown">—</div><div class="small">Updates every second</div></div>
-</div><div class="notice">Fiat values are converted to the selected display currency. The current BTC price is fetched from Kraken’s public BTC-to-fiat pages when the report loads. Parqet CSV exports retain the currency in which each transaction was recorded.</div>
+</div></div><div class="notice">Fiat values are converted to the selected display currency. The current BTC price is fetched from Kraken’s public BTC-to-fiat pages when the report loads. Parqet CSV exports use EUR.</div>
+</section>
+<section class="report-section" aria-labelledby="reportHeading">
+<header class="report-heading"><h2 id="reportHeading">Period analysis</h2><p class="sub">Choose a date range to review activity and prepare a Parqet export.</p></header>
+<section class="panel report-controls">
+<div class="controls">
+<div class="field"><label for="interval">Withdrawal interval</label><select id="interval"></select></div>
+<div class="field"><label for="start">From</label><input id="start" type="datetime-local"></div>
+<div class="field"><label for="end">To</label><input id="end" type="datetime-local"></div>
+<button id="refresh">Load report</button>
+</div><div id="error" class="error hidden"></div><div class="notice">Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The Parqet CSV consolidates the period into one purchase: all real purchase costs and trading fees in EUR, and net BTC received at withdrawals after network fees. The period must contain purchases and a bot-recorded withdrawal. Dry-run purchases are shown separately and excluded from the CSV. Delete removes a purchase from local history only; it cannot reverse an exchange order.</div>
 </section>
 <section class="panel"><h2>Selected period summary</h2><div class="grid period-summary-grid">
 <div class="card"><label>BTC purchases</label><div class="value" id="buyCount">—</div><div class="small" id="buyBtc"></div></div>
@@ -111,6 +122,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 </div></section>
 <section class="panel"><div class="activity-heading"><h2>Activity</h2><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>10</option><option selected>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th><th>Action</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><button class="secondary" id="previousPage">Previous</button><span id="pageInfo" class="notice"></span><button class="secondary" id="nextPage">Next</button></div></section>
 <div class="bottom-actions"><button class="secondary" id="download">Download Parqet CSV</button></div>
+</section>
 </main>
 <script>
 const $=id=>document.getElementById(id);
@@ -219,7 +231,7 @@ async function loadAnalytics(){
  $("settingExchange").textContent=ex;$("baseAsset").textContent=d.configuration.baseAsset;$("settingQuoteCurrency").textContent=quote;$("tradingMode").textContent=d.configuration.liveTrading?"Live":"Dry run";
  $("buyAmount").textContent=Number(d.configuration.buyAmount)===0?"Exchange minimum":btc(d.configuration.buyAmount);
  $("depositDay").textContent=String(d.configuration.depositDay);$("withdrawEnabled").textContent=d.configuration.withdrawalsEnabled?"Enabled":"Disabled";
- $("threshold").textContent=money(Number(d.configuration.withdrawalThreshold)*fxRate,displayCurrency);$("thresholdNote").textContent="Environment variable value in "+quote+", shown in "+displayCurrency;
+ $("threshold").textContent=money(Number(d.configuration.withdrawalThreshold)*fxRate,displayCurrency);$("thresholdNote").textContent="Threshold in "+quote+", shown in "+displayCurrency;
  $("buyCount").textContent=d.summary.buyCount;$("buyBtc").textContent=btc(d.summary.boughtBtc);
  $("buyVolume").textContent=money(Number(d.summary.buyVolume)*fxRate,displayCurrency);$("avgPrice").textContent="Average: "+money(Number(d.summary.averagePrice)*fxRate,displayCurrency)+"/BTC";
  $("tradeFees").textContent=money(Number(d.summary.tradeFees)*fxRate,displayCurrency);$("withdrawBtc").textContent=btc(d.summary.withdrawnBtc);$("withdrawCount").textContent=d.summary.withdrawalCount+" withdrawals";
