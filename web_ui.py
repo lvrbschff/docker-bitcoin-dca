@@ -78,7 +78,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 </style>
 </head>
 <body><main>
-<header class="top"><div><div class="eyebrow" id="exchangeName">Exchange</div><h1>DCA Crypto Bot</h1><p class="sub">Portfolio overview and activity analysis, with optional Parqet CSV export</p></div><div class="top-actions"><form method="post" action="/logout"><button class="secondary" type="submit">Log out</button></form><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
+<header class="top"><div><div class="eyebrow" id="exchangeName">Exchange</div><h1>DCA Crypto Bot</h1><p class="sub">Portfolio overview, bot configuration and activity analysis, with optional Parqet CSV export</p></div><div class="top-actions"><form method="post" action="/logout"><button class="secondary" type="submit">Log out</button></form><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
 <section class="panel"><h2>Bot-tracked portfolio <a class="footnote-ref" href="#currency-note" aria-label="Read note 1 about display currency and prices"><sup>1</sup></a></h2><div class="grid">
 <div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
 <div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
