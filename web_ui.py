@@ -78,7 +78,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 </style>
 </head>
 <body><main>
-<header class="top"><div><div class="eyebrow" id="exchangeName">Exchange</div><h1>DCA Crypto Bot</h1><p class="sub">Portfolio overview, bot configuration and activity analysis, with optional Parqet CSV export</p></div><div class="top-actions"><form method="post" action="/logout"><button class="secondary" type="submit">Log out</button></form><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
+<header class="top"><div><h1>DCA Crypto Bot</h1><p class="sub">Portfolio overview, bot configuration and activity analysis, with optional Parqet CSV export</p></div><div class="top-actions"><form method="post" action="/logout"><button class="secondary" type="submit">Log out</button></form><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
 <section class="panel"><h2>Bot-tracked portfolio <a class="footnote-ref" href="#currency-note" aria-label="Read note 1 about display currency and prices"><sup>1</sup></a></h2><div class="grid">
 <div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
 <div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
@@ -218,7 +218,7 @@ async function loadAnalytics(){
  try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end);const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load the report.");quote=d.quote;
  if(!displayCurrency){const saved=localStorage.getItem("bitcoinDcaDisplayCurrency");displayCurrency=["EUR","USD"].includes(saved)?saved:(["EUR","USD"].includes(quote)?quote:"EUR")}
  $("displayCurrency").value=displayCurrency;
- const ex=d.exchange==="KRAKEN"?"Kraken":d.exchange==="BITVAVO"?"Bitvavo":d.exchange;$("exchangeName").textContent=ex;document.title=ex+" DCA · Crypto Bot";
+ const ex=d.exchange==="KRAKEN"?"Kraken":d.exchange==="BITVAVO"?"Bitvavo":d.exchange;document.title=ex+" DCA · Crypto Bot";
  let livePrice=Number((d.snapshot||{}).price||0);
  try{
   const priceResponse=await fetch("/api/market-price?currency="+displayCurrency);const market=await priceResponse.json();if(!priceResponse.ok)throw new Error(market.error||"Could not load current BTC price.");
