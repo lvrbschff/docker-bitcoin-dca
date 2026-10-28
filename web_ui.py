@@ -66,6 +66,8 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 .date-point{display:flex;flex-wrap:wrap;gap:0 .35em}.date-point span{white-space:nowrap}
 .countdown-value{font-size:clamp(16px,1.6vw,20px);white-space:nowrap;letter-spacing:0}
 .tablewrap{width:100%;max-width:100%;min-width:0;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+#activities td{padding:5px 10px}#activities button{padding:3px 9px;line-height:1.4;font-size:13px;border-radius:7px}
+.page-jump{display:flex;align-items:center;gap:8px;margin:0;font-size:12px;color:var(--muted)}.page-jump input{width:76px;padding:7px 8px}.page-jump button{flex:none}
 .pagination{flex-wrap:wrap}.pagination .notice{flex:1;min-width:100px}
 @media(max-width:1100px){.period-summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.controls{grid-template-columns:repeat(3,minmax(0,1fr))}.controls>button{grid-column:1/-1}}
 @media(max-width:850px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.top{align-items:flex-start}.top-actions .field{min-width:150px}}
@@ -83,6 +85,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
  .activity-heading h2{flex-basis:100%}.page-size{width:100%;justify-content:space-between}
  .page-size select{min-width:90px}.pagination{gap:10px}.pagination button{flex:1}
  .pagination .notice{order:3;flex-basis:100%;font-size:12px}
+ .page-jump{order:4;flex-basis:100%;justify-content:center}.page-jump button{flex:none}
  th,td{padding:10px 8px;font-size:13px}.bottom-actions button{width:100%;white-space:normal}
 }
 @media(max-width:360px){.grid{grid-template-columns:minmax(0,1fr)}.time-card{grid-column:auto}}
@@ -146,7 +149,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="card time-card"><label>Date range</label><div class="value time-value" id="periodLabel">—</div></div>
 <div class="card"><label>Last updated</label><div class="value" id="updated">—</div></div>
 </div></section>
-<section class="panel"><div class="activity-heading"><h2>Activity</h2><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>10</option><option selected>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th><th>Action</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><button class="secondary" id="previousPage">Previous</button><span id="pageInfo" class="notice"></span><button class="secondary" id="nextPage">Next</button></div></section>
+<section class="panel"><div class="activity-heading"><h2>Activity</h2><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th><th>Action</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><button class="secondary" id="previousPage">Previous</button><span id="pageInfo" class="notice"></span><button class="secondary" id="nextPage">Next</button><form class="page-jump" id="pageJump" aria-label="Jump to activity page"><label for="pageNumber">Go to page</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><button class="secondary" id="goToPage" type="submit">Go</button></form></div></section>
 <div class="bottom-actions"><button class="secondary" id="download" aria-describedby="exportMessage">Download Parqet CSV</button></div>
 <p id="exportMessage" class="export-feedback hidden" role="alert"></p>
 </section>
@@ -237,10 +240,17 @@ function renderActivities(){
  if(!total){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=7;td.textContent="No BTC activity in this period.";td.className="notice";tr.appendChild(td);body.appendChild(tr)}
  $("pageInfo").textContent=total?("Showing "+(start+1)+"–"+end+" of "+total+" · Page "+currentPage+" of "+totalPages):"No entries";
  $("previousPage").disabled=currentPage<=1;$("nextPage").disabled=currentPage>=totalPages;
+ $("pageNumber").value=currentPage;$("pageNumber").max=totalPages;
+ $("pageNumber").disabled=!total;$("goToPage").disabled=!total;
 }
 $("pageSize").addEventListener("change",()=>{currentPage=1;loadAnalytics()});
 $("previousPage").addEventListener("click",()=>{if(currentPage>1){currentPage--;loadAnalytics()}});
 $("nextPage").addEventListener("click",()=>{currentPage++;loadAnalytics()});
+$("pageJump").addEventListener("submit",event=>{
+ event.preventDefault();const page=Number($("pageNumber").value);
+ if(!activityTotal||!Number.isInteger(page)||page<1||page>activityPages)return;
+ if(page!==currentPage){currentPage=page;loadAnalytics()}
+});
 $("displayCurrency").addEventListener("change",()=>{displayCurrency=$("displayCurrency").value;localStorage.setItem("bitcoinDcaDisplayCurrency",displayCurrency);loadAnalytics()});
 async function loadAnalytics(){
  try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end+"&page="+currentPage+"&limit="+$("pageSize").value);const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load the report.");quote=d.quote;
@@ -726,7 +736,7 @@ class Handler(BaseHTTPRequestHandler):
                     filename = "parqet_btc_" + str(start_ms) + "_" + str(end_ms) + ".csv"
                     self._send(200, parqet_csv(rows), "text/csv; charset=utf-8", filename)
                 else:
-                    page=int(query.get('page',['1'])[0]);limit=int(query.get('limit',['20'])[0])
+                    page=int(query.get('page',['1'])[0]);limit=int(query.get('limit',['10'])[0])
                     page_records,total,page,totals,balance=read_report(start_ms,end_ms,page,limit)
                     snapshot=read_dashboard_snapshot()
                     snapshot['trackedBtc']=str(balance)

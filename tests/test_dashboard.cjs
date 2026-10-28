@@ -9,7 +9,7 @@ class Element{
  appendChild(e){this.children.push(e)} append(...e){this.children.push(...e)} replaceChildren(...e){this.children=e}
  set innerHTML(v){this.children=[]} addEventListener(event,handler){this.handlers[event]=handler}
 }
-const elements={},get=id=>elements[id]??=new Element();get('pageSize').value='20';
+const elements={},get=id=>elements[id]??=new Element();get('pageSize').value=html.match(/<option selected>(\d+)<\/option>/)[1];
 const records=Array.from({length:45},(_,i)=>({activityId:String(i),datetime:'2026-10-22T12:00:00Z',type:'Buy',identifier:'BTC',shares:'.001',currency:i<22?'EUR':'USD',price:i<22?'80000':'100000',amount:i<22?'80':'100',fee:i<22?'.2':'.25'}));
 const requests=[];let checks=0,eurOnly=false,priceUnavailable=false,invalidUsdRate=false;
 const response=data=>({ok:true,json:async()=>data});
@@ -20,8 +20,9 @@ const context={document:{getElementById:get,createElement:()=>new Element()},loc
  if(parsed.pathname==='/api/withdrawal/config')return response({enabled:true,destination:'fictional wallet'});
  if(parsed.pathname==='/api/market-price')return priceUnavailable?{ok:false,json:async()=>({error:'offline'})}:response({price:'80000',conversionRate:'1',conversionRates:{EUR:'1',USD:invalidUsdRate?'invalid':'0.9'},updatedAt:Date.now()/1000});
  if(parsed.pathname==='/api/analytics'){
-  const page=Math.max(1,Math.min(3,Number(parsed.searchParams.get('page'))||1));
-  return response({quote:'EUR',exchange:'KRAKEN',configuration:{liveTrading:true,buyAmount:0,depositDay:1,withdrawalsEnabled:false,withdrawalThreshold:1000},snapshot:{price:80000,balance:'.045',updatedAt:new Date().toISOString()},summary:{buyCount:45,boughtBtc:'.045',withdrawnBtc:0,withdrawalCount:0,pendingWithdrawalCount:0,netBtc:'.045'},summaryByCurrency:eurOnly?{EUR:{buyVolume:3600,tradeFees:9,withdrawalFees:0}}:{EUR:{buyVolume:1760,tradeFees:4.4,withdrawalFees:0},USD:{buyVolume:2300,tradeFees:5.75,withdrawalFees:0}},activities:records.slice((page-1)*20,page*20),pagination:{page,pageSize:20,total:45,pages:3}});
+  const limit=Number(parsed.searchParams.get('limit'))||10,pages=Math.ceil(records.length/limit);
+  const page=Math.max(1,Math.min(pages,Number(parsed.searchParams.get('page'))||1));
+  return response({quote:'EUR',exchange:'KRAKEN',configuration:{liveTrading:true,buyAmount:0,depositDay:1,withdrawalsEnabled:false,withdrawalThreshold:1000},snapshot:{price:80000,balance:'.045',updatedAt:new Date().toISOString()},summary:{buyCount:45,boughtBtc:'.045',withdrawnBtc:0,withdrawalCount:0,pendingWithdrawalCount:0,netBtc:'.045'},summaryByCurrency:eurOnly?{EUR:{buyVolume:3600,tradeFees:9,withdrawalFees:0}}:{EUR:{buyVolume:1760,tradeFees:4.4,withdrawalFees:0},USD:{buyVolume:2300,tradeFees:5.75,withdrawalFees:0}},activities:records.slice((page-1)*limit,page*limit),pagination:{page,pageSize:limit,total:45,pages}});
  }
  if(parsed.pathname==='/api/withdrawal/preview')return response({jobId:'fictional-job'});
  if(parsed.pathname==='/api/withdrawal/jobs/fictional-job')return response(++checks===1?{state:'queued'}:{state:'completed',result:{token:'single-use'}});
@@ -31,15 +32,25 @@ const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate)};
 (async()=>{
  vm.createContext(context);vm.runInContext(script,context);await settle();
  assert(get('start').value&&get('end').value,'Both dates must initialize for the selected interval');
- assert(get('pageInfo').textContent.includes('1–20 of 45'));
- assert.equal(get('activities').children.length,20);
+ assert.equal(get('pageSize').value,'10');
+ assert(html.includes('<option>5</option>'),'5 entries must be selectable');
+ assert(get('pageInfo').textContent.includes('1–10 of 45'));
+ assert.equal(get('activities').children.length,10);
  assert.equal(get('buyVolume').textContent,'€3,830.00');
- get('nextPage').handlers.click();await settle();
- assert(get('pageInfo').textContent.includes('21–40 of 45'));
+ get('pageNumber').value='3';get('pageJump').handlers.submit({preventDefault(){}});await settle();
+ assert(get('pageInfo').textContent.includes('21–30 of 45'));
  assert(get('activities').children[2].children[4].textContent.includes('90.00'),'USD rows use their own conversion rate');
- get('nextPage').handlers.click();await settle();
+ assert.equal(get('pageNumber').max,5);
+ const count=requests.length;
+ for(const value of ['0','6','1.5','invalid']){get('pageNumber').value=value;get('pageJump').handlers.submit({preventDefault(){}})}
+ await settle();assert.equal(requests.length,count,'Invalid jumps must not send requests');
+ get('pageNumber').value='5';get('pageJump').handlers.submit({preventDefault(){}});await settle();
  assert(get('pageInfo').textContent.includes('41–45 of 45'));assert.equal(get('activities').children.length,5);assert(get('nextPage').disabled);
- assert.equal(requests.filter(u=>u.startsWith('/api/analytics')).length,3,'Loading a page must not recursively reload reports');
+ get('pageSize').value='5';get('pageSize').handlers.change();await settle();
+ assert(get('pageInfo').textContent.includes('1–5 of 45'));assert.equal(get('pageNumber').value,1);assert.equal(get('pageNumber').max,9);
+ get('nextPage').handlers.click();await settle();assert(get('pageInfo').textContent.includes('6–10 of 45'));
+ get('previousPage').handlers.click();await settle();assert(get('pageInfo').textContent.includes('1–5 of 45'));
+ assert.equal(requests.filter(u=>u.startsWith('/api/analytics')).length,6,'Each navigation must load exactly once');
  const preview=await vm.runInContext("withdrawalPost('/api/withdrawal/preview',{})",context);
  assert.equal(preview.token,'single-use');assert.equal(checks,2);
  assert.equal(requests.filter(u=>u==='/api/withdrawal/preview').length,1);

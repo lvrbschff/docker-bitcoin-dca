@@ -147,8 +147,8 @@ grids=summary.find(lambda n:n.cls('grid'))
 grid(grids[0],CX,Y+55,CW,5,166)
 grid(grids[1],CX,Y+235,CW,4,148)
 Y+=423
-rect(X,Y,W,390);heading(CX,Y+34,'Activity')
-text(X+W-238,Y+33,'Entries per page',12,MUTED);rect(X+W-104,Y+12,84,36,CARD,LINE,9);text(X+W-87,Y+35,'20',13);text(X+W-41,Y+35,'⌄',13,MUTED)
+rect(X,Y,W,360);heading(CX,Y+34,'Activity')
+text(X+W-238,Y+33,'Entries per page',12,MUTED);rect(X+W-104,Y+12,84,36,CARD,LINE,9);text(X+W-87,Y+35,'10',13);text(X+W-41,Y+35,'⌄',13,MUTED)
 columns=[CX+10,CX+238,CX+410,CX+553,CX+731,CX+870,CX+986]
 for x,label in zip(columns,['DATE','TYPE','BTC','PRICE','VALUE','FEE','ACTION']):text(x,Y+78,label,11,MUTED,True)
 line(CX,Y+91,CX+CW,Y+91)
@@ -159,13 +159,14 @@ rows=[
 ['21/10/2026, 12:00:00','Buy','0.0015 BTC','€82,000.00/BTC','€123.00','€0.31','Delete'],
 ['20/10/2026, 12:00:00','Buy','0.001 BTC','€80,000.00/BTC','€80.00','€0.20','Delete']]
 for i,row in enumerate(rows):
- ry=Y+123+i*43
+ ry=Y+113+i*35
  for x,value in zip(columns,row):
-  if value=='Delete':rect(x-4,ry-21,72,31,CARD,LINE,8);text(x+7,ry,'Delete',13)
+  if value=='Delete':rect(x-4,ry-18,64,25,CARD,LINE,7);text(x+5,ry,'Delete',13)
   else:text(x,ry,value,13)
  line(CX,ry+13,CX+CW,ry+13)
-button(CX,Y+332,99,'Previous');text(CX+CW/2-125,Y+360,'Showing 1–5 of 5 · Page 1 of 1',13,MUTED);button(CX+CW-74,Y+332,74,'Next')
-Y+=408
+button(CX,Y+292,99,'Previous');text(CX+180,Y+320,'Showing 1–5 of 5 · Page 1 of 1',13,MUTED);button(CX+CW-340,Y+292,74,'Next')
+text(CX+CW-245,Y+320,'Go to page',12,MUTED);rect(CX+CW-165,Y+296,76,36,CARD,LINE,10);text(CX+CW-150,Y+320,'1',13);button(CX+CW-70,Y+292,70,'Go')
+Y+=378
 button(X+W-209,Y,209,'Download Parqet CSV')
 Y+=75
 line(X,Y,X+W,Y);heading(X,Y+34,'Notes')
