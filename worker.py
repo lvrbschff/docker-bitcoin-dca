@@ -10,6 +10,7 @@ from activity import write_json_atomic
 
 LOG=logging.getLogger('bitcoin-dca.worker')
 HEALTH_PATH=Path('/data/worker-health.json')
+HEARTBEAT_WRITE_INTERVAL_SECONDS=60
 
 
 class Worker:
@@ -29,7 +30,7 @@ class Worker:
         self.thread=None
         self.beat=time.monotonic()
         self.running=False
-        self._last_health=0
+        self._last_health=None
 
     def submit(self, action, session, token=None):
         job_id=str(uuid.uuid4())
@@ -57,7 +58,7 @@ class Worker:
 
     def heartbeat(self):
         self.beat=time.monotonic()
-        if self.beat-self._last_health>=5:
+        if self._last_health is None or self.beat-self._last_health>=HEARTBEAT_WRITE_INTERVAL_SECONDS:
             write_json_atomic(HEALTH_PATH,{'heartbeat':time.time(),'running':self.running,'lastError':self.last_error,'lastSuccessfulCheck':self.last_success})
             self._last_health=self.beat
 
