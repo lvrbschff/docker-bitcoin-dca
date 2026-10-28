@@ -105,27 +105,6 @@ Keep `LIVE_TRADING` set to `false` for the initial startup. The common settings 
 | `WEB_UI_ENABLED` | `true` | Enables the local portfolio dashboard. |
 | `LOG_LEVEL` | `INFO` | Python log level, such as `INFO`, `WARNING`, or `DEBUG`. |
 
-### Bitvavo settings
-
-These variables are used only when `EXCHANGE=BITVAVO`. Put the API key and secret in .env. Set the withdrawal address and network in .env for automatic or manual withdrawals.
-
-| Variable | Required when | Description |
-| --- | --- | --- |
-| `BITVAVO_API_KEY` | `EXCHANGE=BITVAVO` | Bitvavo API key in .env. |
-| `BITVAVO_API_SECRET` | `EXCHANGE=BITVAVO` | Bitvavo API secret in .env. |
-| `WITHDRAW_ADDRESS` | Automatic or manual withdrawals on Bitvavo | Verified Bitvavo Bitcoin destination address in .env. |
-| `WITHDRAW_NETWORK` | Automatic or manual withdrawals on Bitvavo | Bitvavo withdrawal network in .env. |
-
-### Kraken settings
-
-These variables are used only when `EXCHANGE=KRAKEN`. Put the API key and secret in .env. The withdrawal method name is required for automatic or manual withdrawals.
-
-| Variable | Required when | Description |
-| --- | --- | --- |
-| `KRAKEN_API_KEY` | `EXCHANGE=KRAKEN` | Kraken API key in .env. |
-| `KRAKEN_API_SECRET` | `EXCHANGE=KRAKEN` | Kraken API secret in .env. |
-| `KRAKEN_WITHDRAW_KEY` | Automatic or manual withdrawals on Kraken | Name of the saved Bitcoin withdrawal method in Kraken; set it in .env. |
-
 ### Web UI access
 
 | .env variable | Default | Description |
