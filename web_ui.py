@@ -128,10 +128,10 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 </div>
 </section>
 <section class="report-section" aria-labelledby="reportHeading">
-<header class="report-heading"><h2 id="reportHeading">Period analysis <sup class="footnote-ref" aria-describedby="report-note">3</sup></h2><p class="sub">Choose a date range to review activity and prepare a Parqet export.</p></header>
+<header class="report-heading"><h2 id="reportHeading">Period analysis <sup class="footnote-ref" aria-describedby="report-note">3</sup></h2><p class="sub">Choose a custom date range or an interval between withdrawals to review activity and prepare a Parqet export.</p></header>
 <section class="panel report-controls">
 <div class="controls">
-<div class="field"><label for="interval">Interval (custom or between withdrawals)</label><select id="interval"></select></div>
+<div class="field"><label for="interval">Interval</label><select id="interval"></select></div>
 <div class="field"><label for="start">From</label><input id="start" type="datetime-local"></div>
 <div class="field"><label for="end">To</label><input id="end" type="datetime-local"></div>
 <button id="refresh">Load report</button>
