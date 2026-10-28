@@ -4,9 +4,9 @@ A Docker-based DCA bot exclusively for buying and withdrawing Bitcoin (BTC) on B
 
 ### Example web UI (fictional data)
 
-The image below is an illustrative screenshot with fictional values; it does not show real balances or activity.
+The illustration below shows the current web UI layout, including manual withdrawals, purchase scheduling, period analysis and activity. All values and the withdrawal method are fictional; it does not show a real account.
 
-![Bitcoin DCA web UI example using fictional data](docs/web-ui-example-current.svg)
+![Current Bitcoin DCA Bot web UI illustration using fictional data](docs/web-ui-example-current.svg)
 
 ## What you need
 
