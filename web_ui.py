@@ -92,7 +92,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 .report-heading{margin-bottom:18px}.report-heading h2{font-size:21px;margin:0 0 5px}
 .report-heading .sub{font-size:14px}.report-controls{border-color:#354b70;background:linear-gradient(145deg,#17243b,#111a2d)}
 @media(max-width:600px){.schedule-grid{grid-template-columns:minmax(0,1fr)}.report-section{margin-top:28px;padding-top:22px}.report-heading h2{font-size:19px}}
-.footnote-ref{color:var(--accent);margin-left:3px}
+sup{color:#fff}.footnote-ref{margin-left:3px}
 .dashboard-footnotes{margin-top:30px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
 .dashboard-footnotes h2{font-size:14px;margin:0 0 12px}.dashboard-footnotes ol{margin:0;padding-left:20px}.dashboard-footnotes li{padding-left:4px;margin-bottom:14px;scroll-margin-top:20px}.dashboard-footnotes strong{color:var(--text);font-weight:600}.dashboard-footnotes p{margin:4px 0 0}
 .export-feedback{margin:10px 0 0;text-align:right;color:var(--red);font-size:13px;line-height:1.6;overflow-wrap:anywhere}
@@ -251,7 +251,9 @@ async function loadAnalytics(){
  const currencies=Object.keys(d.summaryByCurrency||{});
  try{
   const priceResponse=await fetch("/api/market-price?currency="+displayCurrency+"&currencies="+encodeURIComponent(currencies.join(",")));const market=await priceResponse.json();if(!priceResponse.ok)throw new Error(market.error||"Could not load current BTC price.");
-  fxRate=Number(market.conversionRate);livePrice=Number(market.price);currencyRates=market.conversionRates||{[quote]:fxRate};
+  fxRate=Number(market.conversionRate);livePrice=Number(market.price);currencyRates=Object.fromEntries(Object.entries(market.conversionRates||{[quote]:fxRate})
+   .map(([currency,rate])=>[currency,Number(rate)]).filter(([,rate])=>Number.isFinite(rate)&&rate>0));
+  currencyRates[displayCurrency]=1;
   $("spotUpdated").textContent=(market.stale?"Cached Kraken price · fetched ":"Kraken public price page · fetched ")+new Date(Number(market.updatedAt)*1000).toLocaleTimeString("en-GB");
  }catch(priceError){
   displayCurrency=quote;fxRate=1;$("displayCurrency").value=quote;
@@ -265,7 +267,7 @@ async function loadAnalytics(){
   if(!Number.isFinite(currencyRates[currency])){moneyAvailable=false;continue}
   for(const key of Object.keys(converted))converted[key]+=Number(values[key]||0)*currencyRates[currency];
  }
- if(!moneyAvailable)showError("Historical totals contain multiple currencies. Price conversion is unavailable; monetary totals are hidden.");
+ if(!moneyAvailable)showError("A required currency conversion is unavailable; monetary totals are hidden.");
  const currentPortfolioValue=Number(d.snapshot.balance)*livePrice;
  $("balanceValue").textContent=livePrice>0?money(currentPortfolioValue,displayCurrency):"—";
  if(livePrice>0&&moneyAvailable){

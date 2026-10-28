@@ -76,7 +76,7 @@ def button(x,y,w,label,primary=False):
  width=draw.textlength(label,font=font(15,primary));text(x+(w-width)/2,y+28,label,15,'#081122' if primary else TEXT,primary)
 def heading(x,y,label,reference=None):
  text(x,y,label,17,TEXT,True)
- if reference is not None:text(x+draw.textlength(label,font=font(17,True))+5,y-5,str(reference),11,ACCENT,True)
+ if reference is not None:text(x+draw.textlength(label,font=font(17,True))+5,y-5,str(reference),11,'#fff',True)
 
 values={'balance':'0.001 BTC','spot':'€84,000.00/BTC','spotUpdated':'Kraken public price page · fetched 12:00:00',
 'balanceValue':'€84.00','settingExchange':'Kraken','settingQuoteCurrency':'EUR','tradingMode':'Live',
@@ -117,7 +117,7 @@ X=152;W=1136;CX=X+20;CW=W-40
 text(X,112,'Bitcoin DCA Bot',30,TEXT,True)
 text(X,141,'Portfolio overview, bot configuration and activity analysis, with optional Parqet CSV export',15,MUTED)
 button(X+W-93,36,93,'Log out')
-button(X+W-238,91,238,'Withdraw BTC manually',False);text(X+W-20,106,'4',11,TEXT)
+button(X+W-238,91,238,'Withdraw BTC manually',False);text(X+W-20,106,'4',11,'#fff')
 text(X+W-170,164,'Display currency',12,MUTED)
 rect(X+W-170,174,170,45,CARD,LINE,10);text(X+W-157,202,'Euro (EUR)',15);text(X+W-21,202,'⌄',15,MUTED)
 
@@ -131,7 +131,7 @@ Y+=316
 rect(X,Y,W,180);heading(CX,Y+34,'Purchase schedule',2)
 grid(schedule.find(lambda n:n.cls('grid'))[0],CX,Y+55,CW,2,102)
 Y+=218
-line(X,Y,X+W,Y);text(X,Y+48,'Period analysis',21,TEXT,True);text(X+draw.textlength('Period analysis',font=font(21,True))+5,Y+39,'3',11,ACCENT,True)
+line(X,Y,X+W,Y);text(X,Y+48,'Period analysis',21,TEXT,True);text(X+draw.textlength('Period analysis',font=font(21,True))+5,Y+39,'3',11,'#fff',True)
 text(X,Y+75,'Choose a date range to review activity and prepare a Parqet export.',14,MUTED)
 Y+=100
 rect(X,Y,W,119)

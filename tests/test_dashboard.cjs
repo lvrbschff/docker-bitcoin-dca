@@ -11,17 +11,17 @@ class Element{
 }
 const elements={},get=id=>elements[id]??=new Element();get('pageSize').value='20';
 const records=Array.from({length:45},(_,i)=>({activityId:String(i),datetime:'2026-10-22T12:00:00Z',type:'Buy',identifier:'BTC',shares:'.001',currency:i<22?'EUR':'USD',price:i<22?'80000':'100000',amount:i<22?'80':'100',fee:i<22?'.2':'.25'}));
-const requests=[];let checks=0;
+const requests=[];let checks=0,eurOnly=false,priceUnavailable=false,invalidUsdRate=false;
 const response=data=>({ok:true,json:async()=>data});
 const context={document:{getElementById:get,createElement:()=>new Element()},localStorage:{getItem:()=>null,setItem(){}},Intl,Date,URL,console,alert(){},confirm:()=>false,setInterval(){},setTimeout(fn){queueMicrotask(fn)},window:{location:{reload(){throw Error('Unexpected reload')}}},fetch:async(url,options)=>{
  requests.push(url);const parsed=new URL(url,'http://example.test');
  if(parsed.pathname==='/api/schedule')return response({nextPurchaseAt:new Date(Date.now()+3600000).toISOString(),serverTime:new Date().toISOString(),timezone:'Europe/Berlin'});
  if(parsed.pathname==='/api/withdrawals')return response([{timestamp:Date.parse('2026-10-20T12:00:00Z')},{timestamp:Date.parse('2026-10-23T12:00:00Z')}]);
  if(parsed.pathname==='/api/withdrawal/config')return response({enabled:true,destination:'fictional wallet'});
- if(parsed.pathname==='/api/market-price')return response({price:'80000',conversionRate:'1',conversionRates:{EUR:1,USD:.9},updatedAt:Date.now()/1000});
+ if(parsed.pathname==='/api/market-price')return priceUnavailable?{ok:false,json:async()=>({error:'offline'})}:response({price:'80000',conversionRate:'1',conversionRates:{EUR:'1',USD:invalidUsdRate?'invalid':'0.9'},updatedAt:Date.now()/1000});
  if(parsed.pathname==='/api/analytics'){
   const page=Math.max(1,Math.min(3,Number(parsed.searchParams.get('page'))||1));
-  return response({quote:'EUR',exchange:'KRAKEN',configuration:{liveTrading:true,buyAmount:0,depositDay:1,withdrawalsEnabled:false,withdrawalThreshold:1000},snapshot:{price:80000,balance:'.045',updatedAt:new Date().toISOString()},summary:{buyCount:45,boughtBtc:'.045',withdrawnBtc:0,withdrawalCount:0,pendingWithdrawalCount:0,netBtc:'.045'},summaryByCurrency:{EUR:{buyVolume:1760,tradeFees:4.4,withdrawalFees:0},USD:{buyVolume:2300,tradeFees:5.75,withdrawalFees:0}},activities:records.slice((page-1)*20,page*20),pagination:{page,pageSize:20,total:45,pages:3}});
+  return response({quote:'EUR',exchange:'KRAKEN',configuration:{liveTrading:true,buyAmount:0,depositDay:1,withdrawalsEnabled:false,withdrawalThreshold:1000},snapshot:{price:80000,balance:'.045',updatedAt:new Date().toISOString()},summary:{buyCount:45,boughtBtc:'.045',withdrawnBtc:0,withdrawalCount:0,pendingWithdrawalCount:0,netBtc:'.045'},summaryByCurrency:eurOnly?{EUR:{buyVolume:3600,tradeFees:9,withdrawalFees:0}}:{EUR:{buyVolume:1760,tradeFees:4.4,withdrawalFees:0},USD:{buyVolume:2300,tradeFees:5.75,withdrawalFees:0}},activities:records.slice((page-1)*20,page*20),pagination:{page,pageSize:20,total:45,pages:3}});
  }
  if(parsed.pathname==='/api/withdrawal/preview')return response({jobId:'fictional-job'});
  if(parsed.pathname==='/api/withdrawal/jobs/fictional-job')return response(++checks===1?{state:'queued'}:{state:'completed',result:{token:'single-use'}});
@@ -43,5 +43,15 @@ const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate)};
  const preview=await vm.runInContext("withdrawalPost('/api/withdrawal/preview',{})",context);
  assert.equal(preview.token,'single-use');assert.equal(checks,2);
  assert.equal(requests.filter(u=>u==='/api/withdrawal/preview').length,1);
+ eurOnly=true;await vm.runInContext('loadAnalytics()',context);
+ assert.equal(get('buyVolume').textContent,'€3,600.00','EUR string rate must retain monetary totals');
+ assert.equal(get('error').textContent,'','EUR-only history must not report mixed currencies');
+ priceUnavailable=true;await vm.runInContext('loadAnalytics()',context);
+ assert.equal(get('buyVolume').textContent,'€3,600.00','EUR totals need no external conversion rate');
+ assert(!get('error').textContent.includes('multiple currencies'));
+ eurOnly=false;priceUnavailable=false;invalidUsdRate=true;await vm.runInContext('loadAnalytics()',context);
+ assert.equal(get('buyVolume').textContent,'—','Invalid foreign rates must not produce incorrect totals');
+ assert.equal(get('error').textContent,'A required currency conversion is unavailable; monetary totals are hidden.');
+ assert(html.includes('sup{color:#fff}'),'All superscript references must be white');
  console.log('Dashboard regressions passed: interval dates, server pages, mixed-currency rows/totals and queued preview polling');
 })().catch(e=>{console.error(e);process.exit(1)});
