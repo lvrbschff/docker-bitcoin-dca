@@ -31,7 +31,7 @@ HTML = """<!doctype html>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#26324a;--text:#edf2ff;--muted:#9ba9c4;--accent:#8bafff;--green:#61d7ae;--red:#ff8f9e}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#1b2a49 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
 main{max-width:1180px;margin:0 auto;padding:36px 22px 64px}.top{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:26px}.eyebrow{color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}h1{font-size:30px;margin:4px 0}.sub{color:var(--muted);margin:0}
-.bottom-actions{display:flex;justify-content:flex-end;margin-top:18px}.badge{border:1px solid var(--line);border-radius:999px;padding:8px 12px;color:var(--muted);font-size:12px}.top-actions{display:flex;flex-direction:column;align-items:flex-end;gap:10px}.top-actions form{margin:0}.withdraw-action{display:flex;align-items:center;gap:4px}.top-actions #withdrawMessage{max-width:280px;margin:0;text-align:right;font-size:13px}.top-actions #withdrawMessage:empty{display:none}.top-actions .field{min-width:170px}.top-actions .field label{margin-bottom:5px}
+.bottom-actions{display:flex;justify-content:flex-end;margin-top:18px}.badge{border:1px solid var(--line);border-radius:999px;padding:8px 12px;color:var(--muted);font-size:12px}.top-actions{display:flex;flex-direction:column;align-items:flex-end;gap:10px}.top-actions form{margin:0}.withdraw-action{display:flex;align-items:center;gap:4px}#withdrawMessage:empty{display:none}.top-actions .field{min-width:170px}.top-actions .field label{margin-bottom:5px}
 .panel{background:linear-gradient(145deg,rgba(21,31,52,.96),rgba(15,22,39,.96));border:1px solid var(--line);border-radius:18px;padding:20px;margin:18px 0;box-shadow:0 14px 40px #0002}
 .controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:12px;align-items:end}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}select,input,button{font:inherit;color:var(--text);background:#0c1425;border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%}button{width:auto;cursor:pointer;background:var(--accent);border-color:var(--accent);color:#081122;font-weight:700}button.secondary{background:transparent;color:var(--text);border-color:var(--line)}button:hover{filter:brightness(1.08)}
 .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.period-summary-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.card{padding:17px;border:1px solid var(--line);border-radius:14px;background:#0c1425a8}.card label{display:block;color:var(--muted);font-size:12px;margin-bottom:9px}.value{font-size:22px;font-weight:700;letter-spacing:-.02em}.small{font-size:12px;color:var(--muted);margin-top:4px}
@@ -51,7 +51,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
  main{padding:22px 12px 36px}.panel{padding:15px;margin:14px 0;border-radius:14px}
  .top{flex-direction:column;gap:18px;margin-bottom:20px}h1{font-size:26px}.sub{font-size:14px}
  .top-actions{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center}
- .top-actions form,.top-actions .withdraw-action,.top-actions #withdrawMessage{grid-column:1/-1;justify-self:end}.top-actions .field{grid-column:1/-1;min-width:0}
+ .top-actions form,.top-actions .withdraw-action{grid-column:1/-1;justify-self:end}.top-actions .field{grid-column:1/-1;min-width:0}
  .controls{grid-template-columns:minmax(0,1fr)}.controls .field:first-child{grid-column:auto}
  input,select{font-size:16px}input,select,button{min-height:44px}
  .grid{gap:10px}.card{padding:13px}.card label{line-height:1.5;margin-bottom:7px}
@@ -78,8 +78,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 </style>
 </head>
 <body><main>
-<header class="top"><div><h1>Bitcoin DCA Bot</h1><p class="sub">Portfolio overview, bot configuration and activity analysis, with optional Parqet CSV export</p></div><div class="top-actions"><form method="post" action="/logout"><button class="secondary" type="submit">Log out</button></form><div class="withdraw-action"><button id="manualWithdraw" type="button">Withdraw BTC manually</button> <a class="footnote-ref" href="#withdrawal-note" aria-label="Read withdrawal configuration note"><sup>4</sup></a></div>
-<p id="withdrawMessage" class="notice" role="status"></p><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
+<header class="top"><div><h1>Bitcoin DCA Bot</h1><p class="sub">Portfolio overview, bot configuration and activity analysis, with optional Parqet CSV export</p></div><div class="top-actions"><form method="post" action="/logout"><button class="secondary" type="submit">Log out</button></form><div class="withdraw-action"><button class="secondary" id="manualWithdraw" type="button" aria-describedby="withdrawal-note">Withdraw BTC manually <sup>4</sup></button></div><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
 <section class="panel"><h2>Bot-tracked portfolio <a class="footnote-ref" href="#currency-note" aria-label="Read note 1 about display currency and prices"><sup>1</sup></a></h2><div class="grid">
 <div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
 <div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
@@ -136,7 +135,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 <li id="currency-note"><strong>Display currency and price data.</strong><p>Fiat values are converted to the selected display currency. The current BTC price is fetched from Kraken’s public BTC-to-fiat pages when the report loads. Parqet CSV exports use EUR.</p></li>
 <li id="schedule-note"><strong>Purchase schedule.</strong><p>The interval is the time until the next deposit day divided by the estimated number of purchases the current balance can cover, using the current market price and configured purchase amount or exchange minimum. Time elapsed since the last purchase is deducted to determine the next purchase time. The estimate is recalculated during bot checks; open or unconfirmed orders block further purchases.</p></li>
 <li id="report-note"><strong>Period analysis, Parqet export and local activity history.</strong><p>These notes apply to the date filters in Period analysis, the Activity table and the Download Parqet CSV button. Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The Parqet CSV consolidates the period into one purchase: all real purchase costs and trading fees in EUR, and net BTC received at withdrawals after network fees. The period must contain purchases and a bot-recorded withdrawal. Dry-run purchases are shown separately and excluded from the CSV. Delete removes a purchase from local history only; it cannot reverse an exchange order.</p></li>
-<li id="withdrawal-note"><strong>Manual BTC withdrawal.</strong><p id="withdrawalDestination">Loading withdrawal configuration…</p><p>The button withdraws the entire available BTC balance, less the exchange withdrawal fee. LIVE_TRADING must be enabled; automatic withdrawals may remain disabled and their threshold does not apply. Configure KRAKEN_WITHDRAW_KEY in .env for Kraken, or WITHDRAW_ADDRESS and WITHDRAW_NETWORK for Bitvavo. Kraken resolves the saved method to its destination address. A confirmation is required before submission. Submitted manual withdrawals appear in Activity and count toward Parqet exports like automatic withdrawals.</p></li>
+<li id="withdrawal-note"><strong>Manual BTC withdrawal.</strong><p id="withdrawalDestination">Loading withdrawal configuration…</p><p id="withdrawMessage" role="status" aria-live="polite"></p><p>The button withdraws the entire available BTC balance, less the exchange withdrawal fee. LIVE_TRADING must be enabled; automatic withdrawals may remain disabled and their threshold does not apply. Configure KRAKEN_WITHDRAW_KEY in .env for Kraken, or WITHDRAW_ADDRESS and WITHDRAW_NETWORK for Bitvavo. Kraken resolves the saved method to its destination address. A confirmation is required before submission. Submitted manual withdrawals appear in Activity and count toward Parqet exports like automatic withdrawals.</p></li>
 <li id="local-access-note"><strong>Local access only.</strong><p>With the default Docker Compose port mapping, the dashboard is accessible only from the Docker host.</p></li>
 </ol>
 </footer>
@@ -277,23 +276,31 @@ async function withdrawalPost(path, body){
  const result=await response.json();if(!response.ok)throw new Error(result.error||"Withdrawal request failed.");return result;
 }
 async function loadWithdrawalConfiguration(){
- try{const response=await fetch("/api/withdrawal/config");const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load withdrawal configuration.");
- $("withdrawalDestination").textContent=d.destination;$("manualWithdraw").disabled=!d.enabled;
- if(!d.enabled)$("withdrawMessage").textContent="Manual withdrawal requires live BTC trading and a configured destination.";
- }catch(e){$("manualWithdraw").disabled=true;$("withdrawMessage").textContent=e.message}
+ const response=await fetch("/api/withdrawal/config");const d=await response.json();
+ if(!response.ok)throw new Error(d.error||"Could not load withdrawal configuration.");
+ $("withdrawalDestination").textContent=d.destination;
+ $("withdrawMessage").textContent=d.reason||"Manual withdrawals are available. Automatic withdrawals may remain disabled.";
+ return d;
+}
+function showWithdrawalMessage(message){
+ $("withdrawMessage").textContent=message;
+ alert(message);
 }
 $("manualWithdraw").addEventListener("click",async()=>{
  const button=$("manualWithdraw");button.disabled=true;
- try{const p=await withdrawalPost("/api/withdrawal/preview",{});
+ try{
+ const configuration=await loadWithdrawalConfiguration();
+ if(!configuration.enabled){showWithdrawalMessage(configuration.reason||"Manual withdrawal is not configured. See note 4.");return}
+ const p=await withdrawalPost("/api/withdrawal/preview",{});
  const fee=p.feeBtc!==null&&p.feeBtc!==undefined?"Withdrawal fee: "+p.feeBtc+" BTC\\nNet sent: "+p.netBtc+" BTC":"Bitvavo deducts its withdrawal fee from this balance; the final fee is returned on submission.";
  if(!confirm("Confirm BTC withdrawal?\\n\\n"+p.destination+"\\nAvailable balance to withdraw: "+p.availableBtc+" BTC\\n"+fee+"\\n\\nThis transfer cannot be reversed. Submit withdrawal?"))return;
  $("withdrawMessage").textContent="Submitting withdrawal…";
- const result=await withdrawalPost("/api/withdrawal/confirm",{token:p.token});$("withdrawMessage").textContent=result.message;
+ const result=await withdrawalPost("/api/withdrawal/confirm",{token:p.token});showWithdrawalMessage(result.message);
  $("interval").value="";$("end").value=localInput(Date.now()+60000);await loadAnalytics();
- }catch(e){$("withdrawMessage").textContent=e.message}
+ }catch(e){showWithdrawalMessage(e.message)}
  finally{button.disabled=false}
 });
-loadWithdrawalConfiguration();
+loadWithdrawalConfiguration().catch(e=>{$("withdrawMessage").textContent=e.message});
 
 (async()=>{try{await loadIntervals();await loadAnalytics()}catch(e){showError(e.message)}})();
 </script></body></html>
@@ -582,8 +589,21 @@ class Handler(BaseHTTPRequestHandler):
             settings = self.settings
             kraken = settings["exchange"] == "KRAKEN"
             destination = ("Kraken saved withdrawal method: " + (settings.get("kraken_withdraw_key") or "not configured")) if kraken else ("Bitvavo address: " + (settings.get("withdraw_address") or "not configured") + "; network: " + settings.get("withdraw_network", "BTC"))
-            configured = bool(settings.get("kraken_withdraw_key")) if kraken else bool(settings.get("withdraw_address") and settings.get("withdraw_network"))
-            self._json(200, {"destination": destination, "enabled": bool(settings["live"] and configured and self.withdrawal_service)})
+            missing = []
+            if not settings["live"]:
+                missing.append("enable LIVE_TRADING=true")
+            if kraken:
+                if not settings.get("kraken_withdraw_key"):
+                    missing.append("set KRAKEN_WITHDRAW_KEY to your saved Bitcoin withdrawal method in .env")
+            else:
+                if not settings.get("withdraw_address"):
+                    missing.append("set WITHDRAW_ADDRESS in .env")
+                if not settings.get("withdraw_network"):
+                    missing.append("set WITHDRAW_NETWORK in .env")
+            if not self.withdrawal_service:
+                missing.append("restart the bot to enable the withdrawal service")
+            reason = "Manual withdrawal is unavailable: " + "; ".join(missing) + "." if missing else ""
+            self._json(200, {"destination": destination, "enabled": not missing, "reason": reason})
             return
         query = parse_qs(parsed.query)
         if parsed.path == "/api/market-price":

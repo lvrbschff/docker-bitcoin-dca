@@ -75,6 +75,36 @@ class Tests(unittest.TestCase):
         bot.maybe_withdraw_btc(self.api,self.state,self.s)
         self.assertEqual(len(self.api.sent),1);self.assertEqual(len(activity.read_activity_records()),1)
 
+    def test_withdrawal_configuration_reports_missing_settings(self):
+        for exchange, missing in [('KRAKEN', ['LIVE_TRADING', 'KRAKEN_WITHDRAW_KEY']),
+                                  ('BITVAVO', ['LIVE_TRADING', 'WITHDRAW_ADDRESS', 'WITHDRAW_NETWORK'])]:
+            handler = object.__new__(web_ui.Handler)
+            handler.settings = {**self.s, 'exchange': exchange, 'live': False,
+                                'kraken_withdraw_key': '', 'withdraw_address': '', 'withdraw_network': ''}
+            handler.withdrawal_service = lambda *args: None
+            handler.path = '/api/withdrawal/config'
+            handler._require_authentication = lambda: True
+            result = []
+            handler._json = lambda status, body: result.append((status, body))
+            handler.do_GET()
+            self.assertEqual(result[0][0], 200)
+            self.assertFalse(result[0][1]['enabled'])
+            for setting in missing:
+                self.assertIn(setting, result[0][1]['reason'])
+
+    def test_manual_withdrawal_configuration_ignores_automatic_toggle(self):
+        handler = object.__new__(web_ui.Handler)
+        handler.settings = {**self.s, 'withdrawals_enabled': False}
+        handler.withdrawal_service = lambda *args: None
+        handler.path = '/api/withdrawal/config'
+        handler._require_authentication = lambda: True
+        result = []
+        handler._json = lambda status, body: result.append((status, body))
+        handler.do_GET()
+        self.assertEqual(result[0][0], 200)
+        self.assertTrue(result[0][1]['enabled'])
+        self.assertEqual(result[0][1]['reason'], '')
+
     def test_route_auth_and_csrf(self):
         handler=object.__new__(web_ui.Handler);handler.path='/api/withdrawal/confirm';handler.headers={};handler._json=lambda status,result:statuses.append(status)
         statuses=[];handler._require_authentication=lambda:False;handler.do_POST();self.assertEqual(statuses,[])
