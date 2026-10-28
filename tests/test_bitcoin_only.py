@@ -31,7 +31,7 @@ class BitcoinOnlyTests(unittest.TestCase):
                          'timezone': 'Europe/Berlin', 'deposit_day': 1,
                          'buy_amount': Decimal('0'), 'withdrawals_enabled': False,
                          'withdraw_threshold': Decimal('1000'), 'first_purchase_done': False,
-                         'first_buy_delay_seconds': 0, 'order_status_check_seconds': 30}
+                         'startup_delay_seconds': 0, 'order_status_check_seconds': 30}
 
     @staticmethod
     def record(identifier, kind='Buy', simulated=False):

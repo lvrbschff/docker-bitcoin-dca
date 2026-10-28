@@ -608,10 +608,10 @@ def make_worker(api, settings, interval):
             LOG.info("Startup history: no recorded real Bitcoin purchase found; using saved execution time if available.")
         update_dashboard_schedule(None,'Calculating purchase schedule')
     LOG.info('Startup: waiting %ss before checking purchase history and calculating the schedule.',
-             settings['first_buy_delay_seconds'])
+             settings['startup_delay_seconds'])
     update_dashboard_schedule(None,'Waiting for startup delay')
     return Worker(lambda:run_once(api,settings,interval),manual_withdrawal_service(api,settings),
-                  startup,interval,settings['first_buy_delay_seconds'],
+                  startup,interval,settings['startup_delay_seconds'],
                   on_error=lambda:update_dashboard_schedule(None,'Account check failed; waiting for retry'))
 
 
@@ -687,7 +687,7 @@ def main():
         "quote": os.getenv("QUOTE_CURRENCY", "EUR").upper(),
         "buy_amount": env_decimal("BUY_AMOUNT", 0),
         "deposit_day": deposit_day,
-        "first_buy_delay_seconds": int(os.getenv("FIRST_BUY_DELAY_SECONDS", "60")),
+        "startup_delay_seconds": int(os.getenv("startup_delay_seconds", "60")),
         "first_purchase_done": False,
         "order_status_check_seconds": int(os.getenv("ORDER_STATUS_CHECK_SECONDS", "30")),
         "timezone": os.getenv("TIMEZONE", "Europe/Berlin"),
@@ -698,8 +698,8 @@ def main():
         "withdraw_network": os.getenv("WITHDRAW_NETWORK", "BTC").upper(),
         "kraken_withdraw_key": os.getenv("KRAKEN_WITHDRAW_KEY", "").strip(),
     }
-    if settings["first_buy_delay_seconds"] < 0:
-        raise ValueError("FIRST_BUY_DELAY_SECONDS must be zero or greater")
+    if settings["startup_delay_seconds"] < 0:
+        raise ValueError("startup_delay_seconds must be zero or greater")
     if settings["order_status_check_seconds"] < 1:
         raise ValueError("ORDER_STATUS_CHECK_SECONDS must be greater than zero")
     api = create_exchange(settings)
@@ -709,7 +709,7 @@ def main():
             raise ValueError("WITHDRAW_THRESHOLD_QUOTE must be greater than zero")
     interval = max(60, int(os.getenv("CHECK_INTERVAL_SECONDS", "300")))
     buy_amount_mode = "exchange minimum will be used" if settings["buy_amount"] == 0 else "fixed requested amount"
-    LOG.info("Starting on %s: %s; live trading=%s; quote currency=%s; BUY_AMOUNT=%s %s (%s); deposit day=%s; first-buy delay=%ss; timezone=%s; check interval=%ss; order status check delay=%ss", settings["exchange"], f"BTC-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], "BTC", buy_amount_mode, deposit_day, settings["first_buy_delay_seconds"], settings["timezone"], interval, settings["order_status_check_seconds"])
+    LOG.info("Starting on %s: %s; live trading=%s; quote currency=%s; BUY_AMOUNT=%s %s (%s); deposit day=%s; startup delay=%ss; timezone=%s; check interval=%ss; order status check delay=%ss", settings["exchange"], f"BTC-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], "BTC", buy_amount_mode, deposit_day, settings["startup_delay_seconds"], settings["timezone"], interval, settings["order_status_check_seconds"])
 
     if os.getenv("WEB_UI_ENABLED", "true").lower() == "true":
         port = int(os.getenv("WEB_UI_PORT", "6890"))

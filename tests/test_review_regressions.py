@@ -20,7 +20,7 @@ class ReviewTests(unittest.TestCase):
             p=patch.object(activity,name,value);p.start();self.addCleanup(p.stop)
         self.settings={'exchange':'KRAKEN','quote':'EUR','live':True,'timezone':'Europe/Berlin','deposit_day':1,
                        'buy_amount':D(0),'withdrawals_enabled':False,'withdraw_threshold':D(1000),
-                       'first_purchase_done':False,'first_buy_delay_seconds':0,'order_status_check_seconds':30}
+                       'first_purchase_done':False,'startup_delay_seconds':0,'order_status_check_seconds':30}
         price_cache._values.clear()
 
     def record(self, id='buy', kind='Buy', currency='EUR', status=None, when='2026-10-20T12:00:00Z'):

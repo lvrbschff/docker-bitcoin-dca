@@ -8,7 +8,7 @@ services:
       QUOTE_CURRENCY: EUR
       BUY_AMOUNT: "0"
       DEPOSIT_DAY: "1"
-      FIRST_BUY_DELAY_SECONDS: "60"
+      startup_delay_seconds: "60"
       TIMEZONE: Europe/Berlin
       LIVE_TRADING: "false"
       CHECK_INTERVAL_SECONDS: "300"
