@@ -159,6 +159,21 @@ def period_records(start, end):
         return [json.loads(r[0]) for r in db.execute("SELECT payload FROM activity WHERE asset='BTC' AND timestamp>? AND timestamp<=? ORDER BY timestamp,id", (start,end))]
 
 
+def parqet_interval_records(start, end):
+    """Return the complete cycle ending at the last selected confirmed withdrawal."""
+    with _db() as db:
+        db.execute('BEGIN')
+        completed = "asset='BTC' AND kind='TransferOut' AND simulated=0 AND status='completed'"
+        latest = db.execute('SELECT max(timestamp) FROM activity WHERE '+completed+' AND timestamp>? AND timestamp<=?', (start,end)).fetchone()[0]
+        if latest is None:
+            return []
+        previous = db.execute('SELECT max(timestamp) FROM activity WHERE '+completed+' AND timestamp<?', (latest,)).fetchone()[0]
+        lower = previous if previous is not None else -1
+        return [json.loads(r[0]) for r in db.execute(
+            "SELECT payload FROM activity WHERE asset='BTC' AND timestamp>? AND timestamp<=? ORDER BY timestamp,id",
+            (lower,latest))]
+
+
 def _totals(db, start, end):
     rows = db.execute("SELECT currency,kind,simulated,status,count(*),decimal_sum(shares),decimal_sum(amount),decimal_sum(fee),decimal_sum(gross) FROM activity WHERE asset='BTC' AND timestamp>? AND timestamp<=? GROUP BY currency,kind,simulated,status", (start,end)).fetchall()
     return [dict(zip(('currency','kind','simulated','status','count','shares','amount','fee','gross'),r)) for r in rows]

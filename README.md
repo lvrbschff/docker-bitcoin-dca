@@ -175,15 +175,15 @@ Click **Withdraw BTC manually** below **Log out**, review the balance and destin
 
 ## Parqet CSV exports
 
-Select a period in the web UI and click **Download Parqet CSV**. The export creates one consolidated **Buy** row for [Parqet’s CSV import](https://faq.parqet.com/de/articles/870989-csv-import-aktivitaten-aus-einer-eigenen-csv-datei-importieren):
+Select a date range in the web UI and click **Download Parqet CSV**. The export uses the last confirmed withdrawal in that range and the complete interval after its previous confirmed withdrawal, creating one consolidated **Buy** row for [Parqet’s CSV import](https://faq.parqet.com/de/articles/870989-csv-import-aktivitaten-aus-einer-eigenen-csv-datei-importieren):
 
-- **Cost:** all real purchases plus trading fees in the period. USD costs are converted to EUR using historical daily reference rates.
-- **BTC quantity:** net BTC from confirmed withdrawals, after network fees.
-- **Date:** the latest confirmed withdrawal in the period.
+- **Cost:** real purchases plus trading fees after the previous confirmed withdrawal and up to and including the ending withdrawal. USD costs are converted to EUR using historical daily reference rates.
+- **BTC quantity:** net BTC from the ending confirmed withdrawal, after network fees.
+- **Date:** the ending confirmed withdrawal.
 
-A period needs at least one real purchase and one confirmed withdrawal. Simulations and unconfirmed or failed withdrawals are excluded. Fees are already reflected in the cost and net quantity; the CSV fee field is zero.
+The selected range must include a confirmed withdrawal, and its complete withdrawal interval must contain a real purchase. Simulations and unconfirmed or failed withdrawals are excluded. Fees are already reflected in the cost and net quantity; the CSV fee field is zero.
 
-Choose periods carefully: purchases after the latest withdrawal are still included, and overlapping exports can duplicate activity. See [Prices and Parqet exports](#prices-and-parqet-exports) for limitations.
+Purchases after the ending withdrawal are always excluded. A start date inside an interval is expanded back to the previous confirmed withdrawal; for the first withdrawal, all earlier recorded real purchases are included. If the range contains multiple withdrawals, only the last interval is exported. Re-exporting the same withdrawal can still duplicate activity in Parqet. See [Prices and Parqet exports](#prices-and-parqet-exports) for limitations.
 
 ## Architecture and operation
 
@@ -269,7 +269,7 @@ The workflow in `.github/workflows/publish.yml` builds and publishes the image t
 
 - **Display prices are reference values.** The UI uses Kraken’s public converter pages, even when trading on Bitvavo. Page changes or outages can interrupt extraction. Prices are cached for 30 seconds; a visibly labelled fallback is allowed only up to five minutes of total age. A saved bot price may then be shown instead, with unavailable conversions omitted. Dashboard currency conversion uses current price ratios, not historical exchange rates.
 - **EUR and USD are supported for reporting.** Live display conversion supports these currencies, and Parqet exports EUR purchases or converts USD purchases to EUR using historical daily reference rates. Other quote currencies are not supported by those reporting features. Missing or expired USD/EUR rates require access to the public Frankfurter service and can prevent an export when it is unavailable.
-- **The CSV is one consolidated purchase per selected period.** All selected real purchase costs and trading fees are assigned to the selected completed withdrawals’ net BTC, dated at the latest completed withdrawal. Purchases after that withdrawal are still included if they fall inside the selected period. There is no purchase-to-withdrawal matching or tracking of previously exported activity; overlapping exports can duplicate amounts. This is not a transaction-by-transaction account statement or tax report.
+- **The CSV covers the last complete withdrawal interval.** The selected range chooses its last confirmed withdrawal; purchase costs and trading fees are limited to activity after the preceding confirmed withdrawal and up to the ending withdrawal. For the first withdrawal, all earlier recorded real purchases are used. A partial start date does not truncate the interval, and later purchases are excluded. Export history is not tracked, so exporting the same withdrawal again can duplicate activity. This is a time-based consolidation, not matching of individual Bitcoin units or a transaction-by-transaction account statement.
 
 ### Operation and persistence
 

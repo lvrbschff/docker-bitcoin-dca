@@ -18,7 +18,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 import price_cache
 from analytics import report as build_report, totals_from_records
-from activity import activity_page, activity_totals, period_records, ledger_balance, withdrawal_records, read_report
+from activity import activity_page, activity_totals, parqet_interval_records, ledger_balance, withdrawal_records, read_report
 
 from activity import bitcoin_activity_records, delete_activity_record, read_dashboard_snapshot
 from reporting import parqet_aggregate_rows, parqet_csv
@@ -156,7 +156,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <ol>
 <li id="currency-note"><strong>Display currency and price data.</strong><p>Historical fiat amounts are grouped by their original currency and converted separately to the selected display currency. The current BTC price is fetched from Kraken’s public BTC-to-fiat pages when the report loads. Parqet CSV exports use EUR.</p></li>
 <li id="schedule-note"><strong>Purchase schedule.</strong><p>The interval is the time until the next deposit day divided by the estimated number of purchases the current balance can cover, using the current market price and configured purchase amount or exchange minimum. Time elapsed since the last purchase is deducted to determine the next purchase time. The estimate is recalculated during bot checks; open or unconfirmed orders block further purchases.</p></li>
-<li id="report-note"><strong>Period analysis, Parqet export and local activity history.</strong><p>These notes apply to the date filters in Period analysis, the Activity table and the Download Parqet CSV button. Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The Parqet CSV consolidates the period into one purchase: all real purchase costs and trading fees in EUR, and net BTC from confirmed withdrawals after network fees. The period must contain purchases and a bot-recorded withdrawal. Dry-run purchases are shown separately and excluded from the CSV. Delete removes a purchase from local history only; it cannot reverse an exchange order.</p></li>
+<li id="report-note"><strong>Period analysis, Parqet export and local activity history.</strong><p>These notes apply to the date filters in Period analysis, the Activity table and the Download Parqet CSV button. Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The Parqet CSV uses the complete interval after the previous confirmed withdrawal through the last confirmed withdrawal in the selected date range. It combines real purchase costs and trading fees in EUR with the ending withdrawal’s net BTC after network fees; later purchases are excluded. The selected range must contain a confirmed withdrawal whose complete interval includes a real purchase. Dry-run purchases are shown separately and excluded from the CSV. Delete removes a purchase from local history only; it cannot reverse an exchange order.</p></li>
 <li id="withdrawal-note"><strong>Manual BTC withdrawal.</strong><p id="withdrawalDestination">Loading withdrawal configuration…</p><p id="withdrawMessage" role="status" aria-live="polite"></p><p>The button withdraws the entire available BTC balance, less the exchange withdrawal fee. LIVE_TRADING must be enabled; automatic withdrawals may remain disabled and their threshold does not apply. Configure KRAKEN_WITHDRAW_KEY in .env for Kraken, or WITHDRAW_ADDRESS and WITHDRAW_NETWORK for Bitvavo. Kraken resolves the saved method to its destination address. A confirmation is required before submission. Submitted manual withdrawals appear in Activity immediately and count toward Parqet exports only after confirmation. Failed or unverified withdrawals are excluded.</p></li>
 <li id="local-access-note"><strong>Local access only.</strong><p>With the default Docker Compose port mapping, the dashboard is accessible only from the Docker host.</p></li>
 </ol>
@@ -698,7 +698,7 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path in ("/api/analytics", "/api/export.csv"):
                 start_ms, end_ms = _period(query)
                 if parsed.path == "/api/export.csv":
-                    selected_records=period_records(start_ms,end_ms)
+                    selected_records=parqet_interval_records(start_ms,end_ms)
                     real_records = [record for record in selected_records if not record.get("simulated")]
                     if not any(record["row"].get("type") == "TransferOut" and record.get("withdrawalStatus")=="completed" for record in real_records):
                         raise ValueError(
@@ -708,7 +708,7 @@ class Handler(BaseHTTPRequestHandler):
                         )
                     if not any(record["row"].get("type") == "Buy" for record in real_records):
                         raise ValueError(
-                            "No real bot purchase was found in the selected period. "
+                            "No real bot purchase was found since the previous confirmed withdrawal. "
                             "The Parqet export requires a real purchase and a withdrawal; dry-run purchases are excluded."
                         )
                     rows = parqet_aggregate_rows(

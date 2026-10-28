@@ -87,26 +87,31 @@ def _withdrawal_net_btc(record, exchange):
 
 
 def parqet_aggregate_rows(records, exchange):
-    """Represent a selected withdrawal period as one consolidated Parqet Buy row.
-
-    The purchase cost is all real buys plus their trading fees, converted to EUR.
-    The quantity is the net BTC that arrived at the configured withdrawal address.
-    """
+    """Consolidate the last completed withdrawal cycle, excluding later activity."""
     records = bitcoin_activity_records(records)
     exchange = str(exchange).upper()
-    purchases = [
-        record["row"] for record in records
-        if not record.get("simulated")
-        and record.get("row", {}).get("type") == "Buy"
-        and Decimal(str(record["row"].get("shares", "0"))) > 0
-    ]
     withdrawals = [
         record for record in records
         if not record.get("simulated")
         and record.get("row", {}).get("type") == "TransferOut"
         and record.get("withdrawalStatus") == "completed"
     ]
-    if not purchases or not withdrawals:
+    if not withdrawals:
+        return []
+    timestamp = max(_parse_datetime(record["row"]) for record in withdrawals)
+    previous_times = [_parse_datetime(record["row"]) for record in withdrawals
+                      if _parse_datetime(record["row"]) < timestamp]
+    previous = max(previous_times) if previous_times else None
+    purchases = [
+        record["row"] for record in records
+        if not record.get("simulated")
+        and record.get("row", {}).get("type") == "Buy"
+        and Decimal(str(record["row"].get("shares", "0"))) > 0
+        and _parse_datetime(record["row"]) <= timestamp
+        and (previous is None or _parse_datetime(record["row"]) > previous)
+    ]
+    withdrawals = [record for record in withdrawals if _parse_datetime(record["row"]) == timestamp]
+    if not purchases:
         return []
 
     rates = _usd_eur_rates(purchases)
@@ -120,8 +125,6 @@ def parqet_aggregate_rows(records, exchange):
     if total_cost_eur <= 0 or net_withdrawn_btc <= 0:
         return []
 
-    latest_withdrawal = max(withdrawals, key=lambda record: _parse_datetime(record["row"]))
-    timestamp = _parse_datetime(latest_withdrawal["row"])
     unit_price = total_cost_eur / net_withdrawn_btc
     return [{
         "datetime": timestamp.isoformat(timespec="seconds").replace("+00:00", "Z"),
