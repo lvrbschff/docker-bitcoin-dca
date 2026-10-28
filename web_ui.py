@@ -49,7 +49,7 @@ HTML = """<!doctype html>
 main{max-width:1180px;margin:0 auto;padding:36px 22px 64px}.top{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:26px}.eyebrow{color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}h1{font-size:30px;margin:4px 0}.sub{color:var(--muted);margin:0}
 .bottom-actions{display:flex;justify-content:flex-end;margin-top:18px}.badge{border:1px solid var(--line);border-radius:999px;padding:8px 12px;color:var(--muted);font-size:12px}.top-actions{display:flex;flex-direction:column;align-items:flex-end;gap:10px}.top-actions form{margin:0}.withdraw-action{display:flex;align-items:center;gap:4px}#withdrawMessage:empty{display:none}.top-actions .field{min-width:170px}.top-actions .field label{margin-bottom:5px}
 .panel{background:linear-gradient(145deg,rgba(21,31,52,.96),rgba(15,22,39,.96));border:1px solid var(--line);border-radius:18px;padding:20px;margin:18px 0;box-shadow:0 14px 40px #0002}
-.activity-panel{margin:20px 0 0;background:#0c1425a8;box-shadow:none}
+.withdrawal-dialog{width:min(480px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:auto;margin:auto;padding:24px;border:1px solid var(--line);border-radius:18px;background:var(--panel);color:var(--text);box-shadow:0 24px 80px #0008}.withdrawal-dialog::backdrop{background:#060b18bb}.withdrawal-dialog p{color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}.withdrawal-dialog form{display:flex;justify-content:flex-end;margin:20px 0 0}\n.activity-panel{margin:20px 0 0;background:#0c1425a8;box-shadow:none}
 .controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}select,input,button{font:inherit;color:var(--text);background:#0c1425;border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%}button{width:auto;cursor:pointer;background:var(--accent);border-color:var(--accent);color:#081122;font-weight:700}button.secondary{background:transparent;color:var(--text);border-color:var(--line)}button:hover{filter:brightness(1.08)}
 .controls .field{width:100%;min-width:0;min-inline-size:0}
 .controls input,.controls select,.controls>button{display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;min-inline-size:0;height:46px;min-height:46px;line-height:1.25}
@@ -162,8 +162,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 </ol>
 </footer>
 </main>
-<script>
-const $=id=>document.getElementById(id);
+<dialog id="withdrawalNotice" class="withdrawal-dialog" aria-labelledby="withdrawalNoticeTitle" aria-describedby="withdrawalNoticeText"><h2 id="withdrawalNoticeTitle">Manual BTC withdrawal</h2><p id="withdrawalNoticeText"></p><form method="dialog"><button class="secondary" autofocus>Close</button></form></dialog>\n<script>\nconst $=id=>document.getElementById(id);
 let quote="EUR", displayCurrency="", fxRate=1, activityRows=[], currentPage=1, activityTotal=0, activityPages=1, activityRates={};
 function localInput(ms){const d=new Date(ms);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
 function parseInput(el){return new Date(el.value).getTime()}
@@ -320,22 +319,24 @@ async function loadWithdrawalConfiguration(){
  $("withdrawMessage").textContent=d.reason||"Manual withdrawals are available. Automatic withdrawals may remain disabled.";
  return d;
 }
-function showWithdrawalMessage(message){
+function showWithdrawalMessage(message,title="Manual BTC withdrawal"){
  $("withdrawMessage").textContent=message;
- alert(message);
+ $("withdrawalNoticeTitle").textContent=title;
+ $("withdrawalNoticeText").textContent=message;
+ if(!$("withdrawalNotice").open)$("withdrawalNotice").showModal();
 }
 $("manualWithdraw").addEventListener("click",async()=>{
  const button=$("manualWithdraw");button.disabled=true;
  try{
  const configuration=await loadWithdrawalConfiguration();
- if(!configuration.enabled){showWithdrawalMessage(configuration.reason||"Manual withdrawal is not configured. See note 4.");return}
+ if(!configuration.enabled){showWithdrawalMessage(configuration.reason||"Manual withdrawal is not configured. See note 4.","Manual withdrawal unavailable");return}
  const p=await withdrawalPost("/api/withdrawal/preview",{});
  const fee=p.feeBtc!==null&&p.feeBtc!==undefined?"Withdrawal fee: "+p.feeBtc+" BTC\\nNet sent: "+p.netBtc+" BTC":"Bitvavo deducts its withdrawal fee from this balance; the final fee is returned on submission.";
  if(!confirm("Confirm BTC withdrawal?\\n\\n"+p.destination+"\\nAvailable balance to withdraw: "+p.availableBtc+" BTC\\n"+fee+"\\n\\nThis transfer cannot be reversed. Submit withdrawal?"))return;
  $("withdrawMessage").textContent="Submitting withdrawal…";
- const result=await withdrawalPost("/api/withdrawal/confirm",{token:p.token});showWithdrawalMessage(result.message);
+ const result=await withdrawalPost("/api/withdrawal/confirm",{token:p.token});showWithdrawalMessage(result.message,"Withdrawal submitted");
  $("interval").value="";$("end").value=localInput(Date.now()+60000);currentPage=1;await loadAnalytics();
- }catch(e){showWithdrawalMessage(e.message)}
+ }catch(e){showWithdrawalMessage(e.message,"Withdrawal request failed")}
  finally{button.disabled=false}
 });
 loadWithdrawalConfiguration().catch(e=>{$("withdrawMessage").textContent=e.message});

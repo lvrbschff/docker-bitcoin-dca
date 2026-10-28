@@ -6,18 +6,19 @@ m=ast.parse(Path('web_ui.py').read_text());print(json.dumps(next(ast.literal_eva
 const script=html.split('<script>')[1].split('</script>')[0];
 class Element{
  constructor(){this.value='';this.children=[];this.handlers={};this.textContent='';this.disabled=false;this.classList={toggle(){},add(){},remove(){}}}
+ showModal(){this.open=true} close(){this.open=false}
  appendChild(e){this.children.push(e)} append(...e){this.children.push(...e)} replaceChildren(...e){this.children=e}
  set innerHTML(v){this.children=[]} addEventListener(event,handler){this.handlers[event]=handler}
 }
 const elements={},get=id=>elements[id]??=new Element();get('pageSize').value=html.match(/<option selected>(\d+)<\/option>/)[1];
 const records=Array.from({length:45},(_,i)=>({activityId:String(i),datetime:'2026-10-22T12:00:00Z',type:'Buy',identifier:'BTC',shares:'.001',currency:i<22?'EUR':'USD',price:i<22?'80000':'100000',amount:i<22?'80':'100',fee:i<22?'.2':'.25'}));
-const requests=[];let checks=0,eurOnly=false,priceUnavailable=false,invalidUsdRate=false;
+const requests=[];let checks=0,eurOnly=false,priceUnavailable=false,invalidUsdRate=false,withdrawalUnavailable=false;
 const response=data=>({ok:true,json:async()=>data});
-const context={document:{getElementById:get,createElement:()=>new Element()},localStorage:{getItem:()=>null,setItem(){}},Intl,Date,URL,console,alert(){},confirm:()=>false,setInterval(){},setTimeout(fn){queueMicrotask(fn)},window:{location:{reload(){throw Error('Unexpected reload')}}},fetch:async(url,options)=>{
+const context={document:{getElementById:get,createElement:()=>new Element()},localStorage:{getItem:()=>null,setItem(){}},Intl,Date,URL,console,alert(){throw Error('Withdrawal must not use a browser alert')},confirm:()=>false,setInterval(){},setTimeout(fn){queueMicrotask(fn)},window:{location:{reload(){throw Error('Unexpected reload')}}},fetch:async(url,options)=>{
  requests.push(url);const parsed=new URL(url,'http://example.test');
  if(parsed.pathname==='/api/schedule')return response({nextPurchaseAt:new Date(Date.now()+3600000).toISOString(),serverTime:new Date().toISOString(),timezone:'Europe/Berlin'});
  if(parsed.pathname==='/api/withdrawals')return response([{timestamp:Date.parse('2026-10-20T12:00:00Z')},{timestamp:Date.parse('2026-10-23T12:00:00Z')}]);
- if(parsed.pathname==='/api/withdrawal/config')return response({enabled:true,destination:'fictional wallet'});
+ if(parsed.pathname==='/api/withdrawal/config')return response({enabled:!withdrawalUnavailable,destination:'fictional wallet',reason:withdrawalUnavailable?'Manual withdrawal is unavailable: set KRAKEN_WITHDRAW_KEY to your saved Bitcoin withdrawal method in .env.':''});
  if(parsed.pathname==='/api/market-price')return priceUnavailable?{ok:false,json:async()=>({error:'offline'})}:response({price:'80000',conversionRate:'1',conversionRates:{EUR:'1',USD:invalidUsdRate?'invalid':'0.9'},updatedAt:Date.now()/1000});
  if(parsed.pathname==='/api/analytics'){
   const limit=Number(parsed.searchParams.get('limit'))||10,pages=Math.ceil(records.length/limit);
@@ -64,5 +65,14 @@ const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate)};
  assert.equal(get('buyVolume').textContent,'—','Invalid foreign rates must not produce incorrect totals');
  assert.equal(get('error').textContent,'A required currency conversion is unavailable; monetary totals are hidden.');
  assert(html.includes('sup{color:#fff}'),'All superscript references must be white');
+ withdrawalUnavailable=true;
+ const submissions=requests.filter(u=>u==='/api/withdrawal/preview'||u==='/api/withdrawal/confirm').length;
+ await get('manualWithdraw').handlers.click();
+ assert(get('withdrawalNotice').open,'Missing configuration opens the styled dialog');
+ assert.equal(get('withdrawalNoticeTitle').textContent,'Manual withdrawal unavailable');
+ assert(get('withdrawalNoticeText').textContent.includes('KRAKEN_WITHDRAW_KEY'));
+ assert.equal(get('manualWithdraw').disabled,false,'Button is available after closing the message');
+ assert.equal(requests.filter(u=>u==='/api/withdrawal/preview'||u==='/api/withdrawal/confirm').length,submissions,'Missing configuration cannot submit financial actions');
+ get('withdrawalNotice').close();assert(!get('withdrawalNotice').open);
  console.log('Dashboard regressions passed: interval dates, server pages, mixed-currency rows/totals and queued preview polling');
 })().catch(e=>{console.error(e);process.exit(1)});
