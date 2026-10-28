@@ -286,8 +286,3 @@ If you enjoy using this bot and would like to support its development, you can b
 
 - PayPal: [paypal.me/bischoffoliver](https://paypal.me/bischoffoliver)
 - Bitcoin (BTC): `bc1qg7crlvea9rsacfgnujhrjy6judvjnkjz9crvvq`
-
-
-## Reproducing the documentation preview
-
-`docs/web-ui-example-current.svg` is the single canonical illustration. Its headings, cards and notes are read from the current `web_ui.py`; all displayed account data is fictional. Install Pillow for this documentation-only helper, then run `python docs/generate_preview.py` (`--png` additionally writes a PNG). It does not connect to an exchange or run the bot.
