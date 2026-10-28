@@ -21,19 +21,37 @@ from reporting import parqet_aggregate_rows, parqet_csv
 
 LOG = logging.getLogger("bitcoin-dca.web")
 
+FAVICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<title>Bitcoin DCA Bot</title>
+<rect x="1" y="1" width="62" height="62" rx="15" fill="#0b1020" stroke="#26324a" stroke-width="2"/>
+<circle cx="32" cy="32" r="24" fill="#8bafff"/>
+<g transform="rotate(14 32 32)" fill="none" stroke="#0b1020" stroke-width="4.5" stroke-linecap="square" stroke-linejoin="round">
+<path d="M23 19v27M23 19h11c13 0 13 13 0 13H23m0 0h13c14 0 14 14 0 14H23"/>
+<path d="M28 13v6m7-6v6M28 46v6m7-6v6"/>
+</g>
+</svg>"""
+
 HTML = """<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bitcoin DCA Bot</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta name="theme-color" content="#0b1020">
 <style>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#26324a;--text:#edf2ff;--muted:#9ba9c4;--accent:#8bafff;--green:#61d7ae;--red:#ff8f9e}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#1b2a49 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
 main{max-width:1180px;margin:0 auto;padding:36px 22px 64px}.top{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:26px}.eyebrow{color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}h1{font-size:30px;margin:4px 0}.sub{color:var(--muted);margin:0}
 .bottom-actions{display:flex;justify-content:flex-end;margin-top:18px}.badge{border:1px solid var(--line);border-radius:999px;padding:8px 12px;color:var(--muted);font-size:12px}.top-actions{display:flex;flex-direction:column;align-items:flex-end;gap:10px}.top-actions form{margin:0}.withdraw-action{display:flex;align-items:center;gap:4px}#withdrawMessage:empty{display:none}.top-actions .field{min-width:170px}.top-actions .field label{margin-bottom:5px}
 .panel{background:linear-gradient(145deg,rgba(21,31,52,.96),rgba(15,22,39,.96));border:1px solid var(--line);border-radius:18px;padding:20px;margin:18px 0;box-shadow:0 14px 40px #0002}
-.controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:12px;align-items:end}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}select,input,button{font:inherit;color:var(--text);background:#0c1425;border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%}button{width:auto;cursor:pointer;background:var(--accent);border-color:var(--accent);color:#081122;font-weight:700}button.secondary{background:transparent;color:var(--text);border-color:var(--line)}button:hover{filter:brightness(1.08)}
+.controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}select,input,button{font:inherit;color:var(--text);background:#0c1425;border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%}button{width:auto;cursor:pointer;background:var(--accent);border-color:var(--accent);color:#081122;font-weight:700}button.secondary{background:transparent;color:var(--text);border-color:var(--line)}button:hover{filter:brightness(1.08)}
+.controls .field{width:100%;min-width:0;min-inline-size:0}
+.controls input,.controls select,.controls>button{display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;min-inline-size:0;height:46px;min-height:46px;line-height:1.25}
+.controls input[type="datetime-local"]{appearance:none;-webkit-appearance:none;inline-size:100%;max-inline-size:100%;padding:10px 12px}
+.controls input[type="datetime-local"]::-webkit-datetime-edit{min-width:0;padding:0}
+.controls input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper{min-width:0;padding:0}
+.controls input[type="datetime-local"]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.period-summary-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.card{padding:17px;border:1px solid var(--line);border-radius:14px;background:#0c1425a8}.card label{display:block;color:var(--muted);font-size:12px;margin-bottom:9px}.value{font-size:22px;font-weight:700;letter-spacing:-.02em}.small{font-size:12px;color:var(--muted);margin-top:4px}
 h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:740px}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}td.num{text-align:right;font-variant-numeric:tabular-nums}.positive{color:var(--green)}.negative{color:var(--red)}.notice{color:var(--muted);font-size:13px;margin-top:12px}.error{color:var(--red);margin:12px 0}.hidden{display:none}.activity-heading,.pagination,.settings-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.settings-heading h2{margin:0}.settings-heading .field{min-width:160px}.activity-heading h2{margin:0}.page-size{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}.page-size select{width:auto;padding:7px 10px}.pagination{margin-top:12px}.pagination button{padding:8px 12px}.pagination .notice{margin:0;text-align:center}
 main,.panel,.grid,.card,.field,.top>div{min-width:0}
@@ -70,7 +88,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 .report-heading{margin-bottom:18px}.report-heading h2{font-size:21px;margin:0 0 5px}
 .report-heading .sub{font-size:14px}.report-controls{border-color:#354b70;background:linear-gradient(145deg,#17243b,#111a2d)}
 @media(max-width:600px){.schedule-grid{grid-template-columns:minmax(0,1fr)}.report-section{margin-top:28px;padding-top:22px}.report-heading h2{font-size:19px}}
-.footnote-ref{color:var(--accent);text-decoration:none;margin-left:3px}.footnote-ref:hover{text-decoration:underline}.footnote-ref:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
+.footnote-ref{color:var(--accent);margin-left:3px}
 .dashboard-footnotes{margin-top:30px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
 .dashboard-footnotes h2{font-size:14px;margin:0 0 12px}.dashboard-footnotes ol{margin:0;padding-left:20px}.dashboard-footnotes li{padding-left:4px;margin-bottom:14px;scroll-margin-top:20px}.dashboard-footnotes strong{color:var(--text);font-weight:600}.dashboard-footnotes p{margin:4px 0 0}
 .export-feedback{margin:10px 0 0;text-align:right;color:var(--red);font-size:13px;line-height:1.6;overflow-wrap:anywhere}
@@ -79,7 +97,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 </head>
 <body><main>
 <header class="top"><div><h1>Bitcoin DCA Bot</h1><p class="sub">Portfolio overview, bot configuration and activity analysis, with optional Parqet CSV export</p></div><div class="top-actions"><form method="post" action="/logout"><button class="secondary" type="submit">Log out</button></form><div class="withdraw-action"><button class="secondary" id="manualWithdraw" type="button" aria-describedby="withdrawal-note">Withdraw BTC manually <sup>4</sup></button></div><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
-<section class="panel"><h2>Bot-tracked portfolio <a class="footnote-ref" href="#currency-note" aria-label="Read note 1 about display currency and prices"><sup>1</sup></a></h2><div class="grid">
+<section class="panel"><h2>Bot-tracked portfolio <sup class="footnote-ref" aria-describedby="currency-note">1</sup></h2><div class="grid">
 <div class="card"><label>Bot-tracked BTC</label><div class="value" id="balance">—</div></div>
 <div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
 <div class="card"><label>Value in fiat currency</label><div class="value" id="balanceValue">—</div></div>
@@ -97,13 +115,13 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 <div class="card"><label>Withdrawal threshold</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured threshold</div></div>
 </div>
 </section>
-<section class="panel purchase-schedule" aria-labelledby="scheduleHeading"><h2 id="scheduleHeading">Purchase schedule <a class="footnote-ref" href="#schedule-note" aria-label="Read note 2 about purchase timing"><sup>2</sup></a></h2><div class="grid schedule-grid">
+<section class="panel purchase-schedule" aria-labelledby="scheduleHeading"><h2 id="scheduleHeading">Purchase schedule <sup class="footnote-ref" aria-describedby="schedule-note">2</sup></h2><div class="grid schedule-grid">
 <div class="card time-card"><label>Next purchase</label><div class="value time-value" id="nextPurchaseAt">—</div><div class="small" id="nextPurchaseStatus">Waiting for the bot schedule</div></div>
 <div class="card time-card"><label>Time until next purchase</label><div class="value countdown-value" id="nextPurchaseCountdown">—</div><div class="small">Updates every second</div></div>
 </div>
 </section>
 <section class="report-section" aria-labelledby="reportHeading">
-<header class="report-heading"><h2 id="reportHeading">Period analysis <a class="footnote-ref" href="#report-note" aria-label="Read note 3 about reports, CSV exports and activity deletion"><sup>3</sup></a></h2><p class="sub">Choose a date range to review activity and prepare a Parqet export.</p></header>
+<header class="report-heading"><h2 id="reportHeading">Period analysis <sup class="footnote-ref" aria-describedby="report-note">3</sup></h2><p class="sub">Choose a date range to review activity and prepare a Parqet export.</p></header>
 <section class="panel report-controls">
 <div class="controls">
 <div class="field"><label for="interval">Withdrawal interval</label><select id="interval"></select></div>
@@ -312,6 +330,8 @@ LOGIN_HTML = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bitcoin DCA Bot</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta name="theme-color" content="#0b1020">
 <style>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#26324a;--text:#edf2ff;--muted:#9ba9c4;--accent:#8bafff;--red:#ff8f9e}
 *{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:22px;background:radial-gradient(ellipse at 15% 0%,#1b2a49 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
@@ -576,6 +596,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
+        if parsed.path == "/favicon.svg":
+            self._send(200, FAVICON_SVG, "image/svg+xml; charset=utf-8")
+            return
         if parsed.path == "/" and not self._has_valid_session():
             self._send(200, _login_page(), "text/html; charset=utf-8")
             return
