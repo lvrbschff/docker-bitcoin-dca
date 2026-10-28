@@ -189,19 +189,14 @@ Manual withdrawals require `LIVE_TRADING=true` and withdrawal permissions on the
 
 ## Portfolio web UI
 
-The web UI reads current prices from Kraken’s public [BTC/EUR](https://www.kraken.com/convert/btc/eur) and [BTC/USD](https://www.kraken.com/convert/btc/usd) converter pages. No API credentials are required; the Docker host must have internet access.
+Open [http://localhost:6890](http://localhost:6890) and sign in with the credentials from .env. The dashboard shows the bot-tracked BTC portfolio, configuration, next purchase time, and purchases and withdrawals with their current status.
 
-**Purchase schedule** shows the next estimated purchase time in the configured `TIMEZONE` and a countdown that updates every second. The page refreshes the stored schedule every 30 seconds, including after purchases. If no purchase can currently be scheduled, it shows the reason instead of a purchase time.
+- Select EUR or USD for display. Reference prices come from Kraken’s public [BTC/EUR](https://www.kraken.com/convert/btc/eur) and [BTC/USD](https://www.kraken.com/convert/btc/usd) pages; cached prices are labelled.
+- Choose a withdrawal interval or custom dates in **Period analysis**, browse Activity, and download a [Parqet CSV](#parqet-csv-exports). Dry-run purchases are marked and excluded from exports.
+- Use **Withdraw BTC manually** below **Log out** to review and confirm a withdrawal. Destination details appear in Notes; see [Manual Bitcoin withdrawals](#manual-bitcoin-withdrawals).
+- **Delete** removes a purchase from local history only; it never reverses an exchange order.
 
-The dashboard uses a styled login page with `WEB_UI_USERNAME` and `WEB_UI_PASSWORD` from .env (defaults: `admin` / `admin`). Change the default password before running it. After sign-in, an expiring session protects the dashboard and its API routes; use **Log out** to end the session. The dashboard displays Bitcoin purchases and withdrawals recorded when this bot places them, including submitted, completed, failed and unverified withdrawal states. Older records for other assets remain stored but are excluded from the dashboard, scheduling history, and Parqet exports.
-
-Select EUR or USD as the display currency; the page fetches only the currencies it needs from Kraken’s public converter pages and converts each original currency group separately using current price ratios. If a conversion is unavailable, mixed-currency totals are hidden rather than added incorrectly; individual rows can still show their original currency. The two public currency pages are fetched concurrently when both are needed. Prices are cached for 30 seconds. If a refresh fails, a cached price may be reused only while it is at most five minutes old; the page labels it as cached and shows its fetch time. The displayed portfolio value is bot-tracked BTC multiplied by the selected live price.
-
-Its activity history and historical FX cache are stored in `activity.sqlite3`; the small dashboard snapshot is stored in `dashboard.json`. Both use the Docker-managed named volume `bitcoin-dca-webui-data`. SQLite uses transactions, WAL and durable writes. Date-range queries are indexed and the Activity table uses server-side pagination, so selecting 20 entries transfers 20 rows rather than the entire history. Docker Compose creates and reattaches this same volume on redeploy.
-
-On first database access after updating, an existing `/webui-data/activity.json` or older `./state/activity.json` is imported once into SQLite. Original JSON files are retained, IDs and amounts are preserved, and repeated startup does not duplicate the import. Back up the entire named volume and `./state` before upgrading. Older withdrawals without a confirmed status are marked `legacy_unverified` and excluded from CSV exports until matched uniquely to exchange history. Historical exchange provenance is not guessed from the current configuration; a positive exchange-history identity match can establish it. Records lacking sufficient identifiers or destination data may remain unverified. Reverting to an older JSON-only version does not copy new SQLite entries back into JSON. Keep the volume when updating; `docker compose down -v` deletes it. The dashboard reads local activity and snapshots. The account worker queries exchange withdrawal history only to verify bot-recorded withdrawals; it does not import unrelated account history. The displayed BTC amount is the bot-recorded purchased amount minus gross withdrawal debits, including network fees. Pending debits remain reserved; a confirmed failed withdrawal releases its debit. This is not the full exchange-account balance.
-
-Choose an interval between bot-recorded Bitcoin withdrawals or enter custom start and end dates. The activity table distinguishes simulated dry-run purchases from real purchases. Simulated fees are estimates based on your current exchange taker fee tier and are prefixed with `~`. Use **Delete** to remove an individual purchase from the local activity history; this does not reverse an order on the exchange. Download the selected period as a Parqet-compatible CSV for import into Parqet. Simulated purchases are excluded. Activity from before local tracking is enabled is not imported automatically. Set `WEB_UI_ENABLED` to false to disable the dashboard.
+The portfolio covers bot-recorded activity, not the full exchange account. Data persists in the named volume `bitcoin-dca-webui-data`. Set `WEB_UI_ENABLED=false` to disable the dashboard.
 
 ## Parqet CSV exports
 
@@ -213,7 +208,7 @@ Existing local activity is retained during migration. Earlier orders not previou
 
 Docker checks `/data/worker-health.json` every 30 seconds. The worker updates its heartbeat during normal waits; a heartbeat older than ten minutes or a stopped worker is unhealthy. A supervisor exits the process for Docker’s existing restart policy when the worker stops or remains stalled. Saved pending orders and uncertain withdrawals are retained across restarts. The local `/healthz` route exposes only the worker health status. Health indicates that the worker is running, not that exchange requests are succeeding or that trading is possible. Ordinary API errors are logged and retried without making a responsive worker unhealthy. Docker marking a container unhealthy does not itself restart it; the supervisor exits the process for stalled or stopped workers, and `restart: unless-stopped` handles that exit.
 
-Keep both persistent mounts when updating. SQLite migration is automatic and original JSON data is retained. Do not use `docker compose down -v` during an update. Rebuild and recreate with `docker compose up -d --build` after updating the source checkout.
+Keep both persistent mounts when updating: `./state` contains pending requests and scheduling state; `bitcoin-dca-webui-data` contains `activity.sqlite3` and `dashboard.json`. Back up both before upgrading. On first database access, legacy `activity.json` is imported once into SQLite, preserving IDs and amounts and retaining the original JSON. Older withdrawals without a confirmed status remain excluded from exports until uniquely verified; see [Withdrawals and local records](#withdrawals-and-local-records). Reverting to a JSON-only release does not restore new SQLite activity to JSON. Do not use `docker compose down -v` during an update. Rebuild and recreate with `docker compose up -d --build` after updating the source checkout.
 
 ## Logs
 
@@ -246,25 +241,22 @@ Logs may contain account balances, trade amounts, prices, and exchange order or 
 
 ## Project structure and Docker files
 
-The Docker and configuration files have different jobs:
+The bot runs as one Python process inside one Docker container. A single account worker serializes scheduled checks and manual withdrawals, while the HTTP server serves the dashboard and reports.
 
-- **Dockerfile** is the image build recipe. It installs Python dependencies and copies the bot and adapter code into the image.
-- **docker-compose.yml** builds and runs that image, sets the bot's runtime options, and publishes the local web UI port.
-- **.env.example** is a template for a local .env file. Use it for exchange API credentials, web UI settings, KRAKEN_WITHDRAW_KEY, and Bitvavo's WITHDRAW_ADDRESS and WITHDRAW_NETWORK when needed. It is not a second Docker build file, and it contains no exchange API credentials.
+```mermaid
+flowchart LR
+    UI["Web UI<br/>web_ui.py"] -->|Manual actions| Worker["Account worker<br/>worker.py"]
+    Worker --> Bot["DCA logic and verification<br/>bot.py · withdrawals.py"]
+    Bot --> Adapter["Exchange adapter<br/>exchange.py → kraken.py / bitvavo.py"]
+    Adapter <-->|API| Exchange["Kraken or Bitvavo"]
+    Bot <-->|Pending requests and schedule| State["./state"]
+    Bot --> Ledger["SQLite activity ledger<br/>activity.py"]
+    Ledger -->|Reports and CSV| UI
+```
 
-The code is separated by responsibility:
+`analytics.py` builds summaries, `reporting.py` generates Parqet exports, and the cache modules reduce repeated reads. A supervisor and `healthcheck.py` monitor the worker.
 
-- **bot.py** contains the exchange-independent DCA schedule, state handling, and bot workflow.
-- **exchange.py** selects the configured exchange adapter.
-- **bitvavo.py** and **kraken.py** implement the same exchange interface for their respective APIs.
-- **reporting.py** converts trade and withdrawal data into Parqet CSV rows.
-- **activity.py** stores the SQLite ledger, indexed queries, FX cache and JSON migration; snapshots remain small local JSON files.
-- **web_ui.py** serves the local dashboard, paginated reports, queued withdrawal status and on-demand CSV downloads.
-- **worker.py** runs periodic account checks and manual account tasks in one serial worker; its supervisor exits the process if the worker dies or stalls.
-- **withdrawals.py** verifies submitted withdrawals against exchange history without importing unrelated activity.
-- **analytics.py**, **price_cache.py**, and **read_cache.py** separate per-currency reporting and bounded read caches.
-- **exchange_errors.py** distinguishes definitive rejections from uncertain outcomes.
-- **healthcheck.py** checks the worker heartbeat without contacting an exchange.
+`Dockerfile` builds the image; `docker-compose.yml` configures runtime settings, the local port and persistent mounts. Copy `.env.example` to `.env` for credentials, withdrawal destinations and web UI access.
 
 ## GitHub Container Registry
 
