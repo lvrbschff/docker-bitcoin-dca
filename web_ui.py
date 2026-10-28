@@ -117,7 +117,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="card"><label>Quote currency</label><div class="value" id="settingQuoteCurrency">—</div></div>
 <div class="card"><label>Trading mode</label><div class="value" id="tradingMode">—</div></div>
 <div class="card"><label>Purchase amount</label><div class="value" id="buyAmount">—</div></div>
-<div class="card"><label>Deposit day</label><div class="value" id="depositDay">—</div></div>
+<div class="card"><label>Deposit day (day of month)</label><div class="value" id="depositDay">—</div></div>
 <div class="card"><label>Automatic withdrawals</label><div class="value" id="withdrawEnabled">—</div></div>
 <div class="card"><label>Withdrawal threshold</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured threshold</div></div>
 </div>
