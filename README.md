@@ -189,22 +189,28 @@ Choose periods carefully: purchases after the latest withdrawal are still includ
 
 ### Project structure and Docker files
 
-The bot runs as one Python process inside one Docker container. A single account worker serializes scheduled checks and manual withdrawals, while the HTTP server serves the dashboard and reports.
+The application runs in one Docker container. Its HTTP server and account worker share a Python process; the worker executes scheduled checks and queued manual withdrawals sequentially.
 
 ```mermaid
-flowchart LR
-    UI["Web UI<br/>web_ui.py"] -->|Manual actions| Worker["Account worker<br/>worker.py"]
-    Worker --> Bot["DCA logic and verification<br/>bot.py · withdrawals.py"]
-    Bot --> Adapter["Exchange adapter<br/>exchange.py → kraken.py / bitvavo.py"]
-    Adapter <-->|API| Exchange["Kraken or Bitvavo"]
-    Bot <-->|Pending requests and schedule| State["./state"]
-    Bot --> Ledger["SQLite activity ledger<br/>activity.py"]
-    Ledger -->|Reports and CSV| UI
+flowchart TB
+    Browser["Browser"] <-->|Local HTTP| Web
+    subgraph App["Application process"]
+        Web["Dashboard and reports<br/>web_ui.py · analytics.py · reporting.py"]
+        Worker["Account worker and DCA logic<br/>worker.py · bot.py · withdrawals.py"]
+        Adapter["Selected exchange adapter<br/>exchange.py → kraken.py or bitvavo.py"]
+        Web <-->|Action queue and job status| Worker
+        Worker <-->|Balances, orders and withdrawals| Adapter
+    end
+    Adapter <-->|Authenticated and public API calls| Exchange["Kraken or Bitvavo"]
+    Web -->|Reference prices and USD export rates| Sources["Kraken converter pages<br/>Frankfurter API"]
+    Worker <-->|Pending requests, schedule and heartbeat| State["Host directory ./state<br/>mounted at /data"]
+    Worker <-->|Activity and dashboard snapshot| Data["Named volume bitcoin-dca-webui-data<br/>mounted at /webui-data"]
+    Web <-->|Reports, purchase deletion and FX cache| Data
 ```
 
-`analytics.py` builds summaries, `reporting.py` generates Parqet exports, and the cache modules reduce repeated reads. A supervisor and `healthcheck.py` monitor the worker.
+The named volume holds `activity.sqlite3` (activity and FX cache) and `dashboard.json`. The worker’s supervisor detects stopped or stalled execution; Docker runs `healthcheck.py` as a separate process to check the saved heartbeat.
 
-`Dockerfile` builds the image; `docker-compose.yml` configures runtime settings, the local port and persistent mounts. Copy `.env.example` to `.env` for credentials, withdrawal destinations and web UI access.
+`Dockerfile` builds the image. `docker-compose.yml` defines runtime settings, the local port, persistent mounts and restart policy. Copy `.env.example` to `.env` for credentials, withdrawal destinations and web UI access.
 
 ### Worker health and updating
 
