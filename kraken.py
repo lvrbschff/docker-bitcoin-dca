@@ -17,6 +17,10 @@ BASE_URL = "https://api.kraken.com/0"
 LOG = logging.getLogger("bitvavo-dca.kraken")
 _NONCE_LOCK = threading.Lock()
 _LAST_NONCE = 0
+_READ_ONLY_PRIVATE_METHODS = frozenset({
+    "Balance", "BalanceEx", "TradeVolume", "Ledgers", "TradesHistory",
+    "WithdrawStatus", "WithdrawInfo", "OpenOrders", "ClosedOrders", "QueryOrders",
+})
 
 
 class KrakenAPIError(requests.RequestException):
@@ -68,33 +72,60 @@ class Kraken:
             raise KrakenAPIError("; ".join(errors))
         return payload.get("result", {})
 
+    def _request_result(self, endpoint, send_request, retry_safe):
+        attempts = 3 if retry_safe else 1
+        for attempt in range(1, attempts + 1):
+            try:
+                return self._check_response(send_request())
+            except (requests.Timeout, requests.ConnectionError) as exc:
+                if attempt == attempts:
+                    raise KrakenAPIError(
+                        f"{endpoint} failed after {attempts} attempt(s): {exc}"
+                    ) from exc
+                delay = attempt
+                LOG.warning(
+                    "Kraken %s: %s on read attempt %s/%s; retrying in %ss.",
+                    endpoint, type(exc).__name__, attempt, attempts, delay,
+                )
+                time.sleep(delay)
+
     def public(self, method, params=None):
-        response = self.session.get(
-            f"{BASE_URL}/public/{method}", params=params or {}, timeout=20
+        return self._request_result(
+            f"public/{method}",
+            lambda: self.session.get(
+                f"{BASE_URL}/public/{method}", params=params or {}, timeout=(10, 30)
+            ),
+            retry_safe=True,
         )
-        return self._check_response(response)
 
     def private(self, method, params=None):
         path = f"/0/private/{method}"
-        data = dict(params or {})
-        nonce = _next_nonce()
-        data["nonce"] = nonce
-        postdata = urlencode(data)
-        digest = hashlib.sha256((nonce + postdata).encode()).digest()
-        signature = base64.b64encode(
-            hmac.new(self.secret_bytes, path.encode() + digest, hashlib.sha512).digest()
-        ).decode()
-        response = self.session.post(
-            f"https://api.kraken.com{path}",
-            data=postdata,
-            headers={
-                "API-Key": self.key,
-                "API-Sign": signature,
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-            timeout=20,
+
+        def send_request():
+            # A retry of a read operation needs a fresh nonce and signature.
+            data = dict(params or {})
+            nonce = _next_nonce()
+            data["nonce"] = nonce
+            postdata = urlencode(data)
+            digest = hashlib.sha256((nonce + postdata).encode()).digest()
+            signature = base64.b64encode(
+                hmac.new(self.secret_bytes, path.encode() + digest, hashlib.sha512).digest()
+            ).decode()
+            return self.session.post(
+                f"https://api.kraken.com{path}",
+                data=postdata,
+                headers={
+                    "API-Key": self.key,
+                    "API-Sign": signature,
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                timeout=(10, 30),
+            )
+
+        return self._request_result(
+            f"private/{method}", send_request,
+            retry_safe=method in _READ_ONLY_PRIVATE_METHODS,
         )
-        return self._check_response(response)
 
     def _asset_info(self):
         if self._assets is None:
