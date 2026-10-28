@@ -142,11 +142,13 @@ text(CX+239,Y+69,'⌄',15,MUTED)
 button(CX+831,Y+42,265,'Load report',True)
 Y+=137
 summary=report.find(lambda n:n.tag=='section' and n.cls('panel'))[1]
-rect(X,Y,W,405);heading(CX,Y+33,'Selected period summary')
+rect(X,Y,W,805);heading(CX,Y+33,'Selected period summary')
 grids=summary.find(lambda n:n.cls('grid'))
 grid(grids[0],CX,Y+55,CW,5,166)
 grid(grids[1],CX,Y+235,CW,4,148)
 Y+=423
+outer_geometry=(X,W,CX,CW)
+X+=20;W-=40;CX+=20;CW-=40
 rect(X,Y,W,360);heading(CX,Y+34,'Activity')
 text(X+W-238,Y+33,'Entries per page',12,MUTED);rect(X+W-104,Y+12,84,36,CARD,LINE,9);text(X+W-87,Y+35,'10',13);text(X+W-41,Y+35,'⌄',13,MUTED)
 columns=[CX+10,CX+238,CX+410,CX+553,CX+731,CX+870,CX+986]
@@ -166,7 +168,8 @@ for i,row in enumerate(rows):
  line(CX,ry+13,CX+CW,ry+13)
 button(CX,Y+292,99,'Previous');text(CX+180,Y+320,'Showing 1–5 of 5 · Page 1 of 1',13,MUTED);button(CX+CW-340,Y+292,74,'Next')
 text(CX+CW-245,Y+320,'Go to page',12,MUTED);rect(CX+CW-165,Y+296,76,36,CARD,LINE,10);text(CX+CW-150,Y+320,'1',13);button(CX+CW-70,Y+292,70,'Go')
-Y+=378
+Y+=398
+X,W,CX,CW=outer_geometry
 button(X+W-209,Y,209,'Download Parqet CSV')
 Y+=75
 line(X,Y,X+W,Y);heading(X,Y+34,'Notes')
