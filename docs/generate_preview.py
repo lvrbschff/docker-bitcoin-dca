@@ -128,11 +128,11 @@ rect(X,Y,W,180);heading(CX,Y+34,'Purchase schedule',2)
 grid(schedule.find(lambda n:n.cls('grid'))[0],CX,Y+55,CW,2,102)
 Y+=218
 line(X,Y,X+W,Y);text(X,Y+48,'Period analysis',21,TEXT,True);text(X+draw.textlength('Period analysis',font=font(21,True))+5,Y+39,'3',11,'#fff',True)
-text(X,Y+75,'Choose a date range to review activity and prepare a Parqet export.',14,MUTED)
+text(X,Y+75,report.find(lambda n:n.cls('report-heading'))[0].find(lambda n:n.cls('sub'))[0].text(),14,MUTED)
 Y+=100
 rect(X,Y,W,119)
 # Three equal input columns plus report action match the desktop controls.
-for x,w,label,value in [(CX,265,'Withdrawal interval','Custom date range'),(CX+277,265,'From','20/10/2026, 00:00'),(CX+554,265,'To','28/10/2026, 12:00')]:
+for x,w,label,value in [(CX,265,main.find(lambda n:n.tag=='label' and n.attrs.get('for')=='interval')[0].text(),'Custom date range'),(CX+277,265,'From','20/10/2026, 00:00'),(CX+554,265,'To','28/10/2026, 12:00')]:
  text(x,Y+32,label,12,MUTED);rect(x,Y+42,w,45,CARD,LINE,10);text(x+12,Y+71,value,15)
 text(CX+239,Y+69,'⌄',15,MUTED)
 button(CX+831,Y+42,265,'Load report',True)
@@ -146,7 +146,7 @@ Y+=379
 outer_geometry=(X,W,CX,CW)
 X+=20;W-=40;CX+=20;CW-=40
 rect(X,Y,W,360);heading(CX,Y+34,'Activity')
-text(X+W-238,Y+33,'Entries per page',12,MUTED);rect(X+W-104,Y+12,84,36,CARD,LINE,9);text(X+W-87,Y+35,'10',13);text(X+W-41,Y+35,'⌄',13,MUTED)
+text(X+W-238,Y+33,'Entries per page',12,MUTED);rect(X+W-104,Y+12,84,36,CARD,LINE,9);text(X+W-87,Y+35,by_id['pageSize'].find(lambda n:n.tag=='option' and 'selected' in n.attrs)[0].text(),13);text(X+W-41,Y+35,'⌄',13,MUTED)
 columns=[CX+10,CX+238,CX+410,CX+553,CX+731,CX+870,CX+986]
 for x,label in zip(columns,['DATE','TYPE','BTC','PRICE','VALUE','FEE','ACTION']):text(x,Y+78,label,11,MUTED,True)
 line(CX,Y+91,CX+CW,Y+91)

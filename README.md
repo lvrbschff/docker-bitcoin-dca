@@ -1,6 +1,6 @@
 # Bitcoin DCA Bot for Bitvavo and Kraken
 
-A Docker-based DCA bot exclusively for buying and withdrawing Bitcoin (BTC) on Bitvavo or Kraken. Choose the exchange, quote currency, BTC purchase amount, and deposit day. The bot recalculates purchase timing from the available balance and the selected exchange's current minimum order rules. Optional automatic BTC withdrawals to a configured external wallet are supported. A local web UI provides an activity and portfolio overview and can generate Parqet-compatible CSV exports.
+A Docker-based DCA bot for buying Bitcoin (BTC) on Bitvavo or Kraken, with optional Bitcoin withdrawals. Choose the exchange, quote currency, BTC purchase amount, and deposit day. The bot recalculates purchase timing from the available balance and the selected exchange's current minimum order rules. A local web UI provides an activity and portfolio overview and can generate Parqet-compatible CSV exports.
 
 ### Example web UI (fictional data)
 
