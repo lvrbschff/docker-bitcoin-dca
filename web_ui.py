@@ -33,11 +33,37 @@ HTML = """<!doctype html>
 main{max-width:1180px;margin:0 auto;padding:36px 22px 64px}.top{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:26px}.eyebrow{color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}h1{font-size:30px;margin:4px 0}.sub{color:var(--muted);margin:0}
 .bottom-actions{display:flex;justify-content:flex-end;margin-top:18px}.badge{border:1px solid var(--line);border-radius:999px;padding:8px 12px;color:var(--muted);font-size:12px}.top-actions{display:flex;flex-direction:column;align-items:flex-end;gap:10px}.top-actions form{margin:0}.top-actions .field{min-width:170px}.top-actions .field label{margin-bottom:5px}
 .panel{background:linear-gradient(145deg,rgba(21,31,52,.96),rgba(15,22,39,.96));border:1px solid var(--line);border-radius:18px;padding:20px;margin:18px 0;box-shadow:0 14px 40px #0002}
-.controls{display:grid;grid-template-columns:2fr 1fr 1fr auto auto;gap:12px;align-items:end}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}select,input,button{font:inherit;color:var(--text);background:#0c1425;border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%}button{width:auto;cursor:pointer;background:var(--accent);border-color:var(--accent);color:#081122;font-weight:700}button.secondary{background:transparent;color:var(--text);border-color:var(--line)}button:hover{filter:brightness(1.08)}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.period-summary-grid{grid-template-columns:repeat(5,1fr)}.card{padding:17px;border:1px solid var(--line);border-radius:14px;background:#0c1425a8}.card label{display:block;color:var(--muted);font-size:12px;margin-bottom:9px}.value{font-size:22px;font-weight:700;letter-spacing:-.02em}.small{font-size:12px;color:var(--muted);margin-top:4px}
+.controls{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto;gap:12px;align-items:end}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}select,input,button{font:inherit;color:var(--text);background:#0c1425;border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%}button{width:auto;cursor:pointer;background:var(--accent);border-color:var(--accent);color:#081122;font-weight:700}button.secondary{background:transparent;color:var(--text);border-color:var(--line)}button:hover{filter:brightness(1.08)}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.period-summary-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.card{padding:17px;border:1px solid var(--line);border-radius:14px;background:#0c1425a8}.card label{display:block;color:var(--muted);font-size:12px;margin-bottom:9px}.value{font-size:22px;font-weight:700;letter-spacing:-.02em}.small{font-size:12px;color:var(--muted);margin-top:4px}
 h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:740px}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}td.num{text-align:right;font-variant-numeric:tabular-nums}.positive{color:var(--green)}.negative{color:var(--red)}.notice{color:var(--muted);font-size:13px;margin-top:12px}.error{color:var(--red);margin:12px 0}.hidden{display:none}.activity-heading,.pagination,.settings-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.settings-heading h2{margin:0}.settings-heading .field{min-width:160px}.activity-heading h2{margin:0}.page-size{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}.page-size select{width:auto;padding:7px 10px}.pagination{margin-top:12px}.pagination button{padding:8px 12px}.pagination .notice{margin:0;text-align:center}
-@media(max-width:850px){.controls{grid-template-columns:1fr 1fr}.controls .field:first-child{grid-column:span 2}.grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:520px){main{padding:24px 14px}.top{align-items:flex-start;flex-direction:column}.top-actions{align-items:flex-start}h1{font-size:25px}.controls{grid-template-columns:1fr}.controls .field:first-child{grid-column:auto}.grid{gap:9px}.card{padding:13px}.value{font-size:18px}.activity-heading,.settings-heading{align-items:flex-start;flex-direction:column}.pagination{gap:8px}.pagination button{padding:8px}.pagination .notice{font-size:11px}}
+main,.panel,.grid,.card,.field,.top>div{min-width:0}
+main{width:100%}.top-actions{flex-shrink:0}.controls>*{min-width:0}
+input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overflow-wrap:anywhere}
+.value{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.time-value{font-size:16px;line-height:1.5;letter-spacing:0;overflow-wrap:normal}
+.date-point{display:flex;flex-wrap:wrap;gap:0 .35em}.date-point span{white-space:nowrap}
+.countdown-value{font-size:clamp(16px,1.6vw,20px);white-space:nowrap;letter-spacing:0}
+.tablewrap{width:100%;max-width:100%;min-width:0;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+.pagination{flex-wrap:wrap}.pagination .notice{flex:1;min-width:100px}
+@media(max-width:1100px){.period-summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.controls{grid-template-columns:repeat(2,minmax(0,1fr))}.controls .field:first-child{grid-column:1/-1}}
+@media(max-width:850px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.top{align-items:flex-start}.top-actions .field{min-width:150px}}
+@media(max-width:600px){
+ main{padding:22px 12px 36px}.panel{padding:15px;margin:14px 0;border-radius:14px}
+ .top{flex-direction:column;gap:18px;margin-bottom:20px}h1{font-size:26px}.sub{font-size:14px}
+ .top-actions{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center}
+ .top-actions .badge{justify-self:start}.top-actions form{justify-self:end}.top-actions .field{grid-column:1/-1;min-width:0}
+ .controls{grid-template-columns:minmax(0,1fr)}.controls .field:first-child{grid-column:auto}
+ input,select{font-size:16px}input,select,button{min-height:44px}
+ .grid{gap:10px}.card{padding:13px}.card label{line-height:1.5;margin-bottom:7px}
+ .value{font-size:19px;line-height:1.4}.time-card{grid-column:1/-1}
+ .time-value{font-size:15px;line-height:1.65}.countdown-value{font-size:20px}
+ .activity-heading,.settings-heading{align-items:flex-start;flex-wrap:wrap}
+ .activity-heading h2{flex-basis:100%}.page-size{width:100%;justify-content:space-between}
+ .page-size select{min-width:90px}.pagination{gap:10px}.pagination button{flex:1}
+ .pagination .notice{order:3;flex-basis:100%;font-size:12px}
+ th,td{padding:10px 8px;font-size:13px}.bottom-actions button{width:100%;white-space:normal}
+}
+@media(max-width:360px){.grid{grid-template-columns:minmax(0,1fr)}.time-card{grid-column:auto}}
 </style>
 </head>
 <body><main>
@@ -67,8 +93,8 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 <div class="card"><label>Deposit day (DEPOSIT_DAY)</label><div class="value" id="depositDay">—</div></div>
 <div class="card"><label>Automatic withdrawals (WITHDRAWALS_ENABLED)</label><div class="value" id="withdrawEnabled">—</div></div>
 <div class="card"><label>Withdrawal threshold (WITHDRAW_THRESHOLD_QUOTE)</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured environment variable</div></div>
-<div class="card"><label>Next purchase (estimated)</label><div class="value" id="nextPurchaseAt">—</div><div class="small" id="nextPurchaseStatus">Waiting for the bot schedule</div></div>
-<div class="card"><label>Time until next purchase</label><div class="value" id="nextPurchaseCountdown">—</div><div class="small">Updates every second</div></div>
+<div class="card time-card"><label>Next purchase (estimated)</label><div class="value time-value" id="nextPurchaseAt">—</div><div class="small" id="nextPurchaseStatus">Waiting for the bot schedule</div></div>
+<div class="card time-card"><label>Time until next purchase</label><div class="value countdown-value" id="nextPurchaseCountdown">—</div><div class="small">Updates every second</div></div>
 </div><div class="notice">Fiat values are converted to the selected display currency. The current BTC price is fetched from Kraken’s public BTC-to-fiat pages when the report loads. Parqet CSV exports retain the currency in which each transaction was recorded.</div>
 </section>
 <section class="panel"><h2>Selected period summary</h2><div class="grid period-summary-grid">
@@ -80,7 +106,7 @@ h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse
 </div><div class="grid" style="margin-top:14px">
 <div class="card"><label>Withdrawal fees</label><div class="value" id="withdrawFees">—</div></div>
 <div class="card"><label>Net BTC in period</label><div class="value" id="netBtc">—</div><div class="small">Purchases minus withdrawals</div></div>
-<div class="card"><label>Date range</label><div class="value" id="periodLabel">—</div></div>
+<div class="card time-card"><label>Date range</label><div class="value time-value" id="periodLabel">—</div></div>
 <div class="card"><label>Last updated</label><div class="value" id="updated">—</div></div>
 </div></section>
 <section class="panel"><div class="activity-heading"><h2>Activity</h2><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>10</option><option selected>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th><th>Action</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><button class="secondary" id="previousPage">Previous</button><span id="pageInfo" class="notice"></span><button class="secondary" id="nextPage">Next</button></div></section>
@@ -94,6 +120,18 @@ function parseInput(el){return new Date(el.value).getTime()}
 function money(v,c){try{return new Intl.NumberFormat("en-GB",{style:"currency",currency:c,maximumFractionDigits:2}).format(Number(v||0))}catch(e){return Number(v||0).toFixed(2)+" "+c}}
 function btc(v){return Number(v||0).toLocaleString("en-GB",{minimumFractionDigits:0,maximumFractionDigits:8})+" BTC"}
 function dateLabel(ms){return new Date(ms).toLocaleString("en-GB")}
+function renderPeriodLabel(start,end){
+ const points=[start,end].map((timestamp,index)=>{
+  const point=document.createElement("time");
+  point.className="date-point";point.dateTime=new Date(timestamp).toISOString();
+  const date=document.createElement("span"),clock=document.createElement("span");
+  date.textContent=(index?"To: ":"From: ")+new Date(timestamp).toLocaleDateString("en-GB");
+  clock.textContent=new Date(timestamp).toLocaleTimeString("en-GB");
+  point.append(date,clock);return point;
+ });
+ $("periodLabel").replaceChildren(...points);
+}
+
 let nextPurchaseTimestamp=null, scheduleClockOffset=0;
 function renderPurchaseCountdown(){
  const output=$("nextPurchaseCountdown");
@@ -186,7 +224,7 @@ async function loadAnalytics(){
  $("buyVolume").textContent=money(Number(d.summary.buyVolume)*fxRate,displayCurrency);$("avgPrice").textContent="Average: "+money(Number(d.summary.averagePrice)*fxRate,displayCurrency)+"/BTC";
  $("tradeFees").textContent=money(Number(d.summary.tradeFees)*fxRate,displayCurrency);$("withdrawBtc").textContent=btc(d.summary.withdrawnBtc);$("withdrawCount").textContent=d.summary.withdrawalCount+" withdrawals";
  $("withdrawFees").textContent=money(Number(d.summary.withdrawalFees)*fxRate,displayCurrency);$("netBtc").textContent=btc(d.summary.netBtc);
- $("periodLabel").textContent=new Date(p.start).toLocaleString("en-GB")+" – "+new Date(p.end).toLocaleString("en-GB");$("updated").textContent=new Date(d.snapshot.updatedAt||Date.now()).toLocaleTimeString("en-GB");
+ renderPeriodLabel(p.start,p.end);$("updated").textContent=new Date(d.snapshot.updatedAt||Date.now()).toLocaleTimeString("en-GB");
  activityRows=d.activities.slice().reverse();currentPage=1;renderActivities();
  }catch(e){showError(e.message)}
 }
@@ -211,6 +249,7 @@ LOGIN_HTML = """<!doctype html>
 label{display:block;color:var(--muted);font-size:12px;margin:15px 0 6px}input{width:100%;padding:12px 13px;color:var(--text);background:#0c1425;border:1px solid var(--line);border-radius:10px;font:inherit;outline:none}input:focus{border-color:var(--accent);box-shadow:0 0 0 3px #8bafff22}
 button{width:100%;margin-top:22px;padding:12px;border:1px solid var(--accent);border-radius:10px;background:var(--accent);color:#081122;font:inherit;font-weight:700;cursor:pointer}button:hover{filter:brightness(1.08)}
 .error{min-height:20px;margin:12px 0 0;color:var(--red);font-size:13px}.foot{margin-top:20px;color:var(--muted);font-size:12px}
+@media(max-width:480px){body{padding:16px;min-height:100svh}.card{padding:24px}input{font-size:16px}}
 </style>
 </head>
 <body><main class="card">
