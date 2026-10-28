@@ -182,6 +182,12 @@ The bot checks the available BTC balance and its value in `QUOTE_CURRENCY`. When
 
 Check the destination and network carefully before enabling automatic withdrawals on either exchange. If a withdrawal request has an ambiguous response, retry behavior differs: Bitvavo may retry the identical request using the same idempotency key, while Kraken withdrawals are not retried automatically. For Kraken, check the withdrawal status in Kraken before taking further action. For Bitvavo, the idempotency key is intended to prevent duplicate withdrawals, but verify the status in Bitvavo before taking manual action.
 
+### Manual Bitcoin withdrawals
+
+Click **Withdraw BTC manually** in Bot configuration to review the available BTC balance and configured destination, then confirm the transfer. The button sends the entire available BTC balance less the exchange withdrawal fee. Kraken previews the fee and net amount; Bitvavo returns the fee on submission. The destination is also shown in the dashboard footnote: `KRAKEN_WITHDRAW_KEY` selects a saved Kraken withdrawal method, while `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK` select the Bitvavo destination. These values are configured in .env.
+
+Manual withdrawals require `LIVE_TRADING=true`, `BASE_ASSET=BTC`, and withdrawal permissions on the selected exchange's API key. They work independently of `WITHDRAWALS_ENABLED` and `WITHDRAW_THRESHOLD_QUOTE`. Confirmation expires after two minutes; a changed balance or intervening withdrawal requires a new preview. Unresolved orders or withdrawals block submission. Submitted withdrawals are recorded in Activity with net BTC and withdrawal fees and are included in Parqet exports. Submission does not confirm blockchain settlement. If the outcome is uncertain, check the exchange before taking further action.
+
 ## Portfolio web UI
 
 The web UI reads current prices from Kraken’s public [BTC/EUR](https://www.kraken.com/convert/btc/eur) and [BTC/USD](https://www.kraken.com/convert/btc/usd) converter pages. No API credentials are required; the Docker host must have internet access.

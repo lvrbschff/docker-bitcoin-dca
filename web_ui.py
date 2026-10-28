@@ -87,6 +87,8 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 </div></section>
 <section class="panel">
 <h2>Bot configuration</h2>
+<p><button id="manualWithdraw" type="button">Withdraw BTC manually</button> <a class="footnote-ref" href="#withdrawal-note" aria-label="Read withdrawal configuration note"><sup>4</sup></a></p>
+<p id="withdrawMessage" class="notice" role="status"></p>
 <div class="grid">
 <div class="card"><label>Exchange</label><div class="value" id="settingExchange">—</div></div>
 <div class="card"><label>Cryptocurrency</label><div class="value" id="baseAsset">—</div></div>
@@ -135,6 +137,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 <li id="currency-note"><strong>Display currency and price data.</strong><p>Fiat values are converted to the selected display currency. The current BTC price is fetched from Kraken’s public BTC-to-fiat pages when the report loads. Parqet CSV exports use EUR.</p></li>
 <li id="schedule-note"><strong>Purchase schedule.</strong><p>The interval is the time until the next deposit day divided by the estimated number of purchases the current balance can cover, using the current market price and configured purchase amount or exchange minimum. Time elapsed since the last purchase is deducted to determine the next purchase time. The estimate is recalculated during bot checks; open or unconfirmed orders block further purchases.</p></li>
 <li id="report-note"><strong>Period analysis, Parqet export and local activity history.</strong><p>These notes apply to the date filters in Period analysis, the Activity table and the Download Parqet CSV button. Choose an interval between bot-recorded BTC withdrawals or set a custom date range. The Parqet CSV consolidates the period into one purchase: all real purchase costs and trading fees in EUR, and net BTC received at withdrawals after network fees. The period must contain purchases and a bot-recorded withdrawal. Dry-run purchases are shown separately and excluded from the CSV. Delete removes a purchase from local history only; it cannot reverse an exchange order.</p></li>
+<li id="withdrawal-note"><strong>Manual BTC withdrawal.</strong><p id="withdrawalDestination">Loading withdrawal configuration…</p><p>The button withdraws the entire available BTC balance, less the exchange withdrawal fee. LIVE_TRADING must be enabled; automatic withdrawals may remain disabled and their threshold does not apply. Configure KRAKEN_WITHDRAW_KEY in .env for Kraken, or WITHDRAW_ADDRESS and WITHDRAW_NETWORK for Bitvavo. Kraken resolves the saved method to its destination address. A confirmation is required before submission. Submitted manual withdrawals appear in Activity and count toward Parqet exports like automatic withdrawals.</p></li>
 <li id="local-access-note"><strong>Local access only.</strong><p>With the default Docker Compose port mapping, the dashboard is accessible only from the Docker host.</p></li>
 </ol>
 </footer>
@@ -269,6 +272,30 @@ $("download").addEventListener("click",async()=>{
  }catch(e){message.textContent=e.message;message.classList.remove("hidden")}
  finally{button.disabled=false;button.textContent="Download Parqet CSV"}
 });
+
+async function withdrawalPost(path, body){
+ const response=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json","X-DCA-Action":"withdrawal"},body:JSON.stringify(body)});
+ const result=await response.json();if(!response.ok)throw new Error(result.error||"Withdrawal request failed.");return result;
+}
+async function loadWithdrawalConfiguration(){
+ try{const response=await fetch("/api/withdrawal/config");const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load withdrawal configuration.");
+ $("withdrawalDestination").textContent=d.destination;$("manualWithdraw").disabled=!d.enabled;
+ if(!d.enabled)$("withdrawMessage").textContent="Manual withdrawal requires live BTC trading and a configured destination.";
+ }catch(e){$("manualWithdraw").disabled=true;$("withdrawMessage").textContent=e.message}
+}
+$("manualWithdraw").addEventListener("click",async()=>{
+ const button=$("manualWithdraw");button.disabled=true;
+ try{const p=await withdrawalPost("/api/withdrawal/preview",{});
+ const fee=p.feeBtc!==null&&p.feeBtc!==undefined?"Withdrawal fee: "+p.feeBtc+" BTC\\nNet sent: "+p.netBtc+" BTC":"Bitvavo deducts its withdrawal fee from this balance; the final fee is returned on submission.";
+ if(!confirm("Confirm BTC withdrawal?\\n\\n"+p.destination+"\\nAvailable balance to withdraw: "+p.availableBtc+" BTC\\n"+fee+"\\n\\nThis transfer cannot be reversed. Submit withdrawal?"))return;
+ $("withdrawMessage").textContent="Submitting withdrawal…";
+ const result=await withdrawalPost("/api/withdrawal/confirm",{token:p.token});$("withdrawMessage").textContent=result.message;
+ $("interval").value="";$("end").value=localInput(Date.now()+60000);await loadAnalytics();
+ }catch(e){$("withdrawMessage").textContent=e.message}
+ finally{button.disabled=false}
+});
+loadWithdrawalConfiguration();
+
 (async()=>{try{await loadIntervals();await loadAnalytics()}catch(e){showError(e.message)}})();
 </script></body></html>
 """
@@ -395,6 +422,7 @@ def _period(query):
 
 class Handler(BaseHTTPRequestHandler):
     settings = None
+    withdrawal_service = None
 
     def _send(self, status, body, content_type="application/json; charset=utf-8", filename=None):
         if isinstance(body, str):
@@ -499,6 +527,30 @@ class Handler(BaseHTTPRequestHandler):
             return
         if not self._require_authentication():
             return
+        if parsed.path in ("/api/withdrawal/preview", "/api/withdrawal/confirm"):
+            # A custom header plus JSON prevents cross-origin form submissions.
+            if self.headers.get("X-DCA-Action") != "withdrawal" or self.headers.get("Content-Type") != "application/json":
+                self._json(403, {"error": "Invalid withdrawal request"})
+                return
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if not 0 < length <= 4096:
+                    raise ValueError("Invalid request body")
+                payload = json.loads(self.rfile.read(length).decode("utf-8"))
+                if not isinstance(payload, dict):
+                    raise ValueError("Invalid request body")
+                session = SimpleCookie(self.headers.get("Cookie", ""))["dca_session"].value
+                token = payload.get("token")
+                if parsed.path.endswith("/confirm") and not isinstance(token, str):
+                    raise ValueError("Confirmation token is required")
+                result = self.withdrawal_service("preview" if parsed.path.endswith("/preview") else "confirm", session, token)
+                self._json(200, result)
+            except (ValueError, UnicodeDecodeError) as exc:
+                self._json(400, {"error": str(exc)})
+            except Exception:
+                LOG.exception("Manual withdrawal request failed")
+                self._json(502, {"error": "Withdrawal could not be confirmed. Check exchange status and container logs before trying again."})
+            return
         if parsed.path != "/api/activity/delete":
             self._json(404, {"error": "Not found"})
             return
@@ -526,6 +578,13 @@ class Handler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/":
             self._send(200, HTML, "text/html; charset=utf-8")
+            return
+        if parsed.path == "/api/withdrawal/config":
+            settings = self.settings
+            kraken = settings["exchange"] == "KRAKEN"
+            destination = ("Kraken saved withdrawal method: " + (settings.get("kraken_withdraw_key") or "not configured")) if kraken else ("Bitvavo address: " + (settings.get("withdraw_address") or "not configured") + "; network: " + settings.get("withdraw_network", "BTC"))
+            configured = bool(settings.get("kraken_withdraw_key")) if kraken else bool(settings.get("withdraw_address") and settings.get("withdraw_network"))
+            self._json(200, {"destination": destination, "enabled": bool(settings["live"] and settings["base"] == "BTC" and configured and self.withdrawal_service)})
             return
         query = parse_qs(parsed.query)
         if parsed.path == "/api/market-price":
@@ -669,8 +728,9 @@ def _analytics_from_rows(settings, records, snapshot):
     }
 
 
-def serve(settings, port):
-    handler = type("ConfiguredHandler", (Handler,), {"settings": settings})
+def serve(settings, port, withdrawal_service=None):
+    handler = type("ConfiguredHandler", (Handler,), {"settings": settings, "withdrawal_service": staticmethod(withdrawal_service)})
     server = ThreadingHTTPServer(("0.0.0.0", port), handler)
     LOG.info("Local portfolio web UI listening on container port %s.", port)
     server.serve_forever()
+

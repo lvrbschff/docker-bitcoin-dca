@@ -10,6 +10,16 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 import calendar
 import threading
+from functools import wraps
+
+BOT_LOCK = threading.RLock()
+
+def serialized(function):
+    @wraps(function)
+    def locked(*args, **kwargs):
+        with BOT_LOCK:
+            return function(*args, **kwargs)
+    return locked
 
 import requests
 from activity import append_activity_records, read_activity_records, read_dashboard_snapshot, write_dashboard_snapshot
@@ -156,6 +166,7 @@ def persist_bot_withdrawal(api, withdrawal, result, settings, context):
         "netWithdrawalAmount": True,
         "networkFeeBtc": format(fee_btc, "f"),
         "grossWithdrawalAmountBtc": format(gross_amount, "f"),
+        "manual": bool(context.get("manual")),
     }
     return append_activity_records([record])
 
@@ -232,8 +243,8 @@ def ceil_to_places(value, places):
 
 
 
-def maybe_withdraw_btc(api, state, settings):
-    if not settings["withdrawals_enabled"]:
+def maybe_withdraw_btc(api, state, settings, manual_request=None):
+    if not settings["withdrawals_enabled"] and manual_request is None and not state.get("pending_withdrawal"):
         return
     if not settings["live"]:
         LOG.warning("Automatic withdrawal is enabled but LIVE_TRADING is false; no withdrawal will be sent.")
@@ -241,20 +252,25 @@ def maybe_withdraw_btc(api, state, settings):
 
     pending = state.get("pending_withdrawal")
     if pending:
-        if not getattr(api, "supports_withdrawal_idempotency", False):
-            LOG.error("A previous withdrawal request has an unknown outcome. It will not be retried automatically; verify its status with the exchange before taking further action.")
-            return
-        LOG.warning("Retrying unresolved withdrawal with the same exchange idempotency key.")
-        try:
-            result = api.withdraw_crypto(pending)
-        except requests.RequestException:
-            LOG.exception("Withdrawal outcome is uncertain; the same request will be retried next check.")
-            return
         context = state.get("pending_withdrawal_context", {})
+        result = context.get("result")
+        if result is None:
+            if not getattr(api, "supports_withdrawal_idempotency", False):
+                LOG.error("A previous withdrawal request has an unknown outcome. Verify its status with the exchange; it will not be resent.")
+                return
+            try:
+                result = api.withdraw_crypto(pending)
+            except requests.RequestException:
+                LOG.exception("Withdrawal outcome is uncertain; the same idempotent request will be retried next check.")
+                return
+            context["result"] = result
+            state["pending_withdrawal_context"] = context
+            save_state(Path("/data/state.json"), state)
         persist_bot_withdrawal(api, pending, result, settings, context)
         state["last_withdrawal"] = {
             "id": result.get("id"),
             "amount": pending["amount"],
+            "balanceBefore": context.get("balanceBefore", pending["amount"]),
             "createdAt": result.get("createdAt"),
         }
         state["withdrawal_armed"] = False
@@ -273,7 +289,7 @@ def maybe_withdraw_btc(api, state, settings):
         return
     price = api.price(f"BTC-{settings['quote']}")
     value = available * price
-    if not state.get("withdrawal_armed", True):
+    if manual_request is None and not state.get("withdrawal_armed", True):
         if value < settings["withdraw_threshold"]:
             state["withdrawal_armed"] = True
             save_state(Path("/data/state.json"), state)
@@ -281,7 +297,7 @@ def maybe_withdraw_btc(api, state, settings):
         else:
             LOG.info("Waiting for %s to reflect the previous withdrawal before another automatic withdrawal.", settings["exchange"])
         return
-    if value < settings["withdraw_threshold"]:
+    if manual_request is None and value < settings["withdraw_threshold"]:
         LOG.info("BTC withdrawal threshold not reached: available value %s %s, threshold %s %s.", value, settings["quote"], settings["withdraw_threshold"], settings["quote"])
         return
 
@@ -290,11 +306,13 @@ def maybe_withdraw_btc(api, state, settings):
         LOG.info("No withdrawable BTC remains after applying Bitcoin precision.")
         return
     idempotency_key = str(uuid.uuid4())
-    withdrawal = api.withdrawal_request(amount, idempotency_key, settings)
+    withdrawal = manual_request or api.withdrawal_request(amount, idempotency_key, settings)
     state["pending_withdrawal"] = withdrawal
     state["pending_withdrawal_context"] = {
         "price": format(price, "f"),
         "timestamp_ms": int(time.time() * 1000),
+        "manual": manual_request is not None,
+        "balanceBefore": format(available, "f"),
     }
     save_state(Path("/data/state.json"), state)
     try:
@@ -304,6 +322,8 @@ def maybe_withdraw_btc(api, state, settings):
         if not getattr(api, "supports_withdrawal_idempotency", False):
             LOG.error("This exchange does not support idempotent withdrawal retries; the saved request will not be resent automatically.")
         return
+    state["pending_withdrawal_context"]["result"] = result
+    save_state(Path("/data/state.json"), state)
     persist_bot_withdrawal(
         api, withdrawal, result, settings, state.get("pending_withdrawal_context", {})
     )
@@ -311,6 +331,7 @@ def maybe_withdraw_btc(api, state, settings):
         "id": result.get("id"),
         "amount": withdrawal["amount"],
         "createdAt": result.get("createdAt"),
+        "balanceBefore": format(available, "f"),
     }
     state.pop("pending_withdrawal", None)
     state.pop("pending_withdrawal_context", None)
@@ -390,6 +411,7 @@ def reconcile_pending_order(api, state, state_path, settings, check_interval):
     return None
 
 
+@serialized
 def run_once(api, settings, check_interval, schedule_only=False):
     quote, base = settings["quote"], settings["base"]
     symbol = f"{base}-{quote}"
@@ -596,6 +618,57 @@ def bot_loop(api, settings, interval):
         time.sleep(next_wait)
 
 
+
+def manual_withdrawal_service(api, settings):
+    previews = {}
+
+    @serialized
+    def handle(action, session, token=None):
+        if not settings["live"] or settings["base"] != "BTC":
+            raise ValueError("Manual withdrawals require LIVE_TRADING=true and BASE_ASSET=BTC.")
+        api.validate_withdrawal_settings(settings)
+        cycle, _, _ = cycle_dates(local_now(settings["timezone"]), settings["deposit_day"])
+        state = read_state(Path("/data/state.json"), cycle)
+        if state.get("pending_order") or state.get("pending_withdrawal"):
+            raise ValueError("An order or withdrawal is unresolved. Check the exchange before continuing.")
+        available = api.balance("BTC").quantize(Decimal("0.00000001"), rounding=ROUND_DOWN)
+        if available <= 0:
+            raise ValueError("No BTC is available to withdraw.")
+        last = state.get("last_withdrawal", {})
+        if not state.get("withdrawal_armed", True) and available >= Decimal(last.get("balanceBefore", last.get("amount", "0"))):
+            raise ValueError("Waiting for the exchange balance to reflect the previous withdrawal.")
+        fingerprint = json.dumps(last, sort_keys=True)
+        now = time.monotonic()
+        for key in list(previews):
+            if previews[key]["expires"] <= now:
+                previews.pop(key)
+        if action == "preview":
+            request = api.withdrawal_request(available, str(uuid.uuid4()), settings)
+            key = str(uuid.uuid4())
+            previews[key] = {"session": session, "expires": now + 120, "request": request,
+                             "available": available, "fingerprint": fingerprint}
+            return {"token": key, "availableBtc": format(available, "f"),
+                    "netBtc": request["amount"] if settings["exchange"] == "KRAKEN" else None,
+                    "feeBtc": request.get("fee"), "destination": withdrawal_destination(settings)}
+        preview = previews.get(token)
+        if not preview or preview["session"] != session:
+            raise ValueError("Confirmation expired or already used. Start a new withdrawal preview.")
+        previews.pop(token)
+        if preview["available"] != available or preview["fingerprint"] != fingerprint:
+            raise ValueError("The balance or withdrawal state changed. Review a new preview.")
+        maybe_withdraw_btc(api, state, settings, manual_request=preview["request"])
+        if state.get("pending_withdrawal"):
+            raise ValueError("Withdrawal outcome is uncertain. Check the exchange; do not submit again.")
+        return {"submitted": True, "message": "Withdrawal submitted and recorded in Activity. Blockchain settlement may still be pending."}
+    return handle
+
+
+def withdrawal_destination(settings):
+    if settings["exchange"] == "KRAKEN":
+        return "Kraken saved withdrawal method: " + (settings.get("kraken_withdraw_key") or "not configured")
+    return "Bitvavo address: " + (settings.get("withdraw_address") or "not configured") + "; network: " + settings.get("withdraw_network", "BTC")
+
+
 def main():
     logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(), format="%(asctime)s %(levelname)s %(message)s")
     deposit_day = int(os.getenv("DEPOSIT_DAY", "1"))
@@ -639,10 +712,11 @@ def main():
             raise ValueError("WEB_UI_PORT must be between 1 and 65535")
         threading.Thread(target=bot_loop, args=(api, settings, interval), daemon=True).start()
         from web_ui import serve
-        serve(settings, port)
+        serve(settings, port, manual_withdrawal_service(api, settings))
     else:
         bot_loop(api, settings, interval)
 
 
 if __name__ == "__main__":
     main()
+
