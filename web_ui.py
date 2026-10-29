@@ -195,9 +195,20 @@ details.panel[open]>summary h2::after{content:"−"}
 details.panel:not([open])>summary{margin-bottom:-20px;border-bottom:0;border-radius:17px}
 details.panel>summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media(max-width:600px){details.panel:not([open])>summary{margin-bottom:-15px;border-radius:13px}}
+
+.compact-brand-bar{position:fixed;z-index:50;inset:0 0 auto;background:rgba(11,16,32,.96);border-bottom:1px solid var(--line);backdrop-filter:blur(12px);opacity:0;transform:translateY(-100%);visibility:hidden;transition:transform .22s ease,opacity .22s ease,visibility .22s}
+.compact-brand-inner{max-width:1180px;margin:0 auto;padding:10px 22px;display:flex;align-items:center;gap:12px}
+.compact-brand-inner img{display:block;width:36px;height:36px;border-radius:9px;flex-shrink:0}
+.compact-brand-inner span{font-size:20px;font-weight:700;line-height:1.3}
+body.compact-brand-visible .compact-brand-bar{opacity:1;transform:translateY(0);visibility:visible}
+.top-actions{transition:opacity .2s ease,transform .2s ease,visibility .2s}
+body.header-actions-hidden .top-actions{opacity:0;transform:translateY(-8px);visibility:hidden;pointer-events:none}
+@media(max-width:600px){.compact-brand-inner{padding:9px 12px;gap:10px}.compact-brand-inner span{font-size:17px}}
+@media(prefers-reduced-motion:reduce){.compact-brand-bar,.top-actions{transition:none}}
 </style>
 </head>
-<body><main>
+<body>
+<div class="compact-brand-bar" aria-hidden="true"><div class="compact-brand-inner"><img src="/bitcoin-dca-icon-v3.png" width="36" height="36" alt=""><span>Bitcoin DCA Bot Dashboard</span></div></div><main>
 <header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Bot Dashboard</h1></div></div><div class="top-actions"><form method="post" action="/logout"><button type="submit">Log out</button></form><div class="withdraw-action"><button id="manualWithdraw" type="button" aria-describedby="withdrawal-note withdrawalFeedback">Withdraw BTC manually</button><p id="withdrawalFeedback" class="export-feedback withdraw-feedback hidden" role="alert"></p></div><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
 <details open class="panel" aria-labelledby="configurationHeading">
 <summary class="panel-heading"><h2 id="configurationHeading">Bot configuration</h2></summary>
