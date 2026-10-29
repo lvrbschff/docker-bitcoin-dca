@@ -151,12 +151,17 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
  th,td{padding:10px 8px;font-size:13px}.bottom-actions button{width:100%;white-space:normal}
 }
 @media(max-width:360px){.grid{grid-template-columns:minmax(0,1fr)}.time-card{grid-column:auto}}
-.schedule-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.schedule-group{min-width:0;margin-top:16px;padding:16px;border:1px solid var(--line);border-radius:14px;background:#0c1425a8}
+.schedule-group h3{font-size:14px;font-weight:700;margin:0 0 14px}
+.schedule-row-scroll{max-width:100%;overflow-x:auto;padding-bottom:4px}
+.schedule-row-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+.schedule-grid{grid-template-columns:repeat(4,minmax(220px,1fr))}
+.schedule-grid .time-card{grid-column:auto}
 .schedule-grid .card{border-color:#354b70;background:#111f36}
 .report-section{margin-top:38px;padding-top:28px;border-top:1px solid #354564;min-width:0}
 .report-heading{margin-bottom:18px}.report-heading h2{font-size:21px;margin:0 0 5px}
 .report-heading .sub{font-size:14px}.report-controls{border-color:#354b70;background:linear-gradient(145deg,#17243b,#111a2d)}
-@media(max-width:600px){.schedule-grid{grid-template-columns:minmax(0,1fr)}.report-section{margin-top:28px;padding-top:22px}.report-heading h2{font-size:19px}}
+@media(max-width:600px){.report-section{margin-top:28px;padding-top:22px}.report-heading h2{font-size:19px}}
 sup{color:#fff}.footnote-ref{margin-left:3px}
 .dashboard-footnotes{margin-top:30px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
 .dashboard-footnotes h2{font-size:14px;margin:0 0 12px}.dashboard-footnotes ol{margin:0;padding-left:20px}.dashboard-footnotes li{padding-left:4px;margin-bottom:14px;scroll-margin-top:20px}.dashboard-footnotes strong{color:var(--text);font-weight:600}.dashboard-footnotes p{margin:4px 0 0}
@@ -178,16 +183,26 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="card"><label>Withdrawal threshold</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured threshold</div></div>
 </div>
 </section>
-<section class="panel purchase-schedule" aria-labelledby="scheduleHeading"><h2 id="scheduleHeading">Purchase schedule <sup class="footnote-ref" aria-describedby="schedule-note">2</sup></h2><div class="grid schedule-grid">
+<section class="panel purchase-schedule" aria-labelledby="scheduleHeading">
+<h2 id="scheduleHeading">Purchase and withdrawal schedule <sup class="footnote-ref" aria-describedby="schedule-note">2</sup></h2>
+<section class="schedule-group" aria-labelledby="purchaseHeading">
+<h3 id="purchaseHeading">Purchase</h3>
+<div class="schedule-row-scroll" role="region" aria-label="Purchase schedule cards" tabindex="0"><div class="grid schedule-grid">
 <div class="card"><label>Current BTC price <sup class="footnote-ref" aria-describedby="currency-note">1</sup></label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
 <div class="card"><label id="quoteBalanceLabel">Available fiat balance</label><div class="value" id="quoteBalance">—</div><div class="small" id="quoteBalanceUpdated">Waiting for account check</div></div>
-<div class="card"><label>BTC balance</label><div class="value" id="exchangeBtcBalance">—</div><div class="small" id="exchangeBtcValue">—</div><div class="small" id="exchangeBtcUpdated">Waiting for account check</div></div>
 <div class="card time-card"><label>Next purchase</label><div class="value time-value" id="nextPurchaseAt">—</div><div class="small" id="nextPurchaseStatus">Waiting for the bot schedule</div></div>
 <div class="card time-card"><label>Time until next purchase</label><div class="value countdown-value" id="nextPurchaseCountdown">—</div><div class="small">Updates every second</div></div>
+</div></div>
+</section>
+<section class="schedule-group" aria-labelledby="withdrawalHeading">
+<h3 id="withdrawalHeading">Withdrawal</h3>
+<div class="schedule-row-scroll" role="region" aria-label="Withdrawal schedule cards" tabindex="0"><div class="grid schedule-grid">
+<div class="card"><label>BTC balance</label><div class="value" id="exchangeBtcBalance">—</div><div class="small" id="exchangeBtcValue">—</div><div class="small" id="exchangeBtcUpdated">Waiting for account check</div></div>
 <div class="card"><div class="field"><label for="monthlyDeposit">Expected monthly deposit (<span id="monthlyDepositCurrency">EUR</span>)</label><input id="monthlyDeposit" type="number" min="0" step="0.01" inputmode="decimal" value="0"></div><div class="small">Forecast only · assumes deposits on the configured deposit day · saved in this browser</div></div>
 <div class="card time-card"><label>Estimated automatic withdrawal date</label><div class="value time-value" id="estimatedWithdrawalAt">—</div><div class="small" id="estimatedWithdrawalStatus">Waiting for account check</div></div>
 <div class="card time-card"><label>Time until estimated automatic withdrawal date</label><div class="value countdown-value" id="withdrawalCountdown">—</div><div class="small" id="withdrawalCountdownStatus">Estimate at the current BTC price and purchase interval</div></div>
-</div>
+</div></div>
+</section>
 </section>
 <section class="report-section" aria-labelledby="reportHeading">
 <header class="report-heading"><h2 id="reportHeading">Period analysis <sup class="footnote-ref" aria-describedby="report-note">3</sup></h2><p class="sub">Choose a custom date range or an interval between withdrawals to review activity and prepare a Parqet export.</p></header>
