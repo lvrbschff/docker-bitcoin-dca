@@ -261,11 +261,16 @@ details.panel:not([open])>summary{border-radius:11px}
  .dashboard-logo:hover,.compact-brand-inner img:hover{box-shadow:0 0 12px #8bafff66,0 0 26px #8bafff44;filter:brightness(1.08)}
 }
 @media(prefers-reduced-motion:reduce){.dashboard-logo,.compact-brand-inner img{transition:none}}
+
+.dashboard-home{display:inline-flex;flex-shrink:0;border-radius:11px;text-decoration:none}
+.dashboard-home:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+.compact-brand-bar{pointer-events:none}
+body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
 </style>
 </head>
 <body>
-<div class="compact-brand-bar" aria-hidden="true"><div class="compact-brand-inner"><img src="/bitcoin-dca-icon-v3.png" width="36" height="36" alt=""><span>Bitcoin DCA Dashboard</span></div></div><main>
-<header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Dashboard</h1></div></div><div class="top-actions"><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div><form method="post" action="/logout"><button type="submit">Log out</button></form></div></header>
+<div class="compact-brand-bar"><div class="compact-brand-inner"><a class="dashboard-home" href="#" aria-label="Refresh dashboard and return to top"><img src="/bitcoin-dca-icon-v3.png" width="36" height="36" alt=""></a><span>Bitcoin DCA Dashboard</span></div></div><main>
+<header class="top"><div><div class="dashboard-brand"><a class="dashboard-home" href="#" aria-label="Refresh dashboard and return to top"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""></a><h1>Bitcoin DCA Dashboard</h1></div></div><div class="top-actions"><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div><form method="post" action="/logout"><button type="submit">Log out</button></form></div></header>
 <details open class="panel" aria-labelledby="configurationHeading">
 <summary class="panel-heading"><h2 id="configurationHeading">Configuration</h2></summary>
 <div class="grid">
@@ -334,6 +339,12 @@ details.panel:not([open])>summary{border-radius:11px}
 </main>
 <script data-ui-scroll>
 (()=>{
+ document.querySelectorAll(".dashboard-home").forEach(link=>link.addEventListener("click",event=>{
+  event.preventDefault();
+  if("scrollRestoration" in history)history.scrollRestoration="manual";
+  window.scrollTo({top:0,left:0,behavior:"instant"});
+  window.location.reload();
+ }));
  const brand=document.querySelector(".top .dashboard-brand");
  if(!brand)return;
  let pending=false;
