@@ -140,7 +140,7 @@ class ReviewTests(unittest.TestCase):
         with patch.object(bot,'read_state',return_value=state),patch.object(bot,'save_state'),patch.object(bot,'update_dashboard_snapshot'),patch.object(bot,'update_dashboard_schedule'):
             bot.run_once(api,{**self.settings,'live':False},300)
         self.assertEqual(D(state['spent']),D('8.02'))
-        self.assertEqual(api.balance.call_count,1);self.assertEqual(api.market.call_count,1);self.assertEqual(api.price.call_count,1)
+        self.assertEqual(api.balance.call_count,2);self.assertEqual(api.market.call_count,1);self.assertEqual(api.price.call_count,1)
 
     def test_periodic_checks_do_not_move_due_time_when_inputs_are_unchanged(self):
         now=datetime(2026,10,28,12,tzinfo=timezone.utc)

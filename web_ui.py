@@ -122,6 +122,9 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <section class="panel purchase-schedule" aria-labelledby="scheduleHeading"><h2 id="scheduleHeading">Purchase schedule <sup class="footnote-ref" aria-describedby="schedule-note">2</sup></h2><div class="grid schedule-grid">
 <div class="card"><label>Current BTC price <sup class="footnote-ref" aria-describedby="currency-note">1</sup></label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
 <div class="card"><label id="quoteBalanceLabel">Available fiat balance</label><div class="value" id="quoteBalance">—</div><div class="small" id="quoteBalanceUpdated">Waiting for account check</div></div>
+<div class="card"><label>BTC balance</label><div class="value" id="exchangeBtcBalance">—</div><div class="small">Available on the selected exchange · last account check</div></div>
+<div class="card time-card"><label>Estimated automatic withdrawal date</label><div class="value time-value" id="estimatedWithdrawalAt">—</div><div class="small" id="estimatedWithdrawalStatus">Waiting for account check</div></div>
+<div class="card time-card"><label>Time until estimated withdrawal date</label><div class="value countdown-value" id="withdrawalCountdown">—</div><div class="small">Estimate at the current BTC price and purchase interval</div></div>
 <div class="card time-card"><label>Next purchase</label><div class="value time-value" id="nextPurchaseAt">—</div><div class="small" id="nextPurchaseStatus">Waiting for the bot schedule</div></div>
 <div class="card time-card"><label>Time until next purchase</label><div class="value countdown-value" id="nextPurchaseCountdown">—</div><div class="small">Updates every second</div></div>
 </div>
@@ -168,16 +171,20 @@ function parseInput(el){return new Date(el.value).getTime()}
 function money(v,c){try{return new Intl.NumberFormat("en-GB",{style:"currency",currency:c,maximumFractionDigits:2}).format(Number(v||0))}catch(e){return Number(v||0).toFixed(2)+" "+c}}
 function btc(v){return Number(v||0).toLocaleString("en-GB",{minimumFractionDigits:0,maximumFractionDigits:8})+" BTC"}
 function dateLabel(ms){return new Date(ms).toLocaleString("en-GB")}
-let nextPurchaseTimestamp=null, scheduleClockOffset=0;
-function renderPurchaseCountdown(){
- const output=$("nextPurchaseCountdown");
- if(nextPurchaseTimestamp===null){output.textContent="—";return}
- let seconds=Math.max(0,Math.ceil((nextPurchaseTimestamp-Date.now()-scheduleClockOffset)/1000));
+let nextPurchaseTimestamp=null, estimatedWithdrawalTimestamp=null, scheduleClockOffset=0;
+function renderCountdown(id, timestamp){
+ const output=$(id);
+ if(timestamp===null){output.textContent="—";return}
+ let seconds=Math.max(0,Math.ceil((timestamp-Date.now()-scheduleClockOffset)/1000));
  if(!seconds){output.textContent="Due now";return}
  const days=Math.floor(seconds/86400);seconds%=86400;
  const hours=Math.floor(seconds/3600);seconds%=3600;
  const minutes=Math.floor(seconds/60),remaining=seconds%60;
  output.textContent=(days?days+"d ":"")+String(hours).padStart(2,"0")+"h "+String(minutes).padStart(2,"0")+"m "+String(remaining).padStart(2,"0")+"s";
+}
+function renderPurchaseCountdown(){
+ renderCountdown("nextPurchaseCountdown",nextPurchaseTimestamp);
+ renderCountdown("withdrawalCountdown",estimatedWithdrawalTimestamp);
 }
 async function refreshPurchaseSchedule(){
  try{
@@ -196,6 +203,11 @@ async function refreshPurchaseSchedule(){
   scheduleClockOffset=Number.isFinite(serverTime)?serverTime-Date.now():0;
   $("nextPurchaseAt").textContent=nextPurchaseTimestamp===null?"Not scheduled":new Date(nextPurchaseTimestamp).toLocaleString("en-GB",{timeZone:schedule.timezone||"UTC",timeZoneName:"short"});
   $("nextPurchaseStatus").textContent=schedule.nextPurchaseStatus||"Waiting for the bot schedule";
+  $("exchangeBtcBalance").textContent=schedule.btcBalance==null?"—":btc(schedule.btcBalance);
+  const withdrawalTarget=Date.parse(schedule.estimatedWithdrawalAt);
+  estimatedWithdrawalTimestamp=Number.isFinite(withdrawalTarget)?withdrawalTarget:null;
+  $("estimatedWithdrawalAt").textContent=estimatedWithdrawalTimestamp===null?"Not estimated":new Date(estimatedWithdrawalTimestamp).toLocaleString("en-GB",{timeZone:schedule.timezone||"UTC",timeZoneName:"short"});
+  $("estimatedWithdrawalStatus").textContent=schedule.estimatedWithdrawalStatus||"Waiting for account check";
   renderPurchaseCountdown();
  }catch(e){$("nextPurchaseStatus").textContent="Could not refresh the bot schedule"}
 }
@@ -698,6 +710,9 @@ class Handler(BaseHTTPRequestHandler):
                     "quote": self.settings["quote"],
                     "exchange": self.settings["exchange"],
                     "quoteBalance": snapshot.get("quoteBalance") if balance_matches else None,
+                    "btcBalance": snapshot.get("btcBalance") if balance_matches else None,
+                    "estimatedWithdrawalAt": snapshot.get("estimatedWithdrawalAt") if balance_matches else None,
+                    "estimatedWithdrawalStatus": snapshot.get("estimatedWithdrawalStatus") if balance_matches else "Waiting for account check",
                     "balanceUpdatedAt": snapshot.get("updatedAt") if balance_matches else None,
                     "nextPurchaseAt": snapshot.get("nextPurchaseAt"),
                     "nextPurchaseStatus": snapshot.get("nextPurchaseStatus", "Schedule pending"),

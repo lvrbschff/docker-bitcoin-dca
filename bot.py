@@ -161,13 +161,36 @@ def persist_bot_withdrawal(api, withdrawal, result, settings, context):
     return append_activity_records([record])
 
 
-def update_dashboard_snapshot(settings, quote_balance, price):
+
+def estimate_withdrawal(settings, btc_balance, price, order_amount, possible_buys, due, interval_seconds, now):
+    """Project only purchases affordable with the current budget, at a constant price."""
+    from decimal import ROUND_CEILING
+    if not settings["withdrawals_enabled"]:
+        return None, "Automatic withdrawals disabled"
+    if not settings["live"]:
+        return None, "Unavailable in simulation mode"
+    if btc_balance is None or price <= 0:
+        return None, "Waiting for account balance and price"
+    missing = settings["withdraw_threshold"] / price - btc_balance
+    if missing <= 0:
+        return now, "Threshold reached; awaiting automatic withdrawal check"
+    if order_amount <= 0 or due is None:
+        return None, "Waiting for a purchase schedule"
+    buys = int((missing / order_amount).to_integral_value(rounding=ROUND_CEILING))
+    if buys > possible_buys:
+        return None, "Additional funds required to reach the threshold"
+    return max(now, due) + timedelta(seconds=(buys - 1) * interval_seconds), (
+        f"Estimate after {buys} purchase(s), at the current price and interval")
+
+
+def update_dashboard_snapshot(settings, quote_balance, price, btc_balance=None):
     tracked_btc = ledger_balance()
     previous = read_dashboard_snapshot()
     write_dashboard_snapshot({
         "exchange": settings["exchange"],
         "quote": settings["quote"],
         "trackedBtc": format(tracked_btc, "f"),
+        "btcBalance": str(btc_balance) if btc_balance is not None else None,
         "price": format(price, "f"),
         "value": format(tracked_btc * price, "f"),
         "quoteBalance": format(quote_balance, "f"),
@@ -178,13 +201,19 @@ def update_dashboard_snapshot(settings, quote_balance, price):
     })
 
 
-def update_dashboard_schedule(next_purchase_at, status):
+def update_dashboard_schedule(next_purchase_at, status, withdrawal_estimate=None):
     snapshot = read_dashboard_snapshot()
     snapshot["nextPurchaseAt"] = (
         next_purchase_at.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
         if next_purchase_at is not None else None
     )
     snapshot["nextPurchaseStatus"] = status
+    snapshot["estimatedWithdrawalAt"] = None
+    snapshot["estimatedWithdrawalStatus"] = "Waiting for a purchase schedule"
+    if withdrawal_estimate is not None:
+        at, reason = withdrawal_estimate
+        snapshot["estimatedWithdrawalAt"] = at.isoformat() if at else None
+        snapshot["estimatedWithdrawalStatus"] = reason
     write_dashboard_snapshot(snapshot)
 
 
@@ -451,20 +480,25 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
         LOG.error("Automatic BTC withdrawal check failed: %s", exc)
     # Use the current available quote balance as the DCA budget. This includes
     # funds already on the exchange, even if they were deposited before this cycle.
+    try:
+        exchange_btc = cycle_data['btc_balance'] if cycle_data else api.balance("BTC")
+    except requests.RequestException:
+        LOG.warning("Could not refresh the dashboard BTC balance", exc_info=True)
+        exchange_btc = None
     balance = cycle_data['balance'] if cycle_data else api.balance(quote)
     balance_after_simulated_spend = (
         max(Decimal(0), balance - spent) if not settings["live"] else balance
     )
     if balance_after_simulated_spend <= 0:
-        update_dashboard_snapshot(settings,balance,Decimal(str(read_dashboard_snapshot().get('price','0'))))
+        update_dashboard_snapshot(settings,balance,Decimal(str(read_dashboard_snapshot().get('price','0'))),exchange_btc)
         update_dashboard_schedule(None,'Waiting for available quote-currency funds')
         return check_interval
     # Fee lookup precedes the fresh market-rule check; it is cached by the adapter.
     fee_rate = cycle_data['fee_rate'] if cycle_data else api.estimate_taker_fee(symbol, Decimal(1))
     price = cycle_data['price'] if cycle_data else api.price(symbol)
     market = cycle_data['market'] if cycle_data else api.market(symbol, refresh=True)
-    cycle_data = {'balance':balance,'price':price,'market':market,'fee_rate':fee_rate}
-    update_dashboard_snapshot(settings, balance, price)
+    cycle_data = {'balance':balance,'price':price,'market':market,'fee_rate':fee_rate,'btc_balance':exchange_btc}
+    update_dashboard_snapshot(settings, balance, price, exchange_btc)
     if balance_after_simulated_spend <= 0:
         update_dashboard_schedule(None, "Waiting for available quote-currency funds")
         simulated_spent = spent if not settings["live"] else Decimal(0)
@@ -522,7 +556,9 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
     state['schedule']={'fingerprint':fingerprint,'dueAt':due.isoformat()}
     save_state(state_path,state)
     remaining=max(0,int((due.astimezone(timezone.utc)-now.astimezone(timezone.utc)).total_seconds()))
-    update_dashboard_schedule(due,'Scheduled' if remaining else 'Due now')
+    withdrawal_estimate = estimate_withdrawal(
+        settings, exchange_btc, price, order_amount, possible_buys, due, interval_seconds, now)
+    update_dashboard_schedule(due, 'Scheduled' if remaining else 'Due now', withdrawal_estimate)
     startup_alignment = settings.pop('startup_schedule_log_pending', False)
     log_label = 'Restart alignment' if startup_alignment else 'Purchase schedule'
     local_zone = ZoneInfo(settings['timezone'])
