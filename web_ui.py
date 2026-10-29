@@ -161,7 +161,8 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 .schedule-grid .card{border-color:#354b70;background:#111f36}
 .report-section{margin-top:38px;padding-top:28px;border-top:1px solid #354564;min-width:0}
 .report-heading{margin-bottom:18px}.report-heading h2{font-size:21px;margin:0 0 5px}
-.report-heading .sub{font-size:14px}.report-controls{border-color:#354b70;background:linear-gradient(145deg,#17243b,#111a2d)}
+.report-heading .sub{font-size:14px}.report-controls>.sub{margin-bottom:16px;font-size:14px}
+.report-controls{border-color:#354b70;background:linear-gradient(145deg,#17243b,#111a2d)}
 @media(max-width:600px){.report-section{margin-top:28px;padding-top:22px}.report-heading h2{font-size:19px}}
 sup{color:#fff}.footnote-ref{margin-left:3px}
 .dashboard-footnotes{margin-top:30px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
@@ -206,8 +207,9 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 </section>
 </section>
 <section class="report-section" aria-labelledby="reportHeading">
-<header class="report-heading"><h2 id="reportHeading">Period analysis <sup class="footnote-ref" aria-describedby="report-note">4</sup></h2><p class="sub">Choose a custom date range or an interval between withdrawals to review activity and prepare a Parqet export.</p></header>
+<header class="report-heading"><h2 id="reportHeading">Period analysis <sup class="footnote-ref" aria-describedby="report-note">4</sup></h2></header>
 <section class="panel report-controls">
+<p class="sub">Choose a custom date range or an interval between withdrawals to review activity and prepare a Parqet export.</p>
 <div class="controls">
 <div class="field"><label for="interval">Date range</label><select id="interval"></select></div>
 <div class="field"><label for="start">From</label><input id="start" type="datetime-local"></div>
