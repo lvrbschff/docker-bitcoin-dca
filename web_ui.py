@@ -384,7 +384,11 @@ async function loadAnalytics(){
   $("profitLoss").className="value "+(profitLoss>=0?"positive":"negative");
  }else{$("profitLoss").textContent="—";$("profitLoss").className="value"}
  $("settingExchange").textContent=ex;$("settingQuoteCurrency").textContent=quote;$("tradingMode").textContent=d.configuration.liveTrading?"Live":"Dry run";
- $("buyAmount").textContent=Number(d.configuration.buyAmount)===0?"Exchange minimum":btc(d.configuration.buyAmount);
+ const amountSnapshot=d.snapshot||{};
+ const effectiveMinimum=amountSnapshot.exchange===d.exchange&&amountSnapshot.quote===quote?Number((amountSnapshot.withdrawalForecastPlan||{}).orderAmount):NaN;
+ $("buyAmount").textContent=Number(d.configuration.buyAmount)===0
+  ?(Number.isFinite(effectiveMinimum)&&effectiveMinimum>0?btc(effectiveMinimum)+" (exchange minimum)":"Exchange minimum · waiting for account check")
+  :btc(d.configuration.buyAmount);
  $("depositDay").textContent=String(d.configuration.depositDay);$("withdrawEnabled").textContent=d.configuration.withdrawalsEnabled?"Enabled":"Disabled";
  $("threshold").textContent=money(Number(d.configuration.withdrawalThreshold)*fxRate,displayCurrency);$("thresholdNote").textContent="Threshold in "+quote+", shown in "+displayCurrency;
  $("buyCount").textContent=d.summary.buyCount;$("buyBtc").textContent=btc(d.summary.boughtBtc);
