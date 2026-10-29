@@ -167,7 +167,6 @@ Open [http://localhost:6890](http://localhost:6890) and sign in with the credent
 
 - Select EUR or USD for display. Reference prices come from Kraken’s public [BTC/EUR](https://www.kraken.com/convert/btc/eur) and [BTC/USD](https://www.kraken.com/convert/btc/usd) pages; cached prices are labelled.
 - Choose a withdrawal interval or custom dates in **Period analysis**, browse Activity, and download a [Parqet CSV](#parqet-csv-exports). Dry-run purchases are marked and excluded from exports.
-- **Delete** removes a purchase from local history only; it never reverses an exchange order.
 
 The portfolio covers bot-recorded activity, not the full exchange account. Data persists in the named volume `bitcoin-dca-webui-data`. Set `WEB_UI_ENABLED=false` to disable the dashboard.
 
@@ -207,7 +206,7 @@ flowchart TB
     Web -->|Reference prices and USD export rates| Sources["Kraken converter pages<br/>Frankfurter API"]
     Worker <-->|Pending requests, schedule and heartbeat| State["Host directory ./state<br/>mounted at /data"]
     Worker <-->|Activity and dashboard snapshot| Data["Named volume bitcoin-dca-webui-data<br/>mounted at /webui-data"]
-    Web <-->|Reports, purchase deletion and FX cache| Data
+    Web <-->|Reports and FX cache| Data
 ```
 
 The named volume holds `activity.sqlite3` (activity and FX cache) and `dashboard.json`. The worker’s supervisor detects stopped or stalled execution; Docker runs `healthcheck.py` as a separate process to check the saved heartbeat.
@@ -264,7 +263,7 @@ The workflow in `.github/workflows/publish.yml` builds and publishes the image t
 ### Withdrawals and local records
 
 - **Completion follows the exchange’s status.** Submitted withdrawals appear immediately, but only completed withdrawals verified by a unique history match are exportable. The bot does not independently inspect the Bitcoin blockchain. A missing, inaccessible or ambiguous history entry can leave a withdrawal unresolved and block further withdrawals. Kraken submissions with uncertain outcomes are not automatically resent; Bitvavo can retry the same idempotent request. Verify the exchange status before intervening, and check the destination before confirming a withdrawal.
-- **The ledger covers locally recorded bot activity.** It does not import unrelated trades, deposits or transfers and is not a complete exchange-account statement. BTC totals subtract gross withdrawal debits, including network fees, while wallet quantities use net BTC. Failed withdrawals release their debit once verified. External account activity and local purchase deletions can make the displayed portfolio differ from the account balance; deleting a record never reverses an exchange transaction.
+- **The ledger covers locally recorded bot activity.** It does not import unrelated trades, deposits or transfers and is not a complete exchange-account statement. BTC totals subtract gross withdrawal debits, including network fees, while wallet quantities use net BTC. Failed withdrawals release their debit once verified. External account activity can make locally tracked totals differ from the account balance. Activity cannot be deleted through the web UI.
 - **Old records may remain unverified.** JSON migration preserves the original data, but older withdrawals without sufficient identifiers or destination information may never match history uniquely and remain excluded from exports. Missing historical exchange provenance is not inferred from the currently selected exchange.
 
 ### Prices and Parqet exports
