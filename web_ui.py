@@ -102,7 +102,7 @@ HTML = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bitcoin DCA Bot</title>
+<title>Bitcoin DCA Bot Dashboard</title>
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/bitcoin-dca-icon-v3.png">
 <link rel="mask-icon" href="/safari-pinned-tab-v3.svg" color="#8bafff">
@@ -486,7 +486,7 @@ button{width:100%;margin-top:22px;padding:12px;border:1px solid var(--accent);bo
 </head>
 <body><main class="card">
 
-<div class="login-brand"><img src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Bot</h1></div>
+<div class="login-brand"><img src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Bot Dashboard</h1></div>
 
 <form method="post" action="/login">
 <label for="username">Username</label>
