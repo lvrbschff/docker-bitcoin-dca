@@ -279,6 +279,21 @@ body.header-actions-hidden .top-actions{opacity:0;transform:translateY(-8px);vis
 </details>
 </footer>
 </main>
+<script data-ui-scroll>
+(()=>{
+ const brand=document.querySelector(".top .dashboard-brand");
+ if(!brand)return;
+ let pending=false;
+ function updateHeader(){
+  document.body.classList.toggle("compact-brand-visible",brand.getBoundingClientRect().bottom<=10);
+  document.body.classList.toggle("header-actions-hidden",window.scrollY>40);
+  pending=false;
+ }
+ window.addEventListener("scroll",()=>{if(!pending){pending=true;requestAnimationFrame(updateHeader)}},{passive:true});
+ window.addEventListener("resize",updateHeader);
+ updateHeader();
+})();
+</script>
 <script>\nconst $=id=>document.getElementById(id);
 let quote="EUR", displayCurrency="", fxRate=1, activityRows=[], currentPage=1, activityTotal=0, activityPages=1, activityRates={};
 function localInput(ms){const d=new Date(ms);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
