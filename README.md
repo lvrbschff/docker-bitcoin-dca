@@ -4,9 +4,9 @@ A Docker-based DCA bot for buying Bitcoin (BTC) on Bitvavo or Kraken, with optio
 
 ### Web UI screenshot (fictional data)
 
-The screenshot below shows the upper part of the current dashboard, including its Bitcoin logo, bot configuration and the beginning of the purchase and withdrawal schedule. It was captured from the documentation preview with fictional data; the lower dashboard sections are outside this crop.
+The screenshot below shows the upper part of the current dashboard, including its Bitcoin logo, Configuration panel and the Purchase section of Schedule. It was captured from the documentation preview with fictional data; the lower dashboard sections are outside this crop.
 
-![Upper section of the Bitcoin DCA Bot Dashboard with fictional data](docs/web-ui-dashboard-screenshot.png)
+![Bitcoin DCA Dashboard: Configuration and purchase schedule with fictional data](docs/web-ui-dashboard-screenshot.png)
 
 ## What you need
 
