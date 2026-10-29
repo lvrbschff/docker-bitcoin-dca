@@ -126,7 +126,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="card time-card"><label>Next purchase</label><div class="value time-value" id="nextPurchaseAt">—</div><div class="small" id="nextPurchaseStatus">Waiting for the bot schedule</div></div>
 <div class="card time-card"><label>Time until next purchase</label><div class="value countdown-value" id="nextPurchaseCountdown">—</div><div class="small">Updates every second</div></div>
 <div class="card time-card"><label>Estimated automatic withdrawal date</label><div class="value time-value" id="estimatedWithdrawalAt">—</div><div class="small" id="estimatedWithdrawalStatus">Waiting for account check</div></div>
-<div class="card time-card"><label>Time until estimated withdrawal date</label><div class="value countdown-value" id="withdrawalCountdown">—</div><div class="small">Estimate at the current BTC price and purchase interval</div></div>
+<div class="card time-card"><label>Time until estimated automatic withdrawal date</label><div class="value countdown-value" id="withdrawalCountdown">—</div><div class="small" id="withdrawalCountdownStatus">Estimate at the current BTC price and purchase interval</div></div>
 </div>
 </section>
 <section class="report-section" aria-labelledby="reportHeading">
@@ -189,6 +189,7 @@ function renderCountdown(id, timestamp){
 function renderPurchaseCountdown(){
  renderCountdown("nextPurchaseCountdown",nextPurchaseTimestamp);
  renderCountdown("withdrawalCountdown",estimatedWithdrawalTimestamp);
+ if(estimatedWithdrawalTimestamp===null)$("withdrawalCountdown").textContent="Not estimated";
 }
 async function refreshPurchaseSchedule(){
  try{
@@ -215,6 +216,7 @@ async function refreshPurchaseSchedule(){
   estimatedWithdrawalTimestamp=Number.isFinite(withdrawalTarget)?withdrawalTarget:null;
   $("estimatedWithdrawalAt").textContent=estimatedWithdrawalTimestamp===null?"Not estimated":new Date(estimatedWithdrawalTimestamp).toLocaleString("en-GB",{timeZone:schedule.timezone||"UTC",timeZoneName:"short"});
   $("estimatedWithdrawalStatus").textContent=schedule.estimatedWithdrawalStatus||"Waiting for account check";
+  $("withdrawalCountdownStatus").textContent=estimatedWithdrawalTimestamp===null?$("estimatedWithdrawalStatus").textContent:"Estimate at the current BTC price and purchase interval";
   renderPurchaseCountdown();
  }catch(e){$("nextPurchaseStatus").textContent="Could not refresh the bot schedule"}
 }
