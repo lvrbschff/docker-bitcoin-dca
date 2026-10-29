@@ -206,7 +206,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="schedule-row-scroll" role="region" aria-label="Purchase schedule cards" tabindex="0"><div class="grid schedule-grid">
 <div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
 <div class="card"><label id="quoteBalanceLabel">Available fiat balance</label><div class="value" id="quoteBalance">—</div><div class="small" id="quoteBalanceUpdated">Waiting for account check</div></div>
-<div class="card time-card"><label>Next purchase</label><div class="value time-value" id="nextPurchaseAt">—</div><div class="small" id="nextPurchaseStatus">Waiting for the bot schedule</div></div>
+<div class="card time-card"><label>Next purchase <span id="nextPurchaseStatus">Scheduled</span></label><div class="value time-value" id="nextPurchaseAt">—</div></div>
 <div class="card time-card"><label>Time until next purchase</label><div class="value countdown-value" id="nextPurchaseCountdown">—</div></div>
 </div></div>
 </section>
