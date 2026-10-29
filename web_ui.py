@@ -240,6 +240,10 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 
 .dashboard-footnotes{font-size:11px}
 .dashboard-footnotes h2,.dashboard-footnotes li>strong,.dashboard-footnotes .note-subheading{font-size:13px}
+
+.pagination #previousPage,.pagination #nextPage,.pagination #goToPage{
+ padding:8px 12px;font-size:12px;line-height:1.5;font-weight:700;border-radius:10px
+}
 </style>
 </head>
 <body>
