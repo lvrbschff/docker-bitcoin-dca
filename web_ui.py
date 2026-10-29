@@ -159,18 +159,30 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 .schedule-grid{grid-template-columns:repeat(4,minmax(220px,1fr))}
 .schedule-grid .time-card{grid-column:auto}
 
-.report-section{margin-top:38px;padding-top:28px;border-top:1px solid #354564;min-width:0}
+.report-section{min-width:0}
 .report-heading,.panel-heading{margin-bottom:18px}.report-heading h2,.panel-heading h2{font-size:21px;margin:0 0 5px}
 .report-heading .sub{font-size:14px}.summary-subheading{font-size:17px;font-weight:700;line-height:1.4;margin:0 0 16px}
 .period-summary-content{margin-top:24px;padding-top:20px;border-top:1px solid var(--line)}
 .report-controls>.sub{margin-bottom:16px;font-size:14px}
 
-@media(max-width:600px){.report-section{margin-top:28px;padding-top:22px}.report-heading h2,.panel-heading h2{font-size:19px}}
+@media(max-width:600px){.report-heading h2,.panel-heading h2{font-size:19px}}
 sup{color:#fff}.footnote-ref{margin-left:3px}
 .dashboard-footnotes{margin-top:30px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
 .dashboard-footnotes h2{font-size:14px;margin:0 0 12px}.dashboard-footnotes ol{margin:0;padding-left:20px}.dashboard-footnotes li{padding-left:4px;margin-bottom:14px;scroll-margin-top:20px}.dashboard-footnotes strong{color:var(--text);font-weight:600}.dashboard-footnotes p{margin:4px 0 0}
 .export-feedback{margin:10px 0 0;text-align:right;color:var(--red);font-size:13px;line-height:1.6;overflow-wrap:anywhere}
 .withdraw-feedback{max-width:min(320px,calc(100vw - 76px));margin:4px 0 0}.withdraw-feedback.success{color:var(--green)}\n@media(max-width:600px){.export-feedback{text-align:left}}
+
+/* Shared title bars distinguish the three main panels from subsection headings. */
+.panel>.panel-heading,.panel>.report-heading{
+ margin:-20px -20px 20px;padding:16px 20px;
+ background:linear-gradient(100deg,#223452,#192740);
+ border-bottom:1px solid #354b70;border-radius:17px 17px 0 0;
+}
+.panel>.panel-heading h2,.panel>.report-heading h2{font-size:21px;font-weight:700;line-height:1.4;margin:0}
+@media(max-width:600px){
+ .panel>.panel-heading,.panel>.report-heading{margin:-15px -15px 18px;padding:14px 15px;border-radius:13px 13px 0 0}
+ .panel>.panel-heading h2,.panel>.report-heading h2{font-size:19px}
+}
 </style>
 </head>
 <body><main>
