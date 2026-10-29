@@ -206,6 +206,18 @@ body.compact-brand-visible .compact-brand-bar{opacity:1;transform:translateY(0);
 body.header-actions-hidden .top-actions{opacity:0;transform:translateY(-8px);visibility:hidden;pointer-events:none}
 @media(max-width:600px){.compact-brand-inner{padding:9px 12px;gap:10px}.compact-brand-inner span{font-size:17px}}
 @media(prefers-reduced-motion:reduce){.compact-brand-bar,.top-actions{transition:none}}
+
+/* Compact header controls share one row and wrap only when space is limited. */
+.top{align-items:flex-start;flex-wrap:wrap}
+.top-actions{flex-direction:row;align-items:flex-end;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-left:auto}
+.top-actions button,.top-actions select{padding:8px 10px;min-height:38px;font-size:13px;border-radius:9px}
+.top-actions .field{min-width:130px}
+.top-actions .field label{margin-bottom:4px;font-size:11px}
+@media(max-width:600px){
+ .top-actions{margin-left:0;justify-content:flex-start;align-items:flex-end;width:100%}
+ .top-actions .field{min-width:120px}
+ .top-actions button,.top-actions select{min-height:44px}
+}
 </style>
 </head>
 <body>
