@@ -487,7 +487,7 @@ button{width:100%;margin-top:22px;padding:12px;border:1px solid var(--accent);bo
 <body><main class="card">
 <div class="eyebrow">Dashboard sign-in</div>
 <div class="login-brand"><img src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Bot</h1></div>
-<p class="sub">Sign in to view your portfolio and activity.</p>
+
 <form method="post" action="/login">
 <label for="username">Username</label>
 <input id="username" name="username" type="text" autocomplete="username" required autofocus>
@@ -496,7 +496,7 @@ button{width:100%;margin-top:22px;padding:12px;border:1px solid var(--accent);bo
 <button type="submit">Sign in</button>
 </form>
 <p class="error">{{ERROR}}</p>
-<p class="foot">Sign in with the dashboard credentials configured in .env.</p>
+
 </main></body></html>
 """
 
