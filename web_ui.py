@@ -42,7 +42,7 @@ HTML = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bitcoin DCA Bot</title>
-<link rel="icon" type="image/png" sizes="180x180" href="/bitcoin-dca-icon-v3.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/bitcoin-dca-icon-v3.png">
 <link rel="mask-icon" href="/safari-pinned-tab-v3.svg" color="#8bafff">
 <meta name="theme-color" content="#0b1020">
@@ -356,7 +356,7 @@ LOGIN_HTML = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bitcoin DCA Bot</title>
-<link rel="icon" type="image/png" sizes="180x180" href="/bitcoin-dca-icon-v3.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/bitcoin-dca-icon-v3.png">
 <link rel="mask-icon" href="/safari-pinned-tab-v3.svg" color="#8bafff">
 <meta name="theme-color" content="#0b1020">

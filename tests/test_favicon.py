@@ -45,7 +45,11 @@ class FaviconTests(unittest.TestCase):
             parser=Links();parser.feed(page)
             regular=[link for link in parser.links if link.get('rel')=='icon']
             self.assertEqual(len(regular),1)
-            self.assertEqual(regular[0]['href'],'/bitcoin-dca-icon-v3.png')
+            self.assertEqual(regular[0]['href'],'/favicon-32.png')
+            self.assertEqual(regular[0]['sizes'],'32x32')
+            touch=next(link for link in parser.links if link.get('rel')=='apple-touch-icon')
+            self.assertEqual(touch['sizes'],'180x180')
+            self.assertNotEqual(regular[0]['href'],touch['href'])
             self.assertEqual(regular[0]['type'],'image/png')
             self.assertTrue(any(link.get('rel')=='apple-touch-icon' and link['href']=='/bitcoin-dca-icon-v3.png' for link in parser.links))
             self.assertTrue(any(link.get('rel')=='mask-icon' and link['href']=='/safari-pinned-tab-v3.svg' and link['color']=='#8bafff' for link in parser.links))
