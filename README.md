@@ -156,5 +156,4 @@ Provided “as is” without warranty or investment, tax or legal advice. You ar
 
 ## Support
 
-- [PayPal](https://paypal.me/bischoffoliver)
 - Bitcoin: `bc1qg7crlvea9rsacfgnujhrjy6judvjnkjz9crvvq`
