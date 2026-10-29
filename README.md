@@ -83,7 +83,7 @@ Enable automatic withdrawals and set their threshold with `WITHDRAWALS_ENABLED` 
 | `WEB_UI_USERNAME` | `admin` | Username on the dashboard login page. |
 | `WEB_UI_PASSWORD` | `admin` | Password on the dashboard login page. |
 
-Change `WEB_UI_PASSWORD` before running the bot. The dashboard displays a styled login page and creates a 12-hour session after successful sign-in; the **Log out** button ends that session. By default, the port is bound to the Docker host's loopback address. HTTP does not encrypt the password during sign-in, so do not expose the port directly to a network or the internet.
+Change `WEB_UI_PASSWORD` before running the bot. The dashboard displays a styled login page and creates a 12-hour session after successful sign-in; the **Log out** button ends that session. By default, the port is published on all Docker host interfaces. Access it at `http://<docker-host-ip>:6890` from your network. HTTP does not encrypt sign-in credentials; use HTTPS through a reverse proxy on untrusted networks.
 
 
 All other bot settings are configured directly in docker-compose.yml.
@@ -121,7 +121,7 @@ docker compose up -d --build
 docker compose logs -f
 ~~~
 
-The dashboard is available at [http://localhost:6890](http://localhost:6890) by default and prompts for `WEB_UI_USERNAME` and `WEB_UI_PASSWORD`. The default credentials are `admin` / `admin`; replace the password in .env before starting. It is bound to the Docker host's loopback address, so it is not exposed to the home network or the public internet. If you set `WEB_UI_PORT` in .env, use that port in the address.
+The dashboard is available at [http://localhost:6890](http://localhost:6890) by default and prompts for `WEB_UI_USERNAME` and `WEB_UI_PASSWORD`. The default credentials are `admin` / `admin`; replace the password in .env before starting. The port is published on all Docker host interfaces, so other devices can use `http://<docker-host-ip>:6890` where permitted by the host firewall. If you set `WEB_UI_PORT` in .env, use that port in the address.
 
 When you are ready to place real orders, set `LIVE_TRADING` to true in docker-compose.yml and recreate the container:
 
@@ -277,7 +277,7 @@ The workflow in `.github/workflows/publish.yml` builds and publishes the image t
 
 - **Run one bot instance per account and persistent state.** Account actions are serialized within one process; there is no coordination between multiple containers or other trading tools. The manual-action queue, results, confirmation previews and login sessions are held in memory and disappear on restart. Durable pending submissions remain in the state file; after an interruption, check Activity and the exchange before starting another action.
 - **Health checks monitor the worker, not exchange availability.** A responsive worker can remain healthy while requests fail or trading is blocked. Dead or stalled workers trigger a process exit after detection; recovery depends on Docker’s restart policy and the host being available.
-- **Both persistent mounts are required.** `./state` stores pending requests and scheduling state; the named web UI volume stores the SQLite ledger and snapshot. Retained legacy JSON is a migration source, not an ongoing backup of new entries. Older JSON-only releases cannot read new SQLite activity. Back up both mounts, including the database’s WAL files when present, using a consistent backup or with the bot stopped. The web UI uses local HTTP without TLS and is intended for the default loopback-only binding.
+- **Both persistent mounts are required.** `./state` stores pending requests and scheduling state; the named web UI volume stores the SQLite ledger and snapshot. Retained legacy JSON is a migration source, not an ongoing backup of new entries. Older JSON-only releases cannot read new SQLite activity. Back up both mounts, including the database’s WAL files when present, using a consistent backup or with the bot stopped. The web UI uses HTTP without TLS and its port is published on all Docker host interfaces by default. Use HTTPS through a reverse proxy on untrusted networks.
 
 ### No warranty or financial advice
 

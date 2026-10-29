@@ -27,7 +27,7 @@ services:
       KRAKEN_API_SECRET: ${KRAKEN_API_SECRET:-}
       KRAKEN_WITHDRAW_KEY: ${KRAKEN_WITHDRAW_KEY:-}
     ports:
-      - "127.0.0.1:${WEB_UI_PORT:-6890}:${WEB_UI_PORT:-6890}"
+      - "${WEB_UI_PORT:-6890}:${WEB_UI_PORT:-6890}"
     volumes:
       - ./state:/data
       - bitcoin_dca_webui_data:/webui-data
