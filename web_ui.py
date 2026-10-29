@@ -223,10 +223,10 @@ button{transition:background-color .16s ease,border-color .16s ease,box-shadow .
 button:disabled{cursor:not-allowed;filter:none;transform:none;box-shadow:none}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media(hover:hover) and (pointer:fine){
- button:not(:disabled):hover{filter:brightness(1.13);border-color:var(--accent);box-shadow:0 0 8px #8bafff55,0 4px 20px #8bafff66;transform:translateY(-1px)}
- button:not(:disabled):active{transform:translateY(0);box-shadow:0 1px 5px #8bafff20}
+ button:not(:disabled):not(#previousPage):not(#nextPage):not(#goToPage):hover{filter:brightness(1.13);border-color:var(--accent);box-shadow:0 0 8px #8bafff55,0 4px 20px #8bafff66;transform:translateY(-1px)}
+ button:not(:disabled):not(#previousPage):not(#nextPage):not(#goToPage):active{transform:translateY(0);box-shadow:0 1px 5px #8bafff20}
 }
-@media(prefers-reduced-motion:reduce){button{transition:none}button:not(:disabled):hover{transform:none}}
+@media(prefers-reduced-motion:reduce){button{transition:none}button:not(:disabled):not(#previousPage):not(#nextPage):not(#goToPage):hover{transform:none}}
 
 .btc-balance-card{display:flex;flex-direction:column;align-items:flex-start}
 .btc-balance-card .withdraw-action{align-items:flex-start;width:100%;margin-top:auto;padding-top:12px}
@@ -579,10 +579,10 @@ button{transition:background-color .16s ease,border-color .16s ease,box-shadow .
 button:disabled{cursor:not-allowed;filter:none;transform:none;box-shadow:none}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media(hover:hover) and (pointer:fine){
- button:not(:disabled):hover{filter:brightness(1.13);border-color:var(--accent);box-shadow:0 0 8px #8bafff55,0 4px 20px #8bafff66;transform:translateY(-1px)}
- button:not(:disabled):active{transform:translateY(0);box-shadow:0 1px 5px #8bafff20}
+ button:not(:disabled):not(#previousPage):not(#nextPage):not(#goToPage):hover{filter:brightness(1.13);border-color:var(--accent);box-shadow:0 0 8px #8bafff55,0 4px 20px #8bafff66;transform:translateY(-1px)}
+ button:not(:disabled):not(#previousPage):not(#nextPage):not(#goToPage):active{transform:translateY(0);box-shadow:0 1px 5px #8bafff20}
 }
-@media(prefers-reduced-motion:reduce){button{transition:none}button:not(:disabled):hover{transform:none}}
+@media(prefers-reduced-motion:reduce){button{transition:none}button:not(:disabled):not(#previousPage):not(#nextPage):not(#goToPage):hover{transform:none}}
 </style>
 </head>
 <body><main class="card">
