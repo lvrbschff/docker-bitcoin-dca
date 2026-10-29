@@ -216,7 +216,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="card"><label>Current BTC balance</label><div class="value" id="exchangeBtcBalance">—</div><div class="small" id="exchangeBtcValue">—</div><div class="small" id="exchangeBtcUpdated">Waiting for account check</div></div>
 <div class="card"><div class="field"><label for="monthlyDeposit">Expected monthly deposit (<span id="monthlyDepositCurrency">EUR</span>)</label><input id="monthlyDeposit" type="number" min="0" step="0.01" inputmode="decimal" value="0"></div><div class="small">Forecast only · assumes deposits on the configured deposit day · saved in this browser</div></div>
 <div class="card time-card"><label>Estimated automatic withdrawal date</label><div class="value time-value" id="estimatedWithdrawalAt">—</div><div class="small" id="estimatedWithdrawalStatus">Waiting for account check</div></div>
-<div class="card time-card"><label>Time until estimated automatic withdrawal date</label><div class="value countdown-value" id="withdrawalCountdown">—</div><div class="small" id="withdrawalCountdownStatus">Estimate at the current BTC price and purchase interval</div></div>
+<div class="card time-card"><label>Time until automatic withdrawal</label><div class="value countdown-value" id="withdrawalCountdown">—</div><div class="small" id="withdrawalCountdownStatus">Estimate at the current BTC price and purchase interval</div></div>
 </div></div>
 </section>
 </section>
