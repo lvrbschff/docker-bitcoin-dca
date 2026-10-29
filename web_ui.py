@@ -158,7 +158,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 .schedule-row-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 .schedule-grid{grid-template-columns:repeat(4,minmax(220px,1fr))}
 .schedule-grid .time-card{grid-column:auto}
-.schedule-grid .card{border-color:#354b70;background:#111f36}
+
 .report-section{margin-top:38px;padding-top:28px;border-top:1px solid #354564;min-width:0}
 .report-heading{margin-bottom:18px}.report-heading h2{font-size:21px;margin:0 0 5px}
 .report-heading .sub{font-size:14px}.summary-subheading{font-size:17px;font-weight:700;line-height:1.4;margin:0 0 16px}
