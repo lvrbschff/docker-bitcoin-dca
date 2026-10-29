@@ -115,7 +115,7 @@ main{max-width:1180px;margin:0 auto;padding:36px 22px 64px}.top{display:flex;jus
 .bottom-actions{display:flex;justify-content:flex-end;margin-top:20px}.badge{border:1px solid var(--line);border-radius:999px;padding:8px 12px;color:var(--muted);font-size:12px}.top-actions{display:flex;flex-direction:column;align-items:flex-end;gap:10px}.top-actions form{margin:0}.withdraw-action{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:0}#withdrawMessage:empty{display:none}.top-actions .field{min-width:170px}.top-actions .field label{margin-bottom:5px}
 .panel{background:linear-gradient(145deg,rgba(21,31,52,.96),rgba(15,22,39,.96));border:1px solid var(--line);border-radius:18px;padding:20px;margin:18px 0;box-shadow:0 14px 40px #0002}
 .panel.activity-panel{margin:0;background:#0c1425a8;box-shadow:none}
-.controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}select,input,button{font:inherit;color:var(--text);background:#0c1425;border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%}button{width:auto;cursor:pointer;background:var(--accent);border-color:var(--accent);color:#081122;font-weight:700}button.secondary{background:transparent;color:var(--text);border-color:var(--line)}button:hover{filter:brightness(1.08)}
+.controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}select,input,button{font:inherit;color:var(--text);background:#0c1425;border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%}button{width:auto;cursor:pointer;background:var(--accent);border-color:var(--accent);color:#081122;font-weight:700}button.secondary{background:transparent;color:var(--text);border-color:var(--line)}
 .controls .field{width:100%;min-width:0;min-inline-size:0}
 .controls input,.controls select,.controls>button{display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;min-inline-size:0;height:46px;min-height:46px;line-height:1.25}
 .controls input[type="datetime-local"]{appearance:none;-webkit-appearance:none;inline-size:100%;max-inline-size:100%;padding:10px 12px}
@@ -218,6 +218,15 @@ body.header-actions-hidden .top-actions{opacity:0;transform:translateY(-8px);vis
  .top-actions .field{min-width:120px}
  .top-actions button,.top-actions select{min-height:44px}
 }
+
+button{transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease,filter .16s ease,transform .16s ease}
+button:disabled{cursor:not-allowed;filter:none;transform:none;box-shadow:none}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@media(hover:hover) and (pointer:fine){
+ button:not(:disabled):hover{filter:brightness(1.13);border-color:var(--accent);box-shadow:0 3px 12px #8bafff30;transform:translateY(-1px)}
+ button:not(:disabled):active{transform:translateY(0);box-shadow:0 1px 5px #8bafff20}
+}
+@media(prefers-reduced-motion:reduce){button{transition:none}button:not(:disabled):hover{transform:none}}
 </style>
 </head>
 <body>
@@ -545,9 +554,18 @@ LOGIN_HTML = """<!doctype html>
 .eyebrow{color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}h1{font-size:27px;margin:6px 0 4px}.sub{color:var(--muted);margin:0 0 24px}
 .login-brand{display:flex;align-items:center;gap:12px;margin:10px 0}.login-brand img{display:block;flex:0 0 48px;border-radius:11px}.login-brand h1{min-width:0;margin:0;line-height:1.25}
 label{display:block;color:var(--muted);font-size:12px;margin:15px 0 6px}input{width:100%;padding:12px 13px;color:var(--text);background:#0c1425;border:1px solid var(--line);border-radius:10px;font:inherit;outline:none}input:focus{border-color:var(--accent);box-shadow:0 0 0 3px #8bafff22}
-button{width:100%;margin-top:22px;padding:12px;border:1px solid var(--accent);border-radius:10px;background:var(--accent);color:#081122;font:inherit;font-weight:700;cursor:pointer}button:hover{filter:brightness(1.08)}
+button{width:100%;margin-top:22px;padding:12px;border:1px solid var(--accent);border-radius:10px;background:var(--accent);color:#081122;font:inherit;font-weight:700;cursor:pointer}
 .error{min-height:20px;margin:12px 0 0;color:var(--red);font-size:13px}.foot{margin-top:20px;color:var(--muted);font-size:12px}
 @media(max-width:480px){body{padding:16px;min-height:100svh}.card{padding:24px}input{font-size:16px}}
+
+button{transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease,filter .16s ease,transform .16s ease}
+button:disabled{cursor:not-allowed;filter:none;transform:none;box-shadow:none}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@media(hover:hover) and (pointer:fine){
+ button:not(:disabled):hover{filter:brightness(1.13);border-color:var(--accent);box-shadow:0 3px 12px #8bafff30;transform:translateY(-1px)}
+ button:not(:disabled):active{transform:translateY(0);box-shadow:0 1px 5px #8bafff20}
+}
+@media(prefers-reduced-motion:reduce){button{transition:none}button:not(:disabled):hover{transform:none}}
 </style>
 </head>
 <body><main class="card">
