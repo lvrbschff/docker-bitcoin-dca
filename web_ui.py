@@ -185,12 +185,22 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
  .panel>.panel-heading h2,.panel>.report-heading h2{font-size:19px}
 }
 .notes-disclosure>summary{cursor:pointer;color:var(--text);font-size:14px;font-weight:700;line-height:1.5;width:fit-content}.notes-disclosure[open]>summary{margin-bottom:12px}.notes-disclosure>summary:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:3px}
+
+/* Native disclosure controls keep panel contents and state intact while collapsed. */
+details.panel>summary{list-style:none;cursor:pointer;user-select:none}
+details.panel>summary::-webkit-details-marker{display:none}
+details.panel>summary h2{display:flex;align-items:center;justify-content:space-between;gap:12px}
+details.panel>summary h2::after{content:"+";font-size:22px;font-weight:400;color:var(--accent)}
+details.panel[open]>summary h2::after{content:"−"}
+details.panel:not([open])>summary{margin-bottom:-20px;border-bottom:0;border-radius:17px}
+details.panel>summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@media(max-width:600px){details.panel:not([open])>summary{margin-bottom:-15px;border-radius:13px}}
 </style>
 </head>
 <body><main>
 <header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Bot Dashboard</h1></div></div><div class="top-actions"><form method="post" action="/logout"><button type="submit">Log out</button></form><div class="withdraw-action"><button id="manualWithdraw" type="button" aria-describedby="withdrawal-note withdrawalFeedback">Withdraw BTC manually</button><p id="withdrawalFeedback" class="export-feedback withdraw-feedback hidden" role="alert"></p></div><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
-<section class="panel" aria-labelledby="configurationHeading">
-<header class="panel-heading"><h2 id="configurationHeading">Bot configuration</h2></header>
+<details open class="panel" aria-labelledby="configurationHeading">
+<summary class="panel-heading"><h2 id="configurationHeading">Bot configuration</h2></summary>
 <div class="grid">
 <div class="card"><label>Exchange</label><div class="value" id="settingExchange">—</div></div>
 <div class="card"><label>Quote currency</label><div class="value" id="settingQuoteCurrency">—</div></div>
@@ -201,9 +211,9 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="card"><label>Withdrawal threshold</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured threshold</div></div>
 <div class="card"><label>Withdrawal target</label><div class="value" id="withdrawalTarget">—</div></div>
 </div>
-</section>
-<section class="panel purchase-schedule" aria-labelledby="scheduleHeading">
-<header class="panel-heading"><h2 id="scheduleHeading">Schedule</h2></header>
+</details>
+<details open class="panel purchase-schedule" aria-labelledby="scheduleHeading">
+<summary class="panel-heading"><h2 id="scheduleHeading">Schedule</h2></summary>
 <section class="schedule-group" aria-labelledby="purchaseHeading">
 <h3 id="purchaseHeading" class="summary-subheading">Purchase</h3>
 <div class="schedule-row-scroll" role="region" aria-label="Purchase schedule cards" tabindex="0"><div class="grid schedule-grid">
@@ -222,9 +232,9 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="card time-card"><label>Time until automatic withdrawal</label><div class="value countdown-value" id="withdrawalCountdown">—</div><div class="small" id="withdrawalCountdownStatus">Estimate at the current BTC price and purchase interval</div></div>
 </div></div>
 </section>
-</section>
-<section class="panel report-section report-controls" aria-labelledby="reportHeading">
-<header class="report-heading"><h2 id="reportHeading">Period Analysis</h2></header>
+</details>
+<details open class="panel report-section report-controls" aria-labelledby="reportHeading">
+<summary class="report-heading"><h2 id="reportHeading">Period Analysis</h2></summary>
 <p class="sub">Choose a custom date range or an interval between withdrawals to review activity and prepare a Parqet export.</p>
 <div class="controls">
 <div class="field"><label for="interval">Date range</label><select id="interval"></select></div>
@@ -246,7 +256,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <section class="panel activity-panel" aria-labelledby="activityHeading"><div class="activity-heading"><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th><th>Action</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><button class="secondary" id="previousPage">Previous</button><span id="pageInfo" class="notice"></span><button class="secondary" id="nextPage">Next</button><form class="page-jump" id="pageJump" aria-label="Jump to activity page"><label for="pageNumber">Go to page</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><button class="secondary" id="goToPage" type="submit">Go</button></form></div></section></div>
 <div class="bottom-actions"><button id="download" aria-describedby="exportMessage">Download Parqet CSV</button></div>
 <p id="exportMessage" class="export-feedback hidden" role="alert"></p>
-</section>
+</details>
 <footer class="dashboard-footnotes">
 <details class="notes-disclosure"><summary id="notesHeading">Notes</summary>
 <ol>
