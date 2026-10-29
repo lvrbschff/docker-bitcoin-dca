@@ -380,6 +380,12 @@ async function refreshPurchaseSchedule(){
   if(!response.ok)throw new Error("Schedule unavailable");
   const schedule=await response.json(),target=Date.parse(schedule.nextPurchaseAt),serverTime=Date.parse(schedule.serverTime);
   $("monthlyDepositCurrency").textContent=schedule.quote;
+  if(schedule.configuredBuyAmount!==undefined){
+   const minimumMode=Number(schedule.configuredBuyAmount)===0;
+   const effective=Number(schedule.effectiveBuyAmount);
+   $("buyAmount").textContent=minimumMode?(effective>0?btc(effective):"—"):btc(schedule.configuredBuyAmount);
+   $("buyAmountNote").textContent=minimumMode?"(exchange minimum)"+(effective>0?"":" · waiting for account check"):"";
+  }
   $("quoteBalanceLabel").textContent="Available "+schedule.quote+" balance on exchange";
   const balanceKnown=schedule.quoteBalance!==null&&schedule.quoteBalance!==undefined&&Number.isFinite(Number(schedule.quoteBalance));
   $("quoteBalance").textContent=balanceKnown?money(schedule.quoteBalance,schedule.quote):"—";
@@ -923,6 +929,8 @@ class Handler(BaseHTTPRequestHandler):
                     "quote": self.settings["quote"],
                     "exchange": self.settings["exchange"],
                     "quoteBalance": snapshot.get("quoteBalance") if balance_matches else None,
+                    "configuredBuyAmount": str(self.settings.get("buy_amount", 0)),
+                    "effectiveBuyAmount": (snapshot.get("withdrawalForecastPlan") or {}).get("orderAmount") if balance_matches else None,
                     "btcBalance": snapshot.get("btcBalance") if balance_matches else None,
                     "estimatedWithdrawalAt": forecast_at,
                     "estimatedWithdrawalStatus": forecast_status,
