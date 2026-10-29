@@ -245,6 +245,15 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
  padding:8px 12px;font-size:12px;line-height:1.5;font-weight:700;border-radius:10px
 }
 .pagination-navigation{display:flex;align-items:center;gap:8px}
+
+details.panel{border-radius:12px}
+details.panel>.panel-heading,details.panel>.report-heading{border-radius:11px 11px 0 0}
+details.panel:not([open])>summary{border-radius:11px}
+@media(max-width:600px){
+ details.panel{border-radius:10px}
+ details.panel>.panel-heading,details.panel>.report-heading{border-radius:9px 9px 0 0}
+ details.panel:not([open])>summary{border-radius:9px}
+}
 </style>
 </head>
 <body>
