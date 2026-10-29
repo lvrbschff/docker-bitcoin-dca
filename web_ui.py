@@ -205,7 +205,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <h3 id="purchaseHeading" class="summary-subheading">Purchase</h3>
 <div class="schedule-row-scroll" role="region" aria-label="Purchase schedule cards" tabindex="0"><div class="grid schedule-grid">
 <div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
-<div class="card"><label id="quoteBalanceLabel">Available fiat balance</label><div class="value" id="quoteBalance">—</div><div class="small" id="quoteBalanceUpdated">Waiting for account check</div></div>
+<div class="card"><label id="quoteBalanceLabel">Available fiat balance on exchange</label><div class="value" id="quoteBalance">—</div><div class="small" id="quoteBalanceUpdated">Waiting for account check</div></div>
 <div class="card time-card"><label>Next purchase <span id="nextPurchaseStatus">Scheduled</span></label><div class="value time-value" id="nextPurchaseAt">—</div></div>
 <div class="card time-card"><label>Time until next purchase</label><div class="value countdown-value" id="nextPurchaseCountdown">—</div></div>
 </div></div>
@@ -287,7 +287,7 @@ async function refreshPurchaseSchedule(){
   if(!response.ok)throw new Error("Schedule unavailable");
   const schedule=await response.json(),target=Date.parse(schedule.nextPurchaseAt),serverTime=Date.parse(schedule.serverTime);
   $("monthlyDepositCurrency").textContent=schedule.quote;
-  $("quoteBalanceLabel").textContent="Available "+schedule.quote+" balance";
+  $("quoteBalanceLabel").textContent="Available "+schedule.quote+" balance on exchange";
   const balanceKnown=schedule.quoteBalance!==null&&schedule.quoteBalance!==undefined&&Number.isFinite(Number(schedule.quoteBalance));
   $("quoteBalance").textContent=balanceKnown?money(schedule.quoteBalance,schedule.quote):"—";
   const checkedAt=Date.parse(schedule.balanceUpdatedAt);
