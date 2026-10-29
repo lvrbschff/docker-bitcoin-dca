@@ -193,7 +193,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="card"><label>Exchange</label><div class="value" id="settingExchange">—</div></div>
 <div class="card"><label>Quote currency</label><div class="value" id="settingQuoteCurrency">—</div></div>
 <div class="card"><label>Trading mode</label><div class="value" id="tradingMode">—</div></div>
-<div class="card"><label>Purchase amount</label><div class="value" id="buyAmount">—</div></div>
+<div class="card"><label>Purchase amount</label><div class="value" id="buyAmount">—</div><div class="small" id="buyAmountNote"></div></div>
 <div class="card"><label>Deposit day (day of month)</label><div class="value" id="depositDay">—</div></div>
 <div class="card"><label>Automatic withdrawals</label><div class="value" id="withdrawEnabled">—</div></div>
 <div class="card"><label>Withdrawal threshold</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured threshold</div></div>
@@ -399,8 +399,9 @@ async function loadAnalytics(){
  const amountSnapshot=d.snapshot||{};
  const effectiveMinimum=amountSnapshot.exchange===d.exchange&&amountSnapshot.quote===quote?Number((amountSnapshot.withdrawalForecastPlan||{}).orderAmount):NaN;
  $("buyAmount").textContent=Number(d.configuration.buyAmount)===0
-  ?(Number.isFinite(effectiveMinimum)&&effectiveMinimum>0?btc(effectiveMinimum)+" (exchange minimum)":"Exchange minimum · waiting for account check")
+  ?(Number.isFinite(effectiveMinimum)&&effectiveMinimum>0?btc(effectiveMinimum):"—")
   :btc(d.configuration.buyAmount);
+ $("buyAmountNote").textContent=Number(d.configuration.buyAmount)===0?"(exchange minimum)"+(Number.isFinite(effectiveMinimum)&&effectiveMinimum>0?"":" · waiting for account check"):"";
  $("depositDay").textContent=String(d.configuration.depositDay);$("withdrawEnabled").textContent=d.configuration.withdrawalsEnabled?"Enabled":"Disabled";
  $("threshold").textContent=money(Number(d.configuration.withdrawalThreshold)*fxRate,displayCurrency);$("thresholdNote").textContent="Threshold in "+quote+", shown in "+displayCurrency;
  $("buyCount").textContent=d.summary.buyCount;$("buyBtc").textContent=btc(d.summary.boughtBtc);

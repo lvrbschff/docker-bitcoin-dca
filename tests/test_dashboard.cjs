@@ -33,7 +33,7 @@ const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate)};
  vm.createContext(context);vm.runInContext(script,context);await settle();
  assert(get('start').value&&get('end').value,'Both dates must initialize for the selected interval');
  assert.equal(get('quoteBalance').textContent,'€72.77');
- assert.equal(get('quoteBalanceLabel').textContent,'Available EUR balance');
+ assert.equal(get('quoteBalanceLabel').textContent,'Available EUR balance on exchange');
  assert(html.indexOf('id="quoteBalance"')<html.indexOf('id="nextPurchaseAt"'),'Fiat balance precedes next purchase');
  vm.runInContext('displayCurrency="USD"',context);await vm.runInContext('refreshPurchaseSchedule()',context);
  assert.equal(get('quoteBalance').textContent,'€72.77','Balance stays in the exchange trading currency');
