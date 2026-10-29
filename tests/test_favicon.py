@@ -1,6 +1,9 @@
-"""Icons are available before sign-in in Safari-compatible formats."""
+"""Safari icons: explicit PNG, pinned-tab mask and cacheable public responses."""
+import io
 import struct
 import unittest
+import xml.etree.ElementTree as ET
+from html.parser import HTMLParser
 from unittest.mock import Mock
 import favicon_assets
 import web_ui
@@ -12,27 +15,55 @@ class FaviconTests(unittest.TestCase):
         self.assertEqual(struct.unpack_from('<HHH',data),(0,1,3))
         self.assertEqual([tuple(data[6+i*16:8+i*16]) for i in range(3)],[(16,16),(32,32),(48,48)])
 
-    def test_png_fallback_and_apple_icon_dimensions(self):
+    def test_png_fallback_and_opaque_apple_icon_dimensions(self):
         for data,size in [(favicon_assets.FAVICON_PNG,32),(favicon_assets.APPLE_TOUCH_ICON_PNG,180)]:
             self.assertEqual(data[:8],b'\x89PNG\r\n\x1a\n')
             self.assertEqual(struct.unpack('>II',data[16:24]),(size,size))
+        self.assertEqual(favicon_assets.APPLE_TOUCH_ICON_PNG[25],2,'RGB icon must have no alpha channel')
 
-    def test_all_icon_routes_are_public_and_accept_cache_version(self):
+    def test_all_icon_routes_are_public_and_cacheable(self):
         routes=[('/favicon.ico',favicon_assets.FAVICON_ICO,'image/x-icon'),
                 ('/favicon-32.png',favicon_assets.FAVICON_PNG,'image/png'),
                 ('/apple-touch-icon.png',favicon_assets.APPLE_TOUCH_ICON_PNG,'image/png'),
+                ('/apple-touch-icon-precomposed.png',favicon_assets.APPLE_TOUCH_ICON_PNG,'image/png'),
+                ('/bitcoin-dca-icon-v3.png',favicon_assets.APPLE_TOUCH_ICON_PNG,'image/png'),
+                ('/safari-pinned-tab-v3.svg',favicon_assets.FAVICON_MASK_SVG,'image/svg+xml; charset=utf-8'),
                 ('/favicon.svg',web_ui.FAVICON_SVG,'image/svg+xml; charset=utf-8')]
         for path,data,content_type in routes:
             with self.subTest(path=path):
-                handler=object.__new__(web_ui.Handler);handler.path=path+'?v=2'
+                handler=object.__new__(web_ui.Handler);handler.path=path+'?v=3'
                 handler._send=Mock();handler._require_authentication=Mock(side_effect=AssertionError('Icons must be public'))
-                handler.do_GET();handler._send.assert_called_once_with(200,data,content_type)
+                handler.do_GET();handler._send.assert_called_once_with(200,data,content_type,cache_control='public, max-age=86400')
                 handler._require_authentication.assert_not_called()
 
-    def test_login_and_dashboard_both_reference_raster_and_vector_icons(self):
+    def test_login_and_dashboard_have_one_unambiguous_normal_icon_plus_apple_and_mask_icons(self):
+        class Links(HTMLParser):
+            def __init__(self):super().__init__();self.links=[]
+            def handle_starttag(self,tag,attrs):
+                if tag=='link':self.links.append(dict(attrs))
         for page in [web_ui.HTML,web_ui.LOGIN_HTML]:
-            for target in ['/favicon.ico?v=2','/favicon-32.png?v=2','/favicon.svg?v=2','/apple-touch-icon.png?v=2']:
-                self.assertIn('href="'+target+'"',page)
+            parser=Links();parser.feed(page)
+            regular=[link for link in parser.links if link.get('rel')=='icon']
+            self.assertEqual(len(regular),1)
+            self.assertEqual(regular[0]['href'],'/bitcoin-dca-icon-v3.png')
+            self.assertEqual(regular[0]['type'],'image/png')
+            self.assertTrue(any(link.get('rel')=='apple-touch-icon' and link['href']=='/bitcoin-dca-icon-v3.png' for link in parser.links))
+            self.assertTrue(any(link.get('rel')=='mask-icon' and link['href']=='/safari-pinned-tab-v3.svg' and link['color']=='#8bafff' for link in parser.links))
+
+    def test_pinned_tab_mask_is_a_single_black_vector_layer(self):
+        svg=ET.fromstring(favicon_assets.FAVICON_MASK_SVG)
+        self.assertEqual(svg.attrib['viewBox'],'0 0 16 16')
+        self.assertEqual(len(svg),1);self.assertTrue(svg[0].tag.endswith('path'))
+        self.assertEqual(svg[0].attrib['fill'],'#000000')
+
+    def test_normal_responses_remain_no_store(self):
+        handler=object.__new__(web_ui.Handler)
+        handler.send_response=Mock();handler.send_header=Mock();handler.end_headers=Mock();handler.wfile=io.BytesIO()
+        handler._send(200,'private account data')
+        handler.send_header.assert_any_call('Cache-Control','no-store')
+        handler.send_header.reset_mock()
+        handler._send(200,b'public icon','image/png',cache_control='public, max-age=86400')
+        handler.send_header.assert_any_call('Cache-Control','public, max-age=86400')
 
 
 if __name__=='__main__':unittest.main()
