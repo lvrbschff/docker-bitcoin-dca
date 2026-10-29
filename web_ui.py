@@ -161,7 +161,8 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 .schedule-grid .card{border-color:#354b70;background:#111f36}
 .report-section{margin-top:38px;padding-top:28px;border-top:1px solid #354564;min-width:0}
 .report-heading{margin-bottom:18px}.report-heading h2{font-size:21px;margin:0 0 5px}
-.report-heading .sub{font-size:14px}.period-summary-content{margin-top:24px;padding-top:20px;border-top:1px solid var(--line)}
+.report-heading .sub{font-size:14px}.summary-subheading{font-size:17px;font-weight:700;line-height:1.4;margin:0 0 16px}
+.period-summary-content{margin-top:24px;padding-top:20px;border-top:1px solid var(--line)}
 .report-controls>.sub{margin-bottom:16px;font-size:14px}
 .report-controls{border-color:#354b70;background:linear-gradient(145deg,#17243b,#111a2d)}
 @media(max-width:600px){.report-section{margin-top:28px;padding-top:22px}.report-heading h2{font-size:19px}}
@@ -216,7 +217,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="field"><label for="end">To</label><input id="end" type="datetime-local"></div>
 <button id="refresh">Load report</button>
 </div><div id="error" class="error hidden"></div>
-<div class="period-summary-content"><h2>Selected period summary</h2><div class="grid period-summary-grid">
+<div class="period-summary-content" role="region" aria-labelledby="periodSummaryHeading"><h3 id="periodSummaryHeading" class="summary-subheading">Selected period summary</h3><div class="grid period-summary-grid">
 <div class="card"><label>BTC purchases</label><div class="value" id="buyCount">—</div><div class="small" id="buyBtc"></div></div>
 <div class="card"><label>Purchase volume</label><div class="value" id="buyVolume">—</div><div class="small" id="avgPrice"></div></div>
 <div class="card"><label>Trading fees</label><div class="value" id="tradeFees">—</div></div>
