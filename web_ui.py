@@ -197,6 +197,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="card"><label>Deposit day (day of month)</label><div class="value" id="depositDay">—</div></div>
 <div class="card"><label>Automatic withdrawals</label><div class="value" id="withdrawEnabled">—</div></div>
 <div class="card"><label>Withdrawal threshold</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured threshold</div></div>
+<div class="card"><label>Withdrawal target</label><div class="value" id="withdrawalTarget">—</div></div>
 </div>
 </section>
 <section class="panel purchase-schedule" aria-labelledby="scheduleHeading">
@@ -444,6 +445,9 @@ async function loadWithdrawalConfiguration(){
  const response=await fetch("/api/withdrawal/config");const d=await response.json();
  if(!response.ok)throw new Error(d.error||"Could not load withdrawal configuration.");
  $("withdrawalDestination").textContent=d.destination;
+ const target=d.target||"";
+ $("withdrawalTarget").textContent=target?(d.exchange==="BITVAVO"&&target.length>22?target.slice(0,10)+"…"+target.slice(-8):target):"Not configured";
+ $("withdrawalTarget").title=target;
  $("withdrawMessage").textContent=d.reason||"Manual withdrawals are available. Automatic withdrawals may remain disabled.";
  return d;
 }
@@ -798,7 +802,9 @@ class Handler(BaseHTTPRequestHandler):
             if not self.withdrawal_service:
                 missing.append("restart the bot to enable the withdrawal service")
             reason = "Manual withdrawal is unavailable: " + "; ".join(missing) + "." if missing else ""
-            self._json(200, {"destination": destination, "enabled": not missing, "reason": reason})
+            self._json(200, {"destination": destination, "enabled": not missing, "reason": reason,
+                             "exchange": settings["exchange"],
+                             "target": (settings.get("kraken_withdraw_key") if kraken else settings.get("withdraw_address")) or ""})
             return
         query = parse_qs(parsed.query)
         if parsed.path == "/api/market-price":
