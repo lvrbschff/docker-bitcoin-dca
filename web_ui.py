@@ -251,7 +251,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 <div class="compact-brand-bar" aria-hidden="true"><div class="compact-brand-inner"><img src="/bitcoin-dca-icon-v3.png" width="36" height="36" alt=""><span>Bitcoin DCA Dashboard</span></div></div><main>
 <header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Dashboard</h1></div></div><div class="top-actions"><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div><form method="post" action="/logout"><button type="submit">Log out</button></form></div></header>
 <details open class="panel" aria-labelledby="configurationHeading">
-<summary class="panel-heading"><h2 id="configurationHeading">Bot configuration</h2></summary>
+<summary class="panel-heading"><h2 id="configurationHeading">Configuration</h2></summary>
 <div class="grid">
 <div class="card"><label>Exchange</label><div class="value" id="settingExchange">—</div></div>
 <div class="card"><label>Quote currency</label><div class="value" id="settingQuoteCurrency">—</div></div>
