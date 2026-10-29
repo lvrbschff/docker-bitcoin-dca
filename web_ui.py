@@ -123,7 +123,7 @@ main{max-width:1180px;margin:0 auto;padding:36px 22px 64px}.top{display:flex;jus
 .controls input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper{min-width:0;padding:0}
 .controls input[type="datetime-local"]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.period-summary-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.summary-secondary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.card{padding:17px;border:1px solid var(--line);border-radius:14px;background:#0c1425a8}.card label{display:block;color:var(--muted);font-size:12px;margin-bottom:9px}.value{font-size:22px;font-weight:700;line-height:1.4;letter-spacing:-.02em}.small{font-size:12px;color:var(--muted);margin-top:4px}
-h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:740px}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}td.num{text-align:right;font-variant-numeric:tabular-nums}.positive{color:var(--green)}.negative{color:var(--red)}.notice{color:var(--muted);font-size:13px;margin-top:12px}.error{color:var(--red);margin:12px 0}.hidden{display:none}.activity-heading,.pagination,.settings-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.settings-heading h2{margin:0}.settings-heading .field{min-width:160px}.activity-heading h2{margin:0}.page-size{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}.page-size select{width:auto;padding:7px 10px}.pagination{margin-top:12px}.pagination button{padding:8px 12px}.pagination .notice{margin:0;text-align:center}
+h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:740px}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}td.num{text-align:right;font-variant-numeric:tabular-nums}.positive{color:var(--green)}.negative{color:var(--red)}.notice{color:var(--muted);font-size:13px;margin-top:12px}.error{color:var(--red);margin:12px 0}.hidden{display:none}.activity-heading,.pagination,.settings-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.settings-heading h2{margin:0}.settings-heading .field{min-width:160px}.activity-heading h4{font-size:14px;font-weight:700;margin:0}.page-size{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}.page-size select{width:auto;padding:7px 10px}.pagination{margin-top:12px}.pagination button{padding:8px 12px}.pagination .notice{margin:0;text-align:center}
 main,.panel,.grid,.card,.field,.top>div{min-width:0}
 main{width:100%}.top-actions{flex-shrink:0}.controls>*{min-width:0}
 input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overflow-wrap:anywhere}
@@ -160,12 +160,12 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 .schedule-grid .time-card{grid-column:auto}
 
 .report-section{margin-top:38px;padding-top:28px;border-top:1px solid #354564;min-width:0}
-.report-heading{margin-bottom:18px}.report-heading h2{font-size:21px;margin:0 0 5px}
+.report-heading,.panel-heading{margin-bottom:18px}.report-heading h2,.panel-heading h2{font-size:21px;margin:0 0 5px}
 .report-heading .sub{font-size:14px}.summary-subheading{font-size:17px;font-weight:700;line-height:1.4;margin:0 0 16px}
 .period-summary-content{margin-top:24px;padding-top:20px;border-top:1px solid var(--line)}
 .report-controls>.sub{margin-bottom:16px;font-size:14px}
-.report-controls{border-color:#354b70;background:linear-gradient(145deg,#17243b,#111a2d)}
-@media(max-width:600px){.report-section{margin-top:28px;padding-top:22px}.report-heading h2{font-size:19px}}
+
+@media(max-width:600px){.report-section{margin-top:28px;padding-top:22px}.report-heading h2,.panel-heading h2{font-size:19px}}
 sup{color:#fff}.footnote-ref{margin-left:3px}
 .dashboard-footnotes{margin-top:30px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
 .dashboard-footnotes h2{font-size:14px;margin:0 0 12px}.dashboard-footnotes ol{margin:0;padding-left:20px}.dashboard-footnotes li{padding-left:4px;margin-bottom:14px;scroll-margin-top:20px}.dashboard-footnotes strong{color:var(--text);font-weight:600}.dashboard-footnotes p{margin:4px 0 0}
@@ -175,8 +175,9 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 </head>
 <body><main>
 <header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Bot Dashboard</h1></div><p class="sub">Bot configuration, purchase and withdrawal schedule, and period analysis with activity history and Parqet CSV export</p></div><div class="top-actions"><form method="post" action="/logout"><button type="submit">Log out</button></form><div class="withdraw-action"><button id="manualWithdraw" type="button" aria-describedby="withdrawal-note withdrawalFeedback">Withdraw BTC manually <sup class="footnote-ref" aria-describedby="withdrawal-note">1</sup></button><p id="withdrawalFeedback" class="export-feedback withdraw-feedback hidden" role="alert"></p></div><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
-<section class="panel">
-<h2>Bot configuration</h2>
+<section class="panel" aria-labelledby="configurationScheduleHeading">
+<header class="panel-heading"><h2 id="configurationScheduleHeading">Bot configuration and schedule</h2></header>
+<h3 class="summary-subheading">Bot configuration</h3>
 <div class="grid">
 <div class="card"><label>Exchange</label><div class="value" id="settingExchange">—</div></div>
 <div class="card"><label>Quote currency</label><div class="value" id="settingQuoteCurrency">—</div></div>
@@ -227,7 +228,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="card"><label>Profit / loss on period purchases</label><div class="value" id="profitLoss">—</div><div class="small" id="profitLossBasis">Current value of BTC bought in this period minus trading fees</div></div>
 <div class="card"><label>Net BTC in period</label><div class="value" id="netBtc">—</div><div class="small">Purchases minus gross BTC withdrawals</div></div>
 </div>
-<section class="panel activity-panel"><div class="activity-heading"><h2>Activity</h2><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th><th>Action</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><button class="secondary" id="previousPage">Previous</button><span id="pageInfo" class="notice"></span><button class="secondary" id="nextPage">Next</button><form class="page-jump" id="pageJump" aria-label="Jump to activity page"><label for="pageNumber">Go to page</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><button class="secondary" id="goToPage" type="submit">Go</button></form></div></section></div>
+<section class="panel activity-panel"><div class="activity-heading"><h4>Activity</h4><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th><th>Action</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><button class="secondary" id="previousPage">Previous</button><span id="pageInfo" class="notice"></span><button class="secondary" id="nextPage">Next</button><form class="page-jump" id="pageJump" aria-label="Jump to activity page"><label for="pageNumber">Go to page</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><button class="secondary" id="goToPage" type="submit">Go</button></form></div></section></div>
 <div class="bottom-actions"><button id="download" aria-describedby="exportMessage">Download Parqet CSV</button></div>
 <p id="exportMessage" class="export-feedback hidden" role="alert"></p>
 </section>
@@ -476,6 +477,7 @@ LOGIN_HTML = """<!doctype html>
 *{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:22px;background:radial-gradient(ellipse at 15% 0%,#1b2a49 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
 .card{width:min(100%,420px);padding:32px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,rgba(21,31,52,.98),rgba(15,22,39,.98));box-shadow:0 18px 48px #0005}
 .eyebrow{color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}h1{font-size:27px;margin:6px 0 4px}.sub{color:var(--muted);margin:0 0 24px}
+.login-brand{display:flex;align-items:center;gap:12px;margin:10px 0}.login-brand img{display:block;flex:0 0 48px;border-radius:11px}.login-brand h1{min-width:0;margin:0;line-height:1.25}
 label{display:block;color:var(--muted);font-size:12px;margin:15px 0 6px}input{width:100%;padding:12px 13px;color:var(--text);background:#0c1425;border:1px solid var(--line);border-radius:10px;font:inherit;outline:none}input:focus{border-color:var(--accent);box-shadow:0 0 0 3px #8bafff22}
 button{width:100%;margin-top:22px;padding:12px;border:1px solid var(--accent);border-radius:10px;background:var(--accent);color:#081122;font:inherit;font-weight:700;cursor:pointer}button:hover{filter:brightness(1.08)}
 .error{min-height:20px;margin:12px 0 0;color:var(--red);font-size:13px}.foot{margin-top:20px;color:var(--muted);font-size:12px}
@@ -484,7 +486,7 @@ button{width:100%;margin-top:22px;padding:12px;border:1px solid var(--accent);bo
 </head>
 <body><main class="card">
 <div class="eyebrow">Dashboard sign-in</div>
-<h1>Bitcoin DCA Bot</h1>
+<div class="login-brand"><img src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Bot</h1></div>
 <p class="sub">Sign in to view your portfolio and activity.</p>
 <form method="post" action="/login">
 <label for="username">Username</label>
@@ -494,7 +496,7 @@ button{width:100%;margin-top:22px;padding:12px;border:1px solid var(--accent);bo
 <button type="submit">Sign in</button>
 </form>
 <p class="error">{{ERROR}}</p>
-<p class="foot">Your dashboard is available only on the Docker host.</p>
+<p class="foot">Sign in with the dashboard credentials configured in .env.</p>
 </main></body></html>
 """
 
