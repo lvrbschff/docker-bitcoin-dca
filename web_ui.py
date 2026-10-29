@@ -595,7 +595,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
  button:not(:disabled):not(#previousPage):not(#nextPage):not(#goToPage):active{transform:translateY(0);box-shadow:0 1px 5px #8bafff20}
 }
 @media(prefers-reduced-motion:reduce){button{transition:none}button:not(:disabled):not(#previousPage):not(#nextPage):not(#goToPage):hover{transform:none}}
-.login-support{margin:16px 0 0;padding-top:16px;border-top:1px solid var(--line);font-size:10px;line-height:1.6;color:var(--muted)}.login-support>span{color:#ff8f9e}.login-support code{display:block;margin-top:6px;overflow-wrap:anywhere;font-size:10px}
+.login-support{margin:16px 0 0;padding-top:16px;border-top:1px solid var(--line);font-size:10px;line-height:1.6;color:var(--muted)}.login-support>span{color:#ff8f9e}.login-support code{display:inline;overflow-wrap:anywhere;font-size:10px}
 </style>
 </head>
 <body><main class="card">
