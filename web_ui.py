@@ -227,11 +227,17 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
  button:not(:disabled):active{transform:translateY(0);box-shadow:0 1px 5px #8bafff20}
 }
 @media(prefers-reduced-motion:reduce){button{transition:none}button:not(:disabled):hover{transform:none}}
+
+.btc-balance-card{display:flex;flex-direction:column;align-items:flex-start}
+.btc-balance-card .withdraw-action{align-items:flex-start;width:100%;margin-top:auto;padding-top:12px}
+.btc-balance-card #manualWithdraw{font-size:12px;padding:6px 9px;border-radius:8px;min-height:32px}
+.btc-balance-card .withdraw-feedback{max-width:100%;text-align:left}
+@media(max-width:600px){.btc-balance-card #manualWithdraw{min-height:44px}}
 </style>
 </head>
 <body>
 <div class="compact-brand-bar" aria-hidden="true"><div class="compact-brand-inner"><img src="/bitcoin-dca-icon-v3.png" width="36" height="36" alt=""><span>Bitcoin DCA Bot Dashboard</span></div></div><main>
-<header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Bot Dashboard</h1></div></div><div class="top-actions"><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div><div class="withdraw-action"><button id="manualWithdraw" type="button" aria-describedby="withdrawal-note withdrawalFeedback">Withdraw BTC manually</button><p id="withdrawalFeedback" class="export-feedback withdraw-feedback hidden" role="alert"></p></div><form method="post" action="/logout"><button type="submit">Log out</button></form></div></header>
+<header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Bot Dashboard</h1></div></div><div class="top-actions"><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div><form method="post" action="/logout"><button type="submit">Log out</button></form></div></header>
 <details open class="panel" aria-labelledby="configurationHeading">
 <summary class="panel-heading"><h2 id="configurationHeading">Bot configuration</h2></summary>
 <div class="grid">
@@ -259,7 +265,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 <section class="schedule-group" aria-labelledby="withdrawalHeading">
 <h3 id="withdrawalHeading" class="summary-subheading">Withdrawal</h3>
 <div class="schedule-row-scroll" role="region" aria-label="Withdrawal schedule cards" tabindex="0"><div class="grid schedule-grid">
-<div class="card"><label>Current BTC balance</label><div class="value" id="exchangeBtcBalance">—</div><div class="small" id="exchangeBtcValue">—</div><div class="small" id="exchangeBtcUpdated">Waiting for account check</div></div>
+<div class="card btc-balance-card"><label>Current BTC balance</label><div class="value" id="exchangeBtcBalance">—</div><div class="small" id="exchangeBtcValue">—</div><div class="small" id="exchangeBtcUpdated">Waiting for account check</div><div class="withdraw-action"><button id="manualWithdraw" type="button" aria-describedby="withdrawal-note withdrawalFeedback">Withdraw BTC manually</button><p id="withdrawalFeedback" class="export-feedback withdraw-feedback hidden" role="alert"></p></div></div>
 <div class="card"><div class="field"><label for="monthlyDeposit">Expected monthly deposit (<span id="monthlyDepositCurrency">EUR</span>)</label><input id="monthlyDeposit" type="number" min="0" step="0.01" inputmode="decimal" value="0"></div><div class="small">Forecast only · assumes deposits on the configured deposit day · saved in this browser</div></div>
 <div class="card time-card"><label>Estimated automatic withdrawal date</label><div class="value time-value" id="estimatedWithdrawalAt">—</div><div class="small" id="estimatedWithdrawalStatus">Waiting for account check</div></div>
 <div class="card time-card"><label>Time until automatic withdrawal</label><div class="value countdown-value" id="withdrawalCountdown">—</div><div class="small" id="withdrawalCountdownStatus">Estimate at the current BTC price and purchase interval</div></div>
