@@ -161,6 +161,8 @@ Manual withdrawals are also available in the [web UI](#manual-bitcoin-withdrawal
 
 ## Portfolio web UI
 
+Set **Expected monthly deposit** in the exchange’s quote currency to estimate withdrawals beyond the current fiat balance. The assumption is saved in this browser and affects only the forecast. It adds funds on `DEPOSIT_DAY` and recalculates future purchase intervals using the current BTC price, order size and estimated costs including fees. Actual deposits, prices and execution can change the result.
+
 Open [http://localhost:6890](http://localhost:6890) and sign in with the credentials from .env. The dashboard shows the bot-tracked BTC portfolio, configuration, next purchase time, and purchases and withdrawals with their current status.
 
 - Select EUR or USD for display. Reference prices come from Kraken’s public [BTC/EUR](https://www.kraken.com/convert/btc/eur) and [BTC/USD](https://www.kraken.com/convert/btc/usd) pages; cached prices are labelled.

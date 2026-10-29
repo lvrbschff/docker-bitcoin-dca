@@ -6,7 +6,9 @@ import logging
 import os
 import re
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import calendar
+from zoneinfo import ZoneInfo
 from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
 from http.cookies import CookieError, SimpleCookie
@@ -23,6 +25,65 @@ from activity import activity_page, activity_totals, parqet_interval_records, le
 
 from activity import bitcoin_activity_records, delete_activity_record, read_dashboard_snapshot
 from reporting import parqet_aggregate_rows, parqet_csv
+
+
+def withdrawal_forecast(settings, snapshot, monthly_deposit, now):
+    """Project monthly deposits and purchases at a constant BTC price and order cost."""
+    from decimal import ROUND_CEILING
+    if not settings.get("withdrawals_enabled"):
+        return None, "Automatic withdrawals disabled"
+    if not settings.get("live"):
+        return None, "Unavailable in simulation mode"
+    try:
+        monthly_deposit = Decimal(str(monthly_deposit))
+        if not monthly_deposit.is_finite() or monthly_deposit < 0:
+            return None, "Enter a non-negative monthly deposit"
+        balance = Decimal(str(snapshot["btcBalance"]))
+        price = Decimal(str(snapshot["price"]))
+        threshold = Decimal(str(settings["withdraw_threshold"]))
+        if price <= 0:
+            return None, "Waiting for a market price"
+        if balance * price >= threshold:
+            return now.isoformat(), "Threshold reached; awaiting automatic withdrawal check"
+        plan = snapshot["withdrawalForecastPlan"]
+        amount = Decimal(plan["orderAmount"])
+        cost = Decimal(plan["plannedCost"])
+        budget = Decimal(plan["budget"])
+        interval = max(60, int(plan["intervalSeconds"]))
+        due = max(now, datetime.fromisoformat(snapshot["nextPurchaseAt"].replace("Z", "+00:00")))
+        deposit = datetime.fromisoformat(plan["nextDepositAt"]).astimezone(ZoneInfo(settings.get("timezone", "UTC")))
+        if amount <= 0 or cost <= 0 or budget < 0:
+            return None, "Waiting for a purchase schedule"
+        needed = int(((threshold / price - balance) / amount).to_integral_value(rounding=ROUND_CEILING))
+        last_buy = None
+        for _ in range(1200):
+            slots = max(0, int((deposit.astimezone(timezone.utc) - due.astimezone(timezone.utc)).total_seconds() // interval) + 1)
+            buys = min(int(budget // cost), slots)
+            if needed <= buys:
+                target = due + timedelta(seconds=(needed - 1) * interval)
+                return target.isoformat(), "Estimate at the current price, fees and expected monthly deposits"
+            if buys:
+                last_buy = due + timedelta(seconds=(buys - 1) * interval)
+                budget -= cost * buys
+                needed -= buys
+            if monthly_deposit == 0:
+                return None, "Enter an expected monthly deposit to project further purchases"
+            budget += monthly_deposit
+            start = deposit
+            year, month = (start.year + 1, 1) if start.month == 12 else (start.year, start.month + 1)
+            deposit = start.replace(year=year, month=month,
+                                   day=min(settings["deposit_day"], calendar.monthrange(year, month)[1]))
+            possible = int(budget // cost)
+            if possible:
+                anchor = last_buy or start
+                interval = max(60, int((deposit.astimezone(timezone.utc) - anchor.astimezone(timezone.utc)).total_seconds() / possible))
+                due = max(start, anchor + timedelta(seconds=interval))
+            else:
+                due = deposit + timedelta(seconds=1)
+        return None, "Estimate exceeds the 100-year forecast horizon"
+    except (KeyError, TypeError, ValueError, InvalidOperation, OverflowError):
+        return None, "Waiting for a purchase schedule"
+
 
 LOG = logging.getLogger("bitcoin-dca.web")
 
@@ -123,6 +184,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="card"><label>BTC balance</label><div class="value" id="exchangeBtcBalance">—</div><div class="small" id="exchangeBtcValue">—</div><div class="small" id="exchangeBtcUpdated">Waiting for account check</div></div>
 <div class="card time-card"><label>Next purchase</label><div class="value time-value" id="nextPurchaseAt">—</div><div class="small" id="nextPurchaseStatus">Waiting for the bot schedule</div></div>
 <div class="card time-card"><label>Time until next purchase</label><div class="value countdown-value" id="nextPurchaseCountdown">—</div><div class="small">Updates every second</div></div>
+<div class="card"><div class="field"><label for="monthlyDeposit">Expected monthly deposit (<span id="monthlyDepositCurrency">EUR</span>)</label><input id="monthlyDeposit" type="number" min="0" step="0.01" inputmode="decimal" value="0"></div><div class="small">Forecast only · assumes deposits on the configured deposit day · saved in this browser</div></div>
 <div class="card time-card"><label>Estimated automatic withdrawal date</label><div class="value time-value" id="estimatedWithdrawalAt">—</div><div class="small" id="estimatedWithdrawalStatus">Waiting for account check</div></div>
 <div class="card time-card"><label>Time until estimated automatic withdrawal date</label><div class="value countdown-value" id="withdrawalCountdown">—</div><div class="small" id="withdrawalCountdownStatus">Estimate at the current BTC price and purchase interval</div></div>
 </div>
@@ -191,10 +253,11 @@ function renderPurchaseCountdown(){
 }
 async function refreshPurchaseSchedule(){
  try{
-  const response=await fetch("/api/schedule");
+  const response=await fetch("/api/schedule?monthlyDeposit="+encodeURIComponent($("monthlyDeposit").value||"0"));
   if(response.status===401){window.location.reload();return}
   if(!response.ok)throw new Error("Schedule unavailable");
   const schedule=await response.json(),target=Date.parse(schedule.nextPurchaseAt),serverTime=Date.parse(schedule.serverTime);
+  $("monthlyDepositCurrency").textContent=schedule.quote;
   $("quoteBalanceLabel").textContent="Available "+schedule.quote+" balance";
   const balanceKnown=schedule.quoteBalance!==null&&schedule.quoteBalance!==undefined&&Number.isFinite(Number(schedule.quoteBalance));
   $("quoteBalance").textContent=balanceKnown?money(schedule.quoteBalance,schedule.quote):"—";
@@ -218,6 +281,13 @@ async function refreshPurchaseSchedule(){
   renderPurchaseCountdown();
  }catch(e){$("nextPurchaseStatus").textContent="Could not refresh the bot schedule"}
 }
+const savedMonthlyDeposit=localStorage.getItem("bitcoinDcaMonthlyDeposit");
+if(savedMonthlyDeposit!==null&&Number.isFinite(Number(savedMonthlyDeposit))&&Number(savedMonthlyDeposit)>=0)$("monthlyDeposit").value=savedMonthlyDeposit;
+$("monthlyDeposit").addEventListener("change",()=>{
+ const amount=Number($("monthlyDeposit").value);
+ if(!Number.isFinite(amount)||amount<0){$("monthlyDeposit").reportValidity();return}
+ localStorage.setItem("bitcoinDcaMonthlyDeposit",String(amount));refreshPurchaseSchedule();
+});
 setInterval(renderPurchaseCountdown,1000);
 setInterval(refreshPurchaseSchedule,30000);
 refreshPurchaseSchedule();
@@ -714,13 +784,16 @@ class Handler(BaseHTTPRequestHandler):
                 snapshot = read_dashboard_snapshot()
                 balance_matches = (snapshot.get("quote") == self.settings["quote"]
                                    and snapshot.get("exchange") == self.settings["exchange"])
+                forecast_at, forecast_status = withdrawal_forecast(
+                    self.settings, snapshot if balance_matches else {},
+                    query.get("monthlyDeposit", ["0"])[0], datetime.now(timezone.utc))
                 self._json(200, {
                     "quote": self.settings["quote"],
                     "exchange": self.settings["exchange"],
                     "quoteBalance": snapshot.get("quoteBalance") if balance_matches else None,
                     "btcBalance": snapshot.get("btcBalance") if balance_matches else None,
-                    "estimatedWithdrawalAt": snapshot.get("estimatedWithdrawalAt") if balance_matches else None,
-                    "estimatedWithdrawalStatus": snapshot.get("estimatedWithdrawalStatus") if balance_matches else "Waiting for account check",
+                    "estimatedWithdrawalAt": forecast_at,
+                    "estimatedWithdrawalStatus": forecast_status,
                     "balanceUpdatedAt": snapshot.get("updatedAt") if balance_matches else None,
                     "nextPurchaseAt": snapshot.get("nextPurchaseAt"),
                     "nextPurchaseStatus": snapshot.get("nextPurchaseStatus", "Schedule pending"),

@@ -201,7 +201,7 @@ def update_dashboard_snapshot(settings, quote_balance, price, btc_balance=None):
     })
 
 
-def update_dashboard_schedule(next_purchase_at, status, withdrawal_estimate=None):
+def update_dashboard_schedule(next_purchase_at, status, withdrawal_estimate=None, forecast_plan=None):
     snapshot = read_dashboard_snapshot()
     snapshot["nextPurchaseAt"] = (
         next_purchase_at.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -210,6 +210,7 @@ def update_dashboard_schedule(next_purchase_at, status, withdrawal_estimate=None
     snapshot["nextPurchaseStatus"] = status
     snapshot["estimatedWithdrawalAt"] = None
     snapshot["estimatedWithdrawalStatus"] = "Waiting for a purchase schedule"
+    snapshot["withdrawalForecastPlan"] = forecast_plan
     if withdrawal_estimate is not None:
         at, reason = withdrawal_estimate
         snapshot["estimatedWithdrawalAt"] = at.isoformat() if at else None
@@ -558,7 +559,11 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
     remaining=max(0,int((due.astimezone(timezone.utc)-now.astimezone(timezone.utc)).total_seconds()))
     withdrawal_estimate = estimate_withdrawal(
         settings, exchange_btc, price, order_amount, possible_buys, due, interval_seconds, now)
-    update_dashboard_schedule(due, 'Scheduled' if remaining else 'Due now', withdrawal_estimate)
+    update_dashboard_schedule(due, 'Scheduled' if remaining else 'Due now', withdrawal_estimate, {
+        "orderAmount": str(order_amount), "plannedCost": str(planned_cost),
+        "budget": str(affordable_budget), "intervalSeconds": interval_seconds,
+        "nextDepositAt": next_deposit.isoformat(),
+    })
     startup_alignment = settings.pop('startup_schedule_log_pending', False)
     log_label = 'Restart alignment' if startup_alignment else 'Purchase schedule'
     local_zone = ZoneInfo(settings['timezone'])
