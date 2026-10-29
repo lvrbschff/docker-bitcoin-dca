@@ -223,7 +223,7 @@ button{transition:background-color .16s ease,border-color .16s ease,box-shadow .
 button:disabled{cursor:not-allowed;filter:none;transform:none;box-shadow:none}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media(hover:hover) and (pointer:fine){
- button:not(:disabled):hover{filter:brightness(1.13);border-color:var(--accent);box-shadow:0 3px 12px #8bafff30;transform:translateY(-1px)}
+ button:not(:disabled):hover{filter:brightness(1.13);border-color:var(--accent);box-shadow:0 0 8px #8bafff55,0 4px 20px #8bafff66;transform:translateY(-1px)}
  button:not(:disabled):active{transform:translateY(0);box-shadow:0 1px 5px #8bafff20}
 }
 @media(prefers-reduced-motion:reduce){button{transition:none}button:not(:disabled):hover{transform:none}}
@@ -568,7 +568,7 @@ button{transition:background-color .16s ease,border-color .16s ease,box-shadow .
 button:disabled{cursor:not-allowed;filter:none;transform:none;box-shadow:none}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media(hover:hover) and (pointer:fine){
- button:not(:disabled):hover{filter:brightness(1.13);border-color:var(--accent);box-shadow:0 3px 12px #8bafff30;transform:translateY(-1px)}
+ button:not(:disabled):hover{filter:brightness(1.13);border-color:var(--accent);box-shadow:0 0 8px #8bafff55,0 4px 20px #8bafff66;transform:translateY(-1px)}
  button:not(:disabled):active{transform:translateY(0);box-shadow:0 1px 5px #8bafff20}
 }
 @media(prefers-reduced-motion:reduce){button{transition:none}button:not(:disabled):hover{transform:none}}
