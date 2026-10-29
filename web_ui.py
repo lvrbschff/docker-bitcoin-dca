@@ -254,6 +254,13 @@ details.panel:not([open])>summary{border-radius:11px}
  details.panel>.panel-heading,details.panel>.report-heading{border-radius:9px 9px 0 0}
  details.panel:not([open])>summary{border-radius:9px}
 }
+
+.top{margin-bottom:12px}
+.dashboard-logo,.compact-brand-inner img{transition:box-shadow .2s ease,filter .2s ease}
+@media(hover:hover) and (pointer:fine){
+ .dashboard-logo:hover,.compact-brand-inner img:hover{box-shadow:0 0 12px #8bafff66,0 0 26px #8bafff44;filter:brightness(1.08)}
+}
+@media(prefers-reduced-motion:reduce){.dashboard-logo,.compact-brand-inner img{transition:none}}
 </style>
 </head>
 <body>
