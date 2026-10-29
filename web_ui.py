@@ -171,7 +171,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 @media(max-width:600px){.report-heading h2,.panel-heading h2{font-size:19px}}
 sup{color:#fff}.footnote-ref{margin-left:3px}
 .dashboard-footnotes{margin-top:30px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
-.dashboard-footnotes h2{color:var(--muted);font-size:14px;margin:0 0 12px}.dashboard-footnotes ol{list-style:none;margin:0;padding:0}.dashboard-footnotes li{padding-left:0;margin-bottom:14px;scroll-margin-top:20px}.dashboard-footnotes strong{color:var(--muted);font-weight:600}.dashboard-footnotes p{margin:4px 0 0}
+.dashboard-footnotes h2{color:#c2cde0;font-size:14px;margin:0 0 12px}.dashboard-footnotes ol{list-style:none;margin:0;padding:0}.dashboard-footnotes li{padding-left:0;margin-bottom:14px;scroll-margin-top:20px}.dashboard-footnotes strong{color:var(--muted);font-weight:600}.dashboard-footnotes p{margin:4px 0 0}
 .export-feedback{margin:10px 0 0;text-align:right;color:var(--red);font-size:13px;line-height:1.6;overflow-wrap:anywhere}
 .withdraw-feedback{max-width:min(320px,calc(100vw - 76px));margin:4px 0 0}.withdraw-feedback.success{color:var(--green)}\n@media(max-width:600px){.export-feedback{text-align:left}}
 
