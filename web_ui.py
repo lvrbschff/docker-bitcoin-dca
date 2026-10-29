@@ -285,7 +285,7 @@ body.header-actions-hidden .top-actions{opacity:0;transform:translateY(-8px);vis
  if(!brand)return;
  let pending=false;
  function updateHeader(){
-  document.body.classList.toggle("compact-brand-visible",brand.getBoundingClientRect().bottom<=10);
+  document.body.classList.toggle("compact-brand-visible",window.scrollY>40);
   document.body.classList.toggle("header-actions-hidden",window.scrollY>40);
   pending=false;
  }
