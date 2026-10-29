@@ -174,7 +174,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 </style>
 </head>
 <body><main>
-<header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Bot Dashboard</h1></div></div><div class="top-actions"><form method="post" action="/logout"><button type="submit">Log out</button></form><div class="withdraw-action"><button id="manualWithdraw" type="button" aria-describedby="withdrawal-note withdrawalFeedback">Withdraw BTC manually <sup class="footnote-ref" aria-describedby="withdrawal-note">1</sup></button><p id="withdrawalFeedback" class="export-feedback withdraw-feedback hidden" role="alert"></p></div><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
+<header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Bot Dashboard</h1></div></div><div class="top-actions"><form method="post" action="/logout"><button type="submit">Log out</button></form><div class="withdraw-action"><button id="manualWithdraw" type="button" aria-describedby="withdrawal-note withdrawalFeedback">Withdraw BTC manually</button><p id="withdrawalFeedback" class="export-feedback withdraw-feedback hidden" role="alert"></p></div><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
 <section class="panel" aria-labelledby="configurationScheduleHeading">
 <header class="panel-heading"><h2 id="configurationScheduleHeading">Bot configuration and schedule</h2></header>
 <h3 class="summary-subheading">Bot configuration</h3>
@@ -188,7 +188,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="card"><label>Withdrawal threshold</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured threshold</div></div>
 </div>
 <section class="purchase-schedule period-summary-content" aria-labelledby="scheduleHeading">
-<h3 id="scheduleHeading" class="summary-subheading">Purchase and withdrawal schedule <sup class="footnote-ref" aria-describedby="schedule-note">2</sup></h3>
+<h3 id="scheduleHeading" class="summary-subheading">Purchase and withdrawal schedule</h3>
 <section class="schedule-group" aria-labelledby="purchaseHeading">
 <h4 id="purchaseHeading">Purchase</h4>
 <div class="schedule-row-scroll" role="region" aria-label="Purchase schedule cards" tabindex="0"><div class="grid schedule-grid">
@@ -210,7 +210,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 </section>
 </section>
 <section class="panel report-section report-controls" aria-labelledby="reportHeading">
-<header class="report-heading"><h2 id="reportHeading">Period Analysis <sup class="footnote-ref" aria-describedby="report-note">3</sup></h2></header>
+<header class="report-heading"><h2 id="reportHeading">Period Analysis</h2></header>
 <p class="sub">Choose a custom date range or an interval between withdrawals to review activity and prepare a Parqet export.</p>
 <div class="controls">
 <div class="field"><label for="interval">Date range</label><select id="interval"></select></div>
