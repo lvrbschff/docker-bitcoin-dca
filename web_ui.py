@@ -237,6 +237,9 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .dashboard-footnotes li>strong{display:block;font-size:14px;font-weight:700;letter-spacing:.01em;color:#c2cde0;margin-bottom:10px}
 .note-subsection{margin-top:20px}
 .dashboard-footnotes .note-subheading{font-size:14px;font-weight:700;letter-spacing:.01em;color:#c2cde0;line-height:1.5;margin:0 0 10px}
+
+.dashboard-footnotes{font-size:11px}
+.dashboard-footnotes h2,.dashboard-footnotes li>strong,.dashboard-footnotes .note-subheading{font-size:13px}
 </style>
 </head>
 <body>
