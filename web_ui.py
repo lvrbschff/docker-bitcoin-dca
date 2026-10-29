@@ -89,7 +89,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
  th,td{padding:10px 8px;font-size:13px}.bottom-actions button{width:100%;white-space:normal}
 }
 @media(max-width:360px){.grid{grid-template-columns:minmax(0,1fr)}.time-card{grid-column:auto}}
-.schedule-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.schedule-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 .schedule-grid .card{border-color:#354b70;background:#111f36}
 .report-section{margin-top:38px;padding-top:28px;border-top:1px solid #354564;min-width:0}
 .report-heading{margin-bottom:18px}.report-heading h2{font-size:21px;margin:0 0 5px}
@@ -118,6 +118,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 </section>
 <section class="panel purchase-schedule" aria-labelledby="scheduleHeading"><h2 id="scheduleHeading">Purchase schedule <sup class="footnote-ref" aria-describedby="schedule-note">2</sup></h2><div class="grid schedule-grid">
 <div class="card"><label>Current BTC price <sup class="footnote-ref" aria-describedby="currency-note">1</sup></label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
+<div class="card"><label id="quoteBalanceLabel">Available fiat balance</label><div class="value" id="quoteBalance">—</div><div class="small" id="quoteBalanceUpdated">Waiting for account check</div></div>
 <div class="card time-card"><label>Next purchase</label><div class="value time-value" id="nextPurchaseAt">—</div><div class="small" id="nextPurchaseStatus">Waiting for the bot schedule</div></div>
 <div class="card time-card"><label>Time until next purchase</label><div class="value countdown-value" id="nextPurchaseCountdown">—</div><div class="small">Updates every second</div></div>
 </div>
@@ -181,6 +182,13 @@ async function refreshPurchaseSchedule(){
   if(response.status===401){window.location.reload();return}
   if(!response.ok)throw new Error("Schedule unavailable");
   const schedule=await response.json(),target=Date.parse(schedule.nextPurchaseAt),serverTime=Date.parse(schedule.serverTime);
+  $("quoteBalanceLabel").textContent="Available "+schedule.quote+" balance";
+  const balanceKnown=schedule.quoteBalance!==null&&schedule.quoteBalance!==undefined&&Number.isFinite(Number(schedule.quoteBalance));
+  $("quoteBalance").textContent=balanceKnown?money(schedule.quoteBalance,schedule.quote):"—";
+  const checkedAt=Date.parse(schedule.balanceUpdatedAt);
+  $("quoteBalanceUpdated").textContent=balanceKnown
+   ?schedule.exchange+" · "+(Number.isFinite(checkedAt)?"Last checked "+new Date(checkedAt).toLocaleString("en-GB",{timeZone:schedule.timezone||"UTC"}):"Last account check")
+   :"Waiting for account check";
   nextPurchaseTimestamp=Number.isFinite(target)?target:null;
   scheduleClockOffset=Number.isFinite(serverTime)?serverTime-Date.now():0;
   $("nextPurchaseAt").textContent=nextPurchaseTimestamp===null?"Not scheduled":new Date(nextPurchaseTimestamp).toLocaleString("en-GB",{timeZone:schedule.timezone||"UTC",timeZoneName:"short"});
@@ -668,7 +676,13 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if parsed.path == "/api/schedule":
                 snapshot = read_dashboard_snapshot()
+                balance_matches = (snapshot.get("quote") == self.settings["quote"]
+                                   and snapshot.get("exchange") == self.settings["exchange"])
                 self._json(200, {
+                    "quote": self.settings["quote"],
+                    "exchange": self.settings["exchange"],
+                    "quoteBalance": snapshot.get("quoteBalance") if balance_matches else None,
+                    "balanceUpdatedAt": snapshot.get("updatedAt") if balance_matches else None,
                     "nextPurchaseAt": snapshot.get("nextPurchaseAt"),
                     "nextPurchaseStatus": snapshot.get("nextPurchaseStatus", "Schedule pending"),
                     "timezone": self.settings["timezone"],

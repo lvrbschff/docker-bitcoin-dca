@@ -15,7 +15,7 @@ const requests=[];let checks=0,eurOnly=false,priceUnavailable=false,invalidUsdRa
 const response=data=>({ok:true,json:async()=>data});
 const context={document:{getElementById:get,createElement:()=>new Element()},localStorage:{getItem:()=>null,setItem(){}},Intl,Date,URL,console,alert(){throw Error('Withdrawal must not use a browser alert')},confirm:()=>false,setInterval(){},setTimeout(fn){queueMicrotask(fn)},window:{location:{reload(){throw Error('Unexpected reload')}}},fetch:async(url,options)=>{
  requests.push(url);const parsed=new URL(url,'http://example.test');
- if(parsed.pathname==='/api/schedule')return response({nextPurchaseAt:new Date(Date.now()+3600000).toISOString(),serverTime:new Date().toISOString(),timezone:'Europe/Berlin'});
+ if(parsed.pathname==='/api/schedule')return response({quote:'EUR',exchange:'KRAKEN',quoteBalance:'72.7719',balanceUpdatedAt:'2026-10-29T12:00:00Z',nextPurchaseAt:new Date(Date.now()+3600000).toISOString(),serverTime:new Date().toISOString(),timezone:'Europe/Berlin'});
  if(parsed.pathname==='/api/withdrawals')return response([{timestamp:Date.parse('2026-10-20T12:00:00Z')},{timestamp:Date.parse('2026-10-23T12:00:00Z')}]);
  if(parsed.pathname==='/api/withdrawal/config')return response({enabled:!withdrawalUnavailable,destination:'fictional wallet',reason:withdrawalUnavailable?'Manual withdrawal is unavailable: set KRAKEN_WITHDRAW_KEY to your saved Bitcoin withdrawal method in .env.':''});
  if(parsed.pathname==='/api/market-price')return priceUnavailable?{ok:false,json:async()=>({error:'offline'})}:response({price:'80000',conversionRate:'1',conversionRates:{EUR:'1',USD:invalidUsdRate?'invalid':'0.9'},updatedAt:Date.now()/1000});
@@ -32,6 +32,12 @@ const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate)};
 (async()=>{
  vm.createContext(context);vm.runInContext(script,context);await settle();
  assert(get('start').value&&get('end').value,'Both dates must initialize for the selected interval');
+ assert.equal(get('quoteBalance').textContent,'€72.77');
+ assert.equal(get('quoteBalanceLabel').textContent,'Available EUR balance');
+ assert(html.indexOf('id="quoteBalance"')<html.indexOf('id="nextPurchaseAt"'),'Fiat balance precedes next purchase');
+ vm.runInContext('displayCurrency="USD"',context);await vm.runInContext('refreshPurchaseSchedule()',context);
+ assert.equal(get('quoteBalance').textContent,'€72.77','Balance stays in the exchange trading currency');
+ vm.runInContext('displayCurrency="EUR"',context);
  assert.equal(get('pageSize').value,'10');
  assert(html.includes('<option>5</option>'),'5 entries must be selectable');
  assert(get('pageInfo').textContent.includes('1–10 of 45'));

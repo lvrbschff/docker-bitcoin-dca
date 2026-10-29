@@ -81,6 +81,7 @@ def heading(x,y,label,reference=None):
 values={'spot':'€84,000.00/BTC','spotUpdated':'Kraken public price page · fetched 12:00:00',
 'settingExchange':'Kraken','settingQuoteCurrency':'EUR','tradingMode':'Live',
 'buyAmount':'Exchange minimum','depositDay':'1','withdrawEnabled':'Enabled','threshold':'€1,000.00','thresholdNote':'Threshold in EUR, shown in EUR',
+'quoteBalance':'€72.77','quoteBalanceLabel':'Available EUR balance','quoteBalanceUpdated':'Kraken · Last checked 28/10/2026, 12:00:00',
 'nextPurchaseAt':'28/10/2026, 14:34:56 CET','nextPurchaseStatus':'Scheduled','nextPurchaseCountdown':'02h 34m 56s',
 'buyCount':'4','buyBtc':'0.0055 BTC','buyVolume':'€440.00','avgPrice':'Average: €80,000.00/BTC','tradeFees':'€1.10',
 'withdrawBtc':'0.0044 BTC','withdrawCount':'1 confirmed · 0 pending','profitLoss':'€20.90',
@@ -94,7 +95,7 @@ def grid(node,x,y,width,cols,height):
   rect(round(cx,2),cy,round(cw,2),height,CARD,LINE,14)
   label_node=card.find(lambda n:n.tag=='label')[0]
   references=label_node.find(lambda n:n.tag=='sup')
-  label=label_node.text()
+  label=values.get(label_node.attrs.get('id'),label_node.text())
   if references:label=label.rsplit(' ',1)[0]
   label_lines=wrap(label,cw-34,12)
   baseline=cy+28
@@ -125,9 +126,9 @@ Y=245
 rect(X,Y,W,298);heading(CX,Y+34,'Bot configuration')
 grid(configuration.find(lambda n:n.cls('grid'))[0],CX,Y+55,CW,4,104)
 Y+=316
-rect(X,Y,W,180);heading(CX,Y+34,'Purchase schedule',2)
-grid(schedule.find(lambda n:n.cls('grid'))[0],CX,Y+55,CW,3,102)
-Y+=218
+rect(X,Y,W,196);heading(CX,Y+34,'Purchase schedule',2)
+grid(schedule.find(lambda n:n.cls('grid'))[0],CX,Y+55,CW,4,118)
+Y+=234
 line(X,Y,X+W,Y);text(X,Y+48,'Period analysis',21,TEXT,True);text(X+draw.textlength('Period analysis',font=font(21,True))+5,Y+39,'3',11,'#fff',True)
 text(X,Y+75,report.find(lambda n:n.cls('report-heading'))[0].find(lambda n:n.cls('sub'))[0].text(),14,MUTED)
 Y+=100
