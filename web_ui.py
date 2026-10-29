@@ -153,7 +153,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 }
 @media(max-width:360px){.grid{grid-template-columns:minmax(0,1fr)}.time-card{grid-column:auto}}
 .schedule-group{min-width:0;margin-top:16px;padding:16px;border:1px solid var(--line);border-radius:14px;background:#0c1425a8}
-.schedule-group h3{font-size:14px;font-weight:700;margin:0 0 14px}
+.schedule-group h4{font-size:14px;font-weight:700;margin:0 0 14px}
 .schedule-row-scroll{max-width:100%;overflow-x:auto;padding-bottom:4px}
 .schedule-row-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 .schedule-grid{grid-template-columns:repeat(4,minmax(220px,1fr))}
@@ -186,11 +186,10 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="card"><label>Automatic withdrawals</label><div class="value" id="withdrawEnabled">—</div></div>
 <div class="card"><label>Withdrawal threshold</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured threshold</div></div>
 </div>
-</section>
-<section class="panel purchase-schedule" aria-labelledby="scheduleHeading">
-<h2 id="scheduleHeading">Purchase and withdrawal schedule <sup class="footnote-ref" aria-describedby="schedule-note">2</sup></h2>
+<section class="purchase-schedule period-summary-content" aria-labelledby="scheduleHeading">
+<h3 id="scheduleHeading" class="summary-subheading">Purchase and withdrawal schedule <sup class="footnote-ref" aria-describedby="schedule-note">2</sup></h3>
 <section class="schedule-group" aria-labelledby="purchaseHeading">
-<h3 id="purchaseHeading">Purchase</h3>
+<h4 id="purchaseHeading">Purchase</h4>
 <div class="schedule-row-scroll" role="region" aria-label="Purchase schedule cards" tabindex="0"><div class="grid schedule-grid">
 <div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
 <div class="card"><label id="quoteBalanceLabel">Available fiat balance</label><div class="value" id="quoteBalance">—</div><div class="small" id="quoteBalanceUpdated">Waiting for account check</div></div>
@@ -199,13 +198,14 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 </div></div>
 </section>
 <section class="schedule-group" aria-labelledby="withdrawalHeading">
-<h3 id="withdrawalHeading">Withdrawal</h3>
+<h4 id="withdrawalHeading">Withdrawal</h4>
 <div class="schedule-row-scroll" role="region" aria-label="Withdrawal schedule cards" tabindex="0"><div class="grid schedule-grid">
 <div class="card"><label>BTC balance</label><div class="value" id="exchangeBtcBalance">—</div><div class="small" id="exchangeBtcValue">—</div><div class="small" id="exchangeBtcUpdated">Waiting for account check</div></div>
 <div class="card"><div class="field"><label for="monthlyDeposit">Expected monthly deposit (<span id="monthlyDepositCurrency">EUR</span>)</label><input id="monthlyDeposit" type="number" min="0" step="0.01" inputmode="decimal" value="0"></div><div class="small">Forecast only · assumes deposits on the configured deposit day · saved in this browser</div></div>
 <div class="card time-card"><label>Estimated automatic withdrawal date</label><div class="value time-value" id="estimatedWithdrawalAt">—</div><div class="small" id="estimatedWithdrawalStatus">Waiting for account check</div></div>
 <div class="card time-card"><label>Time until estimated automatic withdrawal date</label><div class="value countdown-value" id="withdrawalCountdown">—</div><div class="small" id="withdrawalCountdownStatus">Estimate at the current BTC price and purchase interval</div></div>
 </div></div>
+</section>
 </section>
 </section>
 <section class="panel report-section report-controls" aria-labelledby="reportHeading">
