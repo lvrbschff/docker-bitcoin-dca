@@ -123,10 +123,10 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="card"><label>Current BTC price <sup class="footnote-ref" aria-describedby="currency-note">1</sup></label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
 <div class="card"><label id="quoteBalanceLabel">Available fiat balance</label><div class="value" id="quoteBalance">—</div><div class="small" id="quoteBalanceUpdated">Waiting for account check</div></div>
 <div class="card"><label>BTC balance</label><div class="value" id="exchangeBtcBalance">—</div><div class="small" id="exchangeBtcValue">—</div><div class="small" id="exchangeBtcUpdated">Waiting for account check</div></div>
-<div class="card time-card"><label>Estimated automatic withdrawal date</label><div class="value time-value" id="estimatedWithdrawalAt">—</div><div class="small" id="estimatedWithdrawalStatus">Waiting for account check</div></div>
-<div class="card time-card"><label>Time until estimated withdrawal date</label><div class="value countdown-value" id="withdrawalCountdown">—</div><div class="small">Estimate at the current BTC price and purchase interval</div></div>
 <div class="card time-card"><label>Next purchase</label><div class="value time-value" id="nextPurchaseAt">—</div><div class="small" id="nextPurchaseStatus">Waiting for the bot schedule</div></div>
 <div class="card time-card"><label>Time until next purchase</label><div class="value countdown-value" id="nextPurchaseCountdown">—</div><div class="small">Updates every second</div></div>
+<div class="card time-card"><label>Estimated automatic withdrawal date</label><div class="value time-value" id="estimatedWithdrawalAt">—</div><div class="small" id="estimatedWithdrawalStatus">Waiting for account check</div></div>
+<div class="card time-card"><label>Time until estimated withdrawal date</label><div class="value countdown-value" id="withdrawalCountdown">—</div><div class="small">Estimate at the current BTC price and purchase interval</div></div>
 </div>
 </section>
 <section class="report-section" aria-labelledby="reportHeading">
