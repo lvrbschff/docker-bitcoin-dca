@@ -244,6 +244,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .pagination #previousPage,.pagination #nextPage,.pagination #goToPage{
  padding:8px 12px;font-size:12px;line-height:1.5;font-weight:700;border-radius:10px
 }
+.pagination-navigation{display:flex;align-items:center;gap:8px}
 </style>
 </head>
 <body>
@@ -303,7 +304,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 <div class="card"><label>Net BTC in period</label><div class="value" id="netBtc">—</div><div class="small">Purchases minus gross BTC withdrawals</div></div>
 </div>
 <h3 class="summary-subheading activity-subheading" id="activityHeading">Period activity</h3>
-<section class="panel activity-panel" aria-labelledby="activityHeading"><div class="activity-heading"><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><button class="secondary" id="previousPage">Previous</button><span id="pageInfo" class="notice"></span><button class="secondary" id="nextPage">Next</button><form class="page-jump" id="pageJump" aria-label="Jump to activity page"><label for="pageNumber">Go to page</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><button class="secondary" id="goToPage" type="submit">Go</button></form></div></section></div>
+<section class="panel activity-panel" aria-labelledby="activityHeading"><div class="activity-heading"><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><span id="pageInfo" class="notice"></span><div class="pagination-navigation"><button class="secondary" id="previousPage">Previous</button><button class="secondary" id="nextPage">Next</button></div><form class="page-jump" id="pageJump" aria-label="Jump to activity page"><label for="pageNumber">Go to page</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><button class="secondary" id="goToPage" type="submit">Go</button></form></div></section></div>
 <div class="bottom-actions"><button id="download" aria-describedby="exportMessage">Download Parqet CSV</button></div>
 <p id="exportMessage" class="export-feedback hidden" role="alert"></p>
 </details>
