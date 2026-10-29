@@ -17,6 +17,7 @@ from threading import RLock
 import time
 from concurrent.futures import ThreadPoolExecutor
 import price_cache
+from favicon_assets import FAVICON_ICO, FAVICON_PNG, APPLE_TOUCH_ICON_PNG
 from analytics import report as build_report, totals_from_records
 from activity import activity_page, activity_totals, parqet_interval_records, ledger_balance, withdrawal_records, read_report
 
@@ -41,7 +42,10 @@ HTML = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bitcoin DCA Bot</title>
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48" href="/favicon.ico?v=2">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2">
+<link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg?v=2">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
 <meta name="theme-color" content="#0b1020">
 <style>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#26324a;--text:#edf2ff;--muted:#9ba9c4;--accent:#8bafff;--green:#61d7ae;--red:#ff8f9e}
@@ -353,7 +357,10 @@ LOGIN_HTML = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bitcoin DCA Bot</title>
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48" href="/favicon.ico?v=2">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2">
+<link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg?v=2">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
 <meta name="theme-color" content="#0b1020">
 <style>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#26324a;--text:#edf2ff;--muted:#9ba9c4;--accent:#8bafff;--red:#ff8f9e}
@@ -620,6 +627,14 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == '/healthz':
             healthy=bool(self.worker and self.worker.healthy())
             self._json(200 if healthy else 503,{'healthy':healthy})
+            return
+        icon = {
+            "/favicon.ico": (FAVICON_ICO, "image/x-icon"),
+            "/favicon-32.png": (FAVICON_PNG, "image/png"),
+            "/apple-touch-icon.png": (APPLE_TOUCH_ICON_PNG, "image/png"),
+        }.get(parsed.path)
+        if icon is not None:
+            self._send(200, icon[0], icon[1])
             return
         if parsed.path == "/favicon.svg":
             self._send(200, FAVICON_SVG, "image/svg+xml; charset=utf-8")
