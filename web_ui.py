@@ -161,7 +161,8 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 .schedule-grid .card{border-color:#354b70;background:#111f36}
 .report-section{margin-top:38px;padding-top:28px;border-top:1px solid #354564;min-width:0}
 .report-heading{margin-bottom:18px}.report-heading h2{font-size:21px;margin:0 0 5px}
-.report-heading .sub{font-size:14px}.report-controls>.sub{margin-bottom:16px;font-size:14px}
+.report-heading .sub{font-size:14px}.period-summary-content{margin-top:24px;padding-top:20px;border-top:1px solid var(--line)}
+.report-controls>.sub{margin-bottom:16px;font-size:14px}
 .report-controls{border-color:#354b70;background:linear-gradient(145deg,#17243b,#111a2d)}
 @media(max-width:600px){.report-section{margin-top:28px;padding-top:22px}.report-heading h2{font-size:19px}}
 sup{color:#fff}.footnote-ref{margin-left:3px}
@@ -206,9 +207,8 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 </div></div>
 </section>
 </section>
-<section class="report-section" aria-labelledby="reportHeading">
-<header class="report-heading"><h2 id="reportHeading">Period analysis <sup class="footnote-ref" aria-describedby="report-note">4</sup></h2></header>
-<section class="panel report-controls">
+<section class="panel report-section report-controls" aria-labelledby="reportHeading">
+<header class="report-heading"><h2 id="reportHeading">Period Analysis <sup class="footnote-ref" aria-describedby="report-note">4</sup></h2></header>
 <p class="sub">Choose a custom date range or an interval between withdrawals to review activity and prepare a Parqet export.</p>
 <div class="controls">
 <div class="field"><label for="interval">Date range</label><select id="interval"></select></div>
@@ -216,8 +216,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="field"><label for="end">To</label><input id="end" type="datetime-local"></div>
 <button id="refresh">Load report</button>
 </div><div id="error" class="error hidden"></div>
-</section>
-<section class="panel"><h2>Selected period summary</h2><div class="grid period-summary-grid">
+<div class="period-summary-content"><h2>Selected period summary</h2><div class="grid period-summary-grid">
 <div class="card"><label>BTC purchases</label><div class="value" id="buyCount">—</div><div class="small" id="buyBtc"></div></div>
 <div class="card"><label>Purchase volume</label><div class="value" id="buyVolume">—</div><div class="small" id="avgPrice"></div></div>
 <div class="card"><label>Trading fees</label><div class="value" id="tradeFees">—</div></div>
@@ -227,7 +226,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <div class="card"><label>Profit / loss on period purchases</label><div class="value" id="profitLoss">—</div><div class="small" id="profitLossBasis">Current value of BTC bought in this period minus trading fees</div></div>
 <div class="card"><label>Net BTC in period</label><div class="value" id="netBtc">—</div><div class="small">Purchases minus gross BTC withdrawals</div></div>
 </div>
-<section class="panel activity-panel"><div class="activity-heading"><h2>Activity</h2><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th><th>Action</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><button class="secondary" id="previousPage">Previous</button><span id="pageInfo" class="notice"></span><button class="secondary" id="nextPage">Next</button><form class="page-jump" id="pageJump" aria-label="Jump to activity page"><label for="pageNumber">Go to page</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><button class="secondary" id="goToPage" type="submit">Go</button></form></div></section></section>
+<section class="panel activity-panel"><div class="activity-heading"><h2>Activity</h2><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th><th>Action</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><button class="secondary" id="previousPage">Previous</button><span id="pageInfo" class="notice"></span><button class="secondary" id="nextPage">Next</button><form class="page-jump" id="pageJump" aria-label="Jump to activity page"><label for="pageNumber">Go to page</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><button class="secondary" id="goToPage" type="submit">Go</button></form></div></section></div>
 <div class="bottom-actions"><button class="secondary" id="download" aria-describedby="exportMessage">Download Parqet CSV</button></div>
 <p id="exportMessage" class="export-feedback hidden" role="alert"></p>
 </section>
