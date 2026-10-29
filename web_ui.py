@@ -595,6 +595,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
  button:not(:disabled):not(#previousPage):not(#nextPage):not(#goToPage):active{transform:translateY(0);box-shadow:0 1px 5px #8bafff20}
 }
 @media(prefers-reduced-motion:reduce){button{transition:none}button:not(:disabled):not(#previousPage):not(#nextPage):not(#goToPage):hover{transform:none}}
+.login-support{margin:16px 0 0;padding-top:16px;border-top:1px solid var(--line);font-size:11px;line-height:1.6;color:var(--muted)}.login-support>span{color:#ff8f9e}.login-support code{display:block;margin-top:6px;overflow-wrap:anywhere;font-size:11px}
 </style>
 </head>
 <body><main class="card">
@@ -609,6 +610,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 <button type="submit">Sign in</button>
 </form>
 <p class="error">{{ERROR}}</p>
+<p class="login-support"><span aria-hidden="true">♥</span> If you want to support the creator of this application, buy him a BTC coffee: <code>bc1qg7crlvea9rsacfgnujhrjy6judvjnkjz9crvvq</code></p>
 
 </main></body></html>
 """
