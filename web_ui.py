@@ -396,7 +396,7 @@ async function refreshPurchaseSchedule(){
   nextPurchaseTimestamp=Number.isFinite(target)?target:null;
   scheduleClockOffset=Number.isFinite(serverTime)?serverTime-Date.now():0;
   $("nextPurchaseAt").textContent=nextPurchaseTimestamp===null?"Not scheduled":new Date(nextPurchaseTimestamp).toLocaleString("en-GB",{timeZone:schedule.timezone||"UTC",timeZoneName:"short"});
-  $("nextPurchaseStatus").textContent=schedule.nextPurchaseStatus||"Waiting for the bot schedule";
+  $("nextPurchaseStatus").textContent=schedule.nextPurchaseStatus==="Waiting for startup delay"?"":(schedule.nextPurchaseStatus||"Waiting for the bot schedule");
   exchangeBtcBalance=schedule.btcBalance!=null&&Number.isFinite(Number(schedule.btcBalance))?Number(schedule.btcBalance):null;
   $("exchangeBtcBalance").textContent=exchangeBtcBalance===null?"—":btc(exchangeBtcBalance);
   $("exchangeBtcUpdated").textContent=exchangeBtcBalance===null?"Waiting for account check":(Number.isFinite(checkedAt)?"Last checked "+new Date(checkedAt).toLocaleString("en-GB",{timeZone:schedule.timezone||"UTC"}):"Last account check");
