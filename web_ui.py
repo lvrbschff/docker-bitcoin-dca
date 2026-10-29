@@ -88,7 +88,7 @@ def withdrawal_forecast(settings, snapshot, monthly_deposit, now):
 LOG = logging.getLogger("bitcoin-dca.web")
 
 FAVICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-<title>Bitcoin DCA Bot</title>
+<title>Bitcoin DCA Bot Dashboard</title>
 <rect x="1" y="1" width="62" height="62" rx="15" fill="#0b1020" stroke="#26324a" stroke-width="2"/>
 <circle cx="32" cy="32" r="24" fill="#8bafff"/>
 <g transform="rotate(14 32 32)" fill="none" stroke="#0b1020" stroke-width="4.5" stroke-linecap="square" stroke-linejoin="round">
@@ -110,6 +110,7 @@ HTML = """<!doctype html>
 <style>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#26324a;--text:#edf2ff;--muted:#9ba9c4;--accent:#8bafff;--green:#61d7ae;--red:#ff8f9e}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#1b2a49 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+.dashboard-brand{display:flex;align-items:center;gap:12px;margin-bottom:6px;min-width:0}.dashboard-logo{display:block;width:48px;height:48px;flex:0 0 48px;border-radius:11px}.dashboard-brand h1{min-width:0;overflow-wrap:anywhere}
 main{max-width:1180px;margin:0 auto;padding:36px 22px 64px}.top{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:26px}.eyebrow{color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}h1{font-size:30px;margin:4px 0}.sub{color:var(--muted);margin:0}
 .bottom-actions{display:flex;justify-content:flex-end;margin-top:18px}.badge{border:1px solid var(--line);border-radius:999px;padding:8px 12px;color:var(--muted);font-size:12px}.top-actions{display:flex;flex-direction:column;align-items:flex-end;gap:10px}.top-actions form{margin:0}.withdraw-action{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:0}#withdrawMessage:empty{display:none}.top-actions .field{min-width:170px}.top-actions .field label{margin-bottom:5px}
 .panel{background:linear-gradient(145deg,rgba(21,31,52,.96),rgba(15,22,39,.96));border:1px solid var(--line);border-radius:18px;padding:20px;margin:18px 0;box-shadow:0 14px 40px #0002}
@@ -170,7 +171,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 </style>
 </head>
 <body><main>
-<header class="top"><div><h1>Bitcoin DCA Bot</h1><p class="sub">Portfolio overview, bot configuration and activity analysis, with optional Parqet CSV export</p></div><div class="top-actions"><form method="post" action="/logout"><button class="secondary" type="submit">Log out</button></form><div class="withdraw-action"><button class="secondary" id="manualWithdraw" type="button" aria-describedby="withdrawal-note withdrawalFeedback">Withdraw BTC manually <sup class="footnote-ref" aria-describedby="withdrawal-note">1</sup></button><p id="withdrawalFeedback" class="export-feedback withdraw-feedback hidden" role="alert"></p></div><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
+<header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Bot Dashboard</h1></div><p class="sub">Portfolio overview, bot configuration and activity analysis, with optional Parqet CSV export</p></div><div class="top-actions"><form method="post" action="/logout"><button class="secondary" type="submit">Log out</button></form><div class="withdraw-action"><button class="secondary" id="manualWithdraw" type="button" aria-describedby="withdrawal-note withdrawalFeedback">Withdraw BTC manually <sup class="footnote-ref" aria-describedby="withdrawal-note">1</sup></button><p id="withdrawalFeedback" class="export-feedback withdraw-feedback hidden" role="alert"></p></div><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div></div></header>
 <section class="panel">
 <h2>Bot configuration</h2>
 <div class="grid">
@@ -351,7 +352,7 @@ async function loadAnalytics(){
  try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end+"&page="+currentPage+"&limit="+$("pageSize").value);const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load the report.");quote=d.quote;
  if(!displayCurrency){const saved=localStorage.getItem("bitcoinDcaDisplayCurrency");displayCurrency=["EUR","USD"].includes(saved)?saved:(["EUR","USD"].includes(quote)?quote:"EUR")}
  $("displayCurrency").value=displayCurrency;
- const ex=d.exchange==="KRAKEN"?"Kraken":d.exchange==="BITVAVO"?"Bitvavo":d.exchange;document.title="Bitcoin DCA Bot";
+ const ex=d.exchange==="KRAKEN"?"Kraken":d.exchange==="BITVAVO"?"Bitvavo":d.exchange;document.title="Bitcoin DCA Bot Dashboard";
  let livePrice=Number((d.snapshot||{}).price||0),currencyRates={[quote]:1};
  const currencies=Object.keys(d.summaryByCurrency||{});
  try{
