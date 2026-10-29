@@ -34,11 +34,12 @@ p=Parser();p.feed(page)
 main=p.root.find(lambda n:n.tag=='main')[0]
 by_id={n.attrs['id']:n for n in main.find(lambda n:'id' in n.attrs)}
 sections=[n for n in main.children if isinstance(n,Node) and n.tag=='section']
-assert len(sections)==3
-configuration,schedule,report=sections
+assert len(sections)==2
+configuration,report=sections
+schedule=configuration.find(lambda n:n.cls("purchase-schedule"))[0]
 
 BG='#0b1020';PANEL='#121a2d';LINE='#26324a';TEXT='#edf2ff';MUTED='#9ba9c4';ACCENT='#8bafff';GREEN='#61d7ae';CARD='#0c1425'
-image=Image.new('RGB',(1440,3400),BG);draw=ImageDraw.Draw(image)
+image=Image.new('RGB',(1440,6500),BG);draw=ImageDraw.Draw(image)
 parts=[]
 fontdir=Path('/System/Library/Fonts/Supplemental')
 def font(size,bold=False):
@@ -81,8 +82,10 @@ def heading(x,y,label,reference=None):
 values={'spot':'€84,000.00/BTC','spotUpdated':'Kraken public price page · fetched 12:00:00',
 'settingExchange':'Kraken','settingQuoteCurrency':'EUR','tradingMode':'Live',
 'buyAmount':'Exchange minimum','depositDay':'1','withdrawEnabled':'Enabled','threshold':'€1,000.00','thresholdNote':'Threshold in EUR, shown in EUR',
-'quoteBalance':'€72.77','quoteBalanceLabel':'Available EUR balance','quoteBalanceUpdated':'Kraken · Last checked 28/10/2026, 12:00:00',
-'nextPurchaseAt':'28/10/2026, 14:34:56 CET','nextPurchaseStatus':'Scheduled','nextPurchaseCountdown':'02h 34m 56s',
+'quoteBalance':'€72.77','quoteBalanceLabel':'Available EUR balance','quoteBalanceUpdated':'Last checked 29/10/2026, 12:00:00',
+'exchangeBtcBalance':'0.00379 BTC','exchangeBtcValue':'€318.36','exchangeBtcUpdated':'Last checked 29/10/2026, 12:00:00',
+'estimatedWithdrawalAt':'12/02/2027, 16:20:00 CET','estimatedWithdrawalStatus':'Estimate at the current price, fees and expected monthly deposits','withdrawalCountdown':'106d 04h 20m 00s',
+'nextPurchaseAt':'29/10/2026, 14:34:56 CET','nextPurchaseStatus':'Scheduled','nextPurchaseCountdown':'02h 34m 56s',
 'buyCount':'4','buyBtc':'0.0055 BTC','buyVolume':'€440.00','avgPrice':'Average: €80,000.00/BTC','tradeFees':'€1.10',
 'withdrawBtc':'0.0044 BTC','withdrawCount':'1 confirmed · 0 pending','profitLoss':'€20.90',
 'withdrawFees':'€8.10','netBtc':'0.001 BTC'}
@@ -101,49 +104,64 @@ def grid(node,x,y,width,cols,height):
   baseline=cy+28
   for row in label_lines:text(cx+17,baseline,row,12,MUTED);baseline+=17
   if references:text(cx+21+draw.textlength(label_lines[-1],font=font(12)),baseline-22,references[0].text(),9,'#fff')
-  value_node=card.find(lambda n:n.cls('value'))[0]
-  identifier=value_node.attrs.get('id')
-  value=values.get(identifier,value_node.text());size=22
-  if value_node.cls('time-value'):size=16
-  if value_node.cls('countdown-value'):size=20
+  value_nodes=card.find(lambda n:n.cls('value'))
+  value_node=value_nodes[0] if value_nodes else None
+  identifier=value_node.attrs.get('id') if value_node else None
+  value=values.get(identifier,value_node.text()) if value_node else '200.00'
+  size=22
+  if not value_node:
+   rect(cx+17,baseline-1,cw-34,44,CARD,LINE,10)
   # CSS wraps long values; use the same width boundary for the illustration.
-  value_y=baseline+15
+  value_y=baseline+(28 if value_node is None else 15)
   for row in wrap(value,cw-34,size,True):text(cx+17,value_y,row,size,GREEN if identifier=='profitLoss' else TEXT,True);value_y+=29
-  value_y-=9
+  value_y+=8 if value_node is None else -9
   for small in card.find(lambda n:n.cls('small')):
    for row in wrap(values.get(small.attrs.get('id'),small.text()),cw-34,12):text(cx+17,value_y,row,12,MUTED);value_y+=18
  return y+((len(cards)+cols-1)//cols)*(height+gap)-gap
 
 X=152;W=1136;CX=X+20;CW=W-40
-text(X,112,'Bitcoin DCA Bot',30,TEXT,True)
-text(X,141,'Portfolio overview, bot configuration and activity analysis, with optional Parqet CSV export',15,MUTED)
-button(X+W-93,36,93,'Log out')
-button(X+W-238,91,238,'Withdraw BTC manually',False);text(X+W-20,106,'4',11,'#fff')
+# Reuse the same Bitcoin artwork as the favicon (embedded SVG, no remote assets).
+import favicon_assets
+from io import BytesIO
+import base64
+icon=Image.open(BytesIO(favicon_assets.APPLE_TOUCH_ICON_PNG)).convert('RGB').resize((48,48))
+image.paste(icon,(X,55))
+parts.append(f'<image x="{X}" y="55" width="48" height="48" href="data:image/png;base64,{base64.b64encode(favicon_assets.APPLE_TOUCH_ICON_PNG).decode()}"/>')
+text(X+60,88,'Bitcoin DCA Bot Dashboard',30,TEXT,True)
+paragraph(X,125,main.find(lambda n:n.tag=='header' and n.cls('top'))[0].find(lambda n:n.cls('sub'))[0].text(),W-285,14)
+button(X+W-93,36,93,'Log out',True)
+button(X+W-238,91,238,'Withdraw BTC manually',True);text(X+W-20,106,'1',11,'#fff')
 text(X+W-170,164,'Display currency',12,MUTED)
 rect(X+W-170,174,170,45,CARD,LINE,10);text(X+W-157,202,'Euro (EUR)',15);text(X+W-21,202,'⌄',15,MUTED)
 
 Y=245
-rect(X,Y,W,298);heading(CX,Y+34,'Bot configuration')
+rect(X,Y,W,914);heading(CX,Y+34,'Bot configuration')
 grid(configuration.find(lambda n:n.cls('grid'))[0],CX,Y+55,CW,4,104)
-Y+=316
-rect(X,Y,W,196);heading(CX,Y+34,'Purchase schedule',2)
-grid(schedule.find(lambda n:n.cls('grid'))[0],CX,Y+55,CW,4,118)
-Y+=234
-line(X,Y,X+W,Y);text(X,Y+48,'Period analysis',21,TEXT,True);text(X+draw.textlength('Period analysis',font=font(21,True))+5,Y+39,'3',11,'#fff',True)
-text(X,Y+75,report.find(lambda n:n.cls('report-heading'))[0].find(lambda n:n.cls('sub'))[0].text(),14,MUTED)
-Y+=100
-rect(X,Y,W,119)
+line(CX,Y+302,CX+CW,Y+302)
+heading(CX,Y+334,'Purchase and withdrawal schedule',2)
+for offset,title,group in zip([355,629],['Purchase','Withdrawal'],schedule.find(lambda n:n.cls('schedule-group'))):
+ rect(CX,Y+offset,CW,254,CARD,LINE,14)
+ text(CX+16,Y+offset+29,title,14,TEXT,True)
+ grid(group.find(lambda n:n.cls('grid'))[0],CX+16,Y+offset+48,CW-32,4,190)
+Y+=946
+line(X,Y,X+W,Y)
+Y+=24
+rect(X,Y,W,1060)
+text(CX,Y+37,'Period Analysis',21,TEXT,True);text(CX+draw.textlength('Period Analysis',font=font(21,True))+5,Y+28,'3',11,'#fff',True)
+text(CX,Y+65,report.find(lambda n:n.cls('sub'))[0].text(),14,MUTED)
+Y+=63
 # Three equal input columns plus report action match the desktop controls.
 for x,w,label,value in [(CX,265,main.find(lambda n:n.tag=='label' and n.attrs.get('for')=='interval')[0].text(),'Custom date range'),(CX+277,265,'From','20/10/2026, 00:00'),(CX+554,265,'To','28/10/2026, 12:00')]:
  text(x,Y+32,label,12,MUTED);rect(x,Y+42,w,45,CARD,LINE,10);text(x+12,Y+71,value,15)
 text(CX+239,Y+69,'⌄',15,MUTED)
 button(CX+831,Y+42,265,'Load report',True)
-Y+=137
-summary=report.find(lambda n:n.tag=='section' and n.cls('panel'))[1]
-rect(X,Y,W,761);heading(CX,Y+33,'Selected period summary')
+Y+=120
+line(CX,Y,CX+CW,Y);Y+=28
+summary=report.find(lambda n:n.cls('period-summary-content'))[0]
+heading(CX,Y,'Selected period summary')
 grids=summary.find(lambda n:n.cls('grid'))
-grid(grids[0],CX,Y+55,CW,5,166)
-grid(grids[1],CX,Y+235,CW,2,104)
+grid(grids[0],CX,Y+22,CW,5,166)
+grid(grids[1],CX,Y+202,CW,2,104)
 Y+=379
 outer_geometry=(X,W,CX,CW)
 X+=20;W-=40;CX+=20;CW-=40
@@ -168,7 +186,7 @@ button(CX,Y+292,99,'Previous');text(CX+180,Y+320,'Showing 1–5 of 5 · Page 1 o
 text(CX+CW-245,Y+320,'Go to page',12,MUTED);rect(CX+CW-165,Y+296,76,36,CARD,LINE,10);text(CX+CW-150,Y+320,'1',13);button(CX+CW-70,Y+292,70,'Go')
 Y+=398
 X,W,CX,CW=outer_geometry
-button(X+W-209,Y,209,'Download Parqet CSV')
+button(X+W-229,Y,209,'Download Parqet CSV',True)
 Y+=75
 line(X,Y,X+W,Y);heading(X,Y+34,'Notes')
 Y+=65
@@ -185,7 +203,7 @@ for index,note in enumerate(notes,1):
 H=Y+30
 svg=f'''<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="{H}" viewBox="0 0 1440 {H}" role="img" aria-labelledby="title desc">
 <title id="title">Bitcoin DCA Bot — current web UI illustration</title>
-<desc id="desc">Illustration of the current dashboard using fictional data: manual withdrawal below Log out, bot configuration, purchase schedule with current Bitcoin price, period analysis, activity table, Parqet export and configuration footnotes. This is not a live account screenshot.</desc>
+<desc id="desc">Illustration of the current dashboard using fictional data: manual withdrawal below Log out, combined configuration and purchase/withdrawal schedule, exchange balances, monthly deposit forecast, unified period analysis with activity and Parqet export, and current notes. This is not a live account screenshot.</desc>
 <style>text{{font-family:Arial,Helvetica,sans-serif}}</style>
 <rect width="1440" height="{H}" fill="{BG}"/>
 '''+''.join(parts)+'\n</svg>\n'

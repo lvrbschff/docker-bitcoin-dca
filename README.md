@@ -4,7 +4,7 @@ A Docker-based DCA bot for buying Bitcoin (BTC) on Bitvavo or Kraken, with optio
 
 ### Example web UI (fictional data)
 
-The illustration below shows the current web UI layout, including manual withdrawals, purchase scheduling, period analysis and activity. All values and the withdrawal method are fictional; it does not show a real account.
+The illustration below shows the current dashboard with its Bitcoin logo, combined bot configuration and purchase/withdrawal schedule, monthly deposit forecast, and unified period analysis with activity and Parqet export. All values and the withdrawal method are fictional; it does not show a real account.
 
 ![Current Bitcoin DCA Bot web UI illustration using fictional data](docs/web-ui-example-current.svg)
 
