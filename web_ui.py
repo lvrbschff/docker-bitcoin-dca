@@ -417,7 +417,7 @@ function renderActivities(){
  const start=(currentPage-1)*pageSize,end=Math.min(start+pageSize,total);
  for(const row of activityRows){
   const rate=Number.isFinite(activityRates[row.currency])?activityRates[row.currency]:1,currency=Number.isFinite(activityRates[row.currency])?displayCurrency:row.currency;
-  const tr=document.createElement("tr"),type=row.simulated?"Simulated buy (dry run)":(row.type==="TransferOut"?"Withdrawal · "+(row.withdrawalStatus||"unverified"):row.type),vals=[dateLabel(Date.parse(row.datetime)),type,btc(row.shares),money(Number(row.price)*rate,currency)+"/BTC",money(Number(row.amount)*rate,currency),(row.simulated?"~":"")+money(Number(row.fee)*rate,currency)];
+  const tr=document.createElement("tr"),type=row.simulated?"Simulated buy (dry run)":(row.type==="TransferOut"?"Withdrawal":row.type),vals=[dateLabel(Date.parse(row.datetime)),type,btc(row.shares),money(Number(row.price)*rate,currency)+"/BTC",money(Number(row.amount)*rate,currency),(row.simulated?"~":"")+money(Number(row.fee)*rate,currency)];
   vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i>=2)td.className="num";tr.appendChild(td)});
   body.appendChild(tr)
  }
