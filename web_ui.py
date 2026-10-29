@@ -485,7 +485,7 @@ button{width:100%;margin-top:22px;padding:12px;border:1px solid var(--accent);bo
 </style>
 </head>
 <body><main class="card">
-<div class="eyebrow">Dashboard sign-in</div>
+
 <div class="login-brand"><img src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Bot</h1></div>
 
 <form method="post" action="/login">
