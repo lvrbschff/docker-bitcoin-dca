@@ -60,14 +60,13 @@ main{max-width:1180px;margin:0 auto;padding:36px 22px 64px}.top{display:flex;jus
 .controls input[type="datetime-local"]::-webkit-datetime-edit{min-width:0;padding:0}
 .controls input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper{min-width:0;padding:0}
 .controls input[type="datetime-local"]::-webkit-date-and-time-value{min-width:0;text-align:left}
-.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.period-summary-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.summary-secondary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.card{padding:17px;border:1px solid var(--line);border-radius:14px;background:#0c1425a8}.card label{display:block;color:var(--muted);font-size:12px;margin-bottom:9px}.value{font-size:22px;font-weight:700;letter-spacing:-.02em}.small{font-size:12px;color:var(--muted);margin-top:4px}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.period-summary-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.summary-secondary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.card{padding:17px;border:1px solid var(--line);border-radius:14px;background:#0c1425a8}.card label{display:block;color:var(--muted);font-size:12px;margin-bottom:9px}.value{font-size:22px;font-weight:700;line-height:1.4;letter-spacing:-.02em}.small{font-size:12px;color:var(--muted);margin-top:4px}
 h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:740px}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}td.num{text-align:right;font-variant-numeric:tabular-nums}.positive{color:var(--green)}.negative{color:var(--red)}.notice{color:var(--muted);font-size:13px;margin-top:12px}.error{color:var(--red);margin:12px 0}.hidden{display:none}.activity-heading,.pagination,.settings-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.settings-heading h2{margin:0}.settings-heading .field{min-width:160px}.activity-heading h2{margin:0}.page-size{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}.page-size select{width:auto;padding:7px 10px}.pagination{margin-top:12px}.pagination button{padding:8px 12px}.pagination .notice{margin:0;text-align:center}
 main,.panel,.grid,.card,.field,.top>div{min-width:0}
 main{width:100%}.top-actions{flex-shrink:0}.controls>*{min-width:0}
 input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overflow-wrap:anywhere}
 .value{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-.time-value{font-size:16px;line-height:1.5;letter-spacing:0;overflow-wrap:normal}
-.countdown-value{font-size:clamp(16px,1.6vw,20px);white-space:nowrap;letter-spacing:0}
+.time-value,.countdown-value{white-space:normal;overflow-wrap:anywhere}
 .tablewrap{width:100%;max-width:100%;min-width:0;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
 #activities td{padding:5px 10px}#activities button{padding:3px 9px;line-height:1.4;font-size:13px;border-radius:7px}
 .page-jump{display:flex;align-items:center;gap:8px;margin:0;font-size:12px;color:var(--muted)}.page-jump input{width:76px;padding:7px 8px}.page-jump button{flex:none}
@@ -83,7 +82,6 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
  input,select{font-size:16px}input,select,button{min-height:44px}
  .grid{gap:10px}.card{padding:13px}.card label{line-height:1.5;margin-bottom:7px}
  .value{font-size:19px;line-height:1.4}.time-card{grid-column:1/-1}
- .time-value{font-size:15px;line-height:1.65}.countdown-value{font-size:20px}
  .activity-heading,.settings-heading{align-items:flex-start;flex-wrap:wrap}
  .activity-heading h2{flex-basis:100%}.page-size{width:100%;justify-content:space-between}
  .page-size select{min-width:90px}.pagination{gap:10px}.pagination button{flex:1}
