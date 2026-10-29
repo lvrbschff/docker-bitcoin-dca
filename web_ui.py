@@ -122,7 +122,7 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 <section class="panel purchase-schedule" aria-labelledby="scheduleHeading"><h2 id="scheduleHeading">Purchase schedule <sup class="footnote-ref" aria-describedby="schedule-note">2</sup></h2><div class="grid schedule-grid">
 <div class="card"><label>Current BTC price <sup class="footnote-ref" aria-describedby="currency-note">1</sup></label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
 <div class="card"><label id="quoteBalanceLabel">Available fiat balance</label><div class="value" id="quoteBalance">—</div><div class="small" id="quoteBalanceUpdated">Waiting for account check</div></div>
-<div class="card"><label>BTC balance</label><div class="value" id="exchangeBtcBalance">—</div><div class="small">Available on the selected exchange · last account check</div></div>
+<div class="card"><label>BTC balance</label><div class="value" id="exchangeBtcBalance">—</div><div class="small" id="exchangeBtcValue">—</div><div class="small" id="exchangeBtcUpdated">Waiting for account check</div></div>
 <div class="card time-card"><label>Estimated automatic withdrawal date</label><div class="value time-value" id="estimatedWithdrawalAt">—</div><div class="small" id="estimatedWithdrawalStatus">Waiting for account check</div></div>
 <div class="card time-card"><label>Time until estimated withdrawal date</label><div class="value countdown-value" id="withdrawalCountdown">—</div><div class="small">Estimate at the current BTC price and purchase interval</div></div>
 <div class="card time-card"><label>Next purchase</label><div class="value time-value" id="nextPurchaseAt">—</div><div class="small" id="nextPurchaseStatus">Waiting for the bot schedule</div></div>
@@ -171,6 +171,10 @@ function parseInput(el){return new Date(el.value).getTime()}
 function money(v,c){try{return new Intl.NumberFormat("en-GB",{style:"currency",currency:c,maximumFractionDigits:2}).format(Number(v||0))}catch(e){return Number(v||0).toFixed(2)+" "+c}}
 function btc(v){return Number(v||0).toLocaleString("en-GB",{minimumFractionDigits:0,maximumFractionDigits:8})+" BTC"}
 function dateLabel(ms){return new Date(ms).toLocaleString("en-GB")}
+let exchangeBtcBalance=null, balanceDisplayPrice=null, balanceDisplayCurrency=null;
+function renderExchangeBtcValue(){
+ $("exchangeBtcValue").textContent=exchangeBtcBalance!==null&&balanceDisplayPrice>0&&balanceDisplayCurrency===displayCurrency?money(exchangeBtcBalance*balanceDisplayPrice,displayCurrency):"—";
+}
 let nextPurchaseTimestamp=null, estimatedWithdrawalTimestamp=null, scheduleClockOffset=0;
 function renderCountdown(id, timestamp){
  const output=$(id);
@@ -197,13 +201,16 @@ async function refreshPurchaseSchedule(){
   $("quoteBalance").textContent=balanceKnown?money(schedule.quoteBalance,schedule.quote):"—";
   const checkedAt=Date.parse(schedule.balanceUpdatedAt);
   $("quoteBalanceUpdated").textContent=balanceKnown
-   ?schedule.exchange+" · "+(Number.isFinite(checkedAt)?"Last checked "+new Date(checkedAt).toLocaleString("en-GB",{timeZone:schedule.timezone||"UTC"}):"Last account check")
+   ?(Number.isFinite(checkedAt)?"Last checked "+new Date(checkedAt).toLocaleString("en-GB",{timeZone:schedule.timezone||"UTC"}):"Last account check")
    :"Waiting for account check";
   nextPurchaseTimestamp=Number.isFinite(target)?target:null;
   scheduleClockOffset=Number.isFinite(serverTime)?serverTime-Date.now():0;
   $("nextPurchaseAt").textContent=nextPurchaseTimestamp===null?"Not scheduled":new Date(nextPurchaseTimestamp).toLocaleString("en-GB",{timeZone:schedule.timezone||"UTC",timeZoneName:"short"});
   $("nextPurchaseStatus").textContent=schedule.nextPurchaseStatus||"Waiting for the bot schedule";
-  $("exchangeBtcBalance").textContent=schedule.btcBalance==null?"—":btc(schedule.btcBalance);
+  exchangeBtcBalance=schedule.btcBalance!=null&&Number.isFinite(Number(schedule.btcBalance))?Number(schedule.btcBalance):null;
+  $("exchangeBtcBalance").textContent=exchangeBtcBalance===null?"—":btc(exchangeBtcBalance);
+  $("exchangeBtcUpdated").textContent=exchangeBtcBalance===null?"Waiting for account check":(Number.isFinite(checkedAt)?"Last checked "+new Date(checkedAt).toLocaleString("en-GB",{timeZone:schedule.timezone||"UTC"}):"Last account check");
+  renderExchangeBtcValue();
   const withdrawalTarget=Date.parse(schedule.estimatedWithdrawalAt);
   estimatedWithdrawalTimestamp=Number.isFinite(withdrawalTarget)?withdrawalTarget:null;
   $("estimatedWithdrawalAt").textContent=estimatedWithdrawalTimestamp===null?"Not estimated":new Date(estimatedWithdrawalTimestamp).toLocaleString("en-GB",{timeZone:schedule.timezone||"UTC",timeZoneName:"short"});
@@ -254,7 +261,7 @@ $("pageJump").addEventListener("submit",event=>{
  if(!activityTotal||!Number.isInteger(page)||page<1||page>activityPages)return;
  if(page!==currentPage){currentPage=page;loadAnalytics()}
 });
-$("displayCurrency").addEventListener("change",()=>{displayCurrency=$("displayCurrency").value;localStorage.setItem("bitcoinDcaDisplayCurrency",displayCurrency);loadAnalytics()});
+$("displayCurrency").addEventListener("change",()=>{displayCurrency=$("displayCurrency").value;renderExchangeBtcValue();localStorage.setItem("bitcoinDcaDisplayCurrency",displayCurrency);loadAnalytics()});
 async function loadAnalytics(){
  try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end+"&page="+currentPage+"&limit="+$("pageSize").value);const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load the report.");quote=d.quote;
  if(!displayCurrency){const saved=localStorage.getItem("bitcoinDcaDisplayCurrency");displayCurrency=["EUR","USD"].includes(saved)?saved:(["EUR","USD"].includes(quote)?quote:"EUR")}
@@ -273,6 +280,7 @@ async function loadAnalytics(){
   $("spotUpdated").textContent=livePrice>0?"Last price saved by the bot":"Live price unavailable";
   showError("Could not fetch a live BTC price. Showing saved activity and values in "+quote+" where available.");
  }
+ balanceDisplayPrice=livePrice;balanceDisplayCurrency=displayCurrency;renderExchangeBtcValue();
  $("spot").textContent=livePrice>0?money(livePrice,displayCurrency)+"/BTC":"—";
  const converted={buyVolume:0,tradeFees:0,withdrawalFees:0};
  let moneyAvailable=true;
