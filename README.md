@@ -2,11 +2,11 @@
 
 A Docker-based DCA bot for buying Bitcoin (BTC) on Bitvavo or Kraken, with optional Bitcoin withdrawals. Choose the exchange, quote currency, BTC purchase amount, and deposit day. The bot recalculates purchase timing from the available balance and the selected exchange's current minimum order rules. A local web UI provides an activity and portfolio overview and can generate Parqet-compatible CSV exports.
 
-### Example web UI (fictional data)
+### Web UI screenshot (fictional data)
 
-The illustration below shows the current dashboard with its Bitcoin logo, combined bot configuration and purchase/withdrawal schedule, monthly deposit forecast, and unified period analysis with activity and Parqet export. All values and the withdrawal method are fictional; it does not show a real account.
+The screenshot below shows the upper part of the current dashboard, including its Bitcoin logo, bot configuration and the beginning of the purchase and withdrawal schedule. It was captured from the documentation preview with fictional data; the lower dashboard sections are outside this crop.
 
-![Current Bitcoin DCA Bot web UI illustration using fictional data](docs/web-ui-example-current.svg)
+![Upper section of the Bitcoin DCA Bot Dashboard with fictional data](docs/web-ui-dashboard-screenshot.png)
 
 ## What you need
 
