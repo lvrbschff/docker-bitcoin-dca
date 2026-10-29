@@ -174,13 +174,13 @@ sup{color:#fff}.footnote-ref{margin-left:3px}
 
 /* Shared title bars distinguish the three main panels from subsection headings. */
 .panel>.panel-heading,.panel>.report-heading{
- margin:-20px -20px 20px;padding:16px 20px;
+ margin:-20px -20px 20px;padding:10px 20px;
  background:linear-gradient(100deg,#223452,#192740);
  border-bottom:1px solid #354b70;border-radius:17px 17px 0 0;
 }
 .panel>.panel-heading h2,.panel>.report-heading h2{font-size:21px;font-weight:700;line-height:1.4;margin:0}
 @media(max-width:600px){
- .panel>.panel-heading,.panel>.report-heading{margin:-15px -15px 18px;padding:14px 15px;border-radius:13px 13px 0 0}
+ .panel>.panel-heading,.panel>.report-heading{margin:-15px -15px 18px;padding:8px 15px;border-radius:13px 13px 0 0}
  .panel>.panel-heading h2,.panel>.report-heading h2{font-size:19px}
 }
 </style>
