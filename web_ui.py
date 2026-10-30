@@ -275,6 +275,17 @@ body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
 .configuration-scroll .configuration-grid{grid-template-columns:repeat(4,minmax(220px,1fr))}
 .report-cards{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:14px;min-width:0}
 .report-scroll .period-summary-grid,.report-scroll .summary-secondary-grid{display:contents}
+
+.section-feedback{font-size:12px;color:var(--muted);margin:0 0 14px}
+.section-feedback.is-error{color:var(--red)}
+th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+.confirmation-dialog{width:min(520px,calc(100vw - 28px));max-height:calc(100dvh - 32px);overflow:auto;padding:24px;color:var(--text);background:#121a2d;border:1px solid var(--line);border-radius:12px;box-shadow:0 20px 70px #0008}
+.confirmation-dialog::backdrop{background:#060b17aa;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+.confirmation-dialog h2{font-size:20px;margin-bottom:12px}
+.confirmation-values{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:12px;margin:22px 0}
+.confirmation-values dt{color:var(--muted);font-size:13px}.confirmation-values dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.confirmation-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
+@media(max-width:480px){.confirmation-dialog{padding:18px}.confirmation-values{grid-template-columns:minmax(0,1fr)}.confirmation-values dd{text-align:left;margin-top:-8px}.confirmation-actions button{flex:1}}
 </style>
 </head>
 <body>
@@ -296,10 +307,11 @@ body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
 </details>
 <details open class="panel purchase-schedule" aria-labelledby="scheduleHeading">
 <summary class="panel-heading"><h2 id="scheduleHeading">Schedule</h2></summary>
+<p id="scheduleFeedback" class="section-feedback hidden" role="status" aria-live="polite"></p>
 <section class="schedule-group" aria-labelledby="purchaseHeading">
 <h3 id="purchaseHeading" class="summary-subheading">Purchase</h3>
 <div class="schedule-row-scroll horizontal-scroll" role="region" aria-label="Purchase schedule cards" tabindex="0"><div class="grid schedule-grid">
-<div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
+<div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div><div class="small negative hidden" id="priceFeedback" role="status"></div></div>
 <div class="card"><label id="quoteBalanceLabel">Available fiat balance on exchange</label><div class="value" id="quoteBalance">—</div><div class="small" id="quoteBalanceUpdated">Waiting for account check</div></div>
 <div class="card time-card"><label>Next purchase <span id="nextPurchaseStatus">Scheduled</span></label><div class="value time-value" id="nextPurchaseAt">—</div></div>
 <div class="card time-card"><label>Time until next purchase</label><div class="value countdown-value" id="nextPurchaseCountdown">—</div></div>
@@ -323,7 +335,7 @@ body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
 <div class="field"><label for="start">From</label><input id="start" type="datetime-local"></div>
 <div class="field"><label for="end">To</label><input id="end" type="datetime-local"></div>
 <button id="refresh">Load report</button>
-</div><div id="error" class="error hidden"></div>
+</div><p id="intervalFeedback" class="section-feedback hidden" role="status"></p><div id="error" class="error hidden" role="alert"></div><p id="reportFeedback" class="section-feedback hidden" role="status" aria-live="polite"></p>
 <div class="period-summary-content" role="region" aria-labelledby="periodSummaryHeading"><h3 id="periodSummaryHeading" class="summary-subheading">Period Report</h3><div class="horizontal-scroll report-scroll" role="region" aria-label="Period report cards" tabindex="0"><div class="report-cards"><div class="grid period-summary-grid">
 <div class="card"><label>BTC purchases</label><div class="value" id="buyCount">—</div><div class="small" id="buyBtc"></div></div>
 <div class="card"><label>Purchase volume</label><div class="value" id="buyVolume">—</div><div class="small" id="avgPrice"></div></div>
@@ -336,7 +348,7 @@ body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
 </div>
 </div></div>
 <h3 class="summary-subheading activity-subheading" id="activityHeading">Period Activity</h3>
-<section class="panel activity-panel" aria-labelledby="activityHeading"><div class="activity-heading"><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap horizontal-scroll" role="region" aria-label="Period activity table" tabindex="0"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><span id="pageInfo" class="notice"></span><div class="pagination-navigation"><button class="secondary" id="previousPage">Previous</button><button class="secondary" id="nextPage">Next</button></div><form class="page-jump" id="pageJump" aria-label="Jump to activity page"><label for="pageNumber">Go to page</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><button class="secondary" id="goToPage" type="submit">Go</button></form></div></section></div>
+<section class="panel activity-panel" aria-labelledby="activityHeading"><div class="activity-heading"><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap horizontal-scroll" role="region" aria-label="Period activity table" tabindex="0"><table><thead><tr><th>Date</th><th>Type</th><th class="num">BTC</th><th class="num">Price</th><th class="num">Value</th><th class="num">Fee</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><span id="pageInfo" class="notice"></span><div class="pagination-navigation"><button class="secondary" id="previousPage">Previous</button><button class="secondary" id="nextPage">Next</button></div><form class="page-jump" id="pageJump" aria-label="Jump to activity page"><label for="pageNumber">Go to page</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><button class="secondary" id="goToPage" type="submit">Go</button></form></div></section></div>
 <div class="bottom-actions"><button id="download" aria-describedby="exportMessage">Download Parqet CSV</button></div>
 <p id="exportMessage" class="export-feedback hidden" role="alert"></p>
 </details>
@@ -348,6 +360,23 @@ body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
 </ol>
 </footer>
 </main>
+<dialog id="confirmationDialog" class="confirmation-dialog" aria-labelledby="confirmationTitle" aria-describedby="confirmationDescription">
+<h2 id="confirmationTitle">Confirm Bitcoin withdrawal</h2>
+<p id="confirmationDescription" class="sub">Review this transfer carefully. It cannot be reversed.</p>
+<dl class="confirmation-values"><dt>Destination</dt><dd id="confirmDestination"></dd><dt>Available BTC (gross)</dt><dd id="confirmGross"></dd><dt>Withdrawal fee</dt><dd id="confirmFee"></dd><dt>Net BTC sent</dt><dd id="confirmNet"></dd></dl>
+<p id="confirmationHint" class="small"></p>
+<form method="dialog" class="confirmation-actions"><button type="submit" value="cancel" class="secondary" id="cancelConfirmation" autofocus>Cancel</button><button type="submit" value="confirm" id="acceptConfirmation">Confirm withdrawal</button></form>
+</dialog>
+<script data-ui-view>
+(()=>{
+ let saved={};try{const value=JSON.parse(localStorage.getItem("bitcoinDcaPanels")||"{}");if(value&&typeof value==="object")saved=value}catch(e){}
+ document.querySelectorAll("details.panel").forEach(panel=>{
+  const key=panel.getAttribute("aria-labelledby");
+  if(typeof saved[key]==="boolean")panel.open=saved[key];
+  panel.addEventListener("toggle",()=>{saved[key]=panel.open;try{localStorage.setItem("bitcoinDcaPanels",JSON.stringify(saved))}catch(e){}});
+ });
+})();
+</script>
 <script data-ui-scroll-areas>
 (()=>{
  const areas=[...document.querySelectorAll(".horizontal-scroll")];
@@ -410,11 +439,12 @@ function renderPurchaseCountdown(){
  if(estimatedWithdrawalTimestamp===null)$("withdrawalCountdown").textContent="Not estimated";
 }
 async function refreshPurchaseSchedule(){
+ const request=++scheduleRequest;sectionFeedback("scheduleFeedback","Updating schedule…");
  try{
   const response=await fetch("/api/schedule?monthlyDeposit="+encodeURIComponent($("monthlyDeposit").value||"0"));
   if(response.status===401){window.location.reload();return}
   if(!response.ok)throw new Error("Schedule unavailable");
-  const schedule=await response.json(),target=Date.parse(schedule.nextPurchaseAt),serverTime=Date.parse(schedule.serverTime);
+  const schedule=await response.json();if(request!==scheduleRequest)return;const target=Date.parse(schedule.nextPurchaseAt),serverTime=Date.parse(schedule.serverTime);
   $("monthlyDepositCurrency").textContent=schedule.quote;
   if(schedule.configuredBuyAmount!==undefined){
    const minimumMode=Number(schedule.configuredBuyAmount)===0;
@@ -443,7 +473,8 @@ async function refreshPurchaseSchedule(){
   $("estimatedWithdrawalStatus").textContent=schedule.estimatedWithdrawalStatus||"Waiting for account check";
   $("withdrawalCountdownStatus").textContent=estimatedWithdrawalTimestamp===null?$("estimatedWithdrawalStatus").textContent:"Estimate at the current BTC price and purchase interval";
   renderPurchaseCountdown();
- }catch(e){$("nextPurchaseStatus").textContent="Could not refresh the bot schedule"}
+  sectionFeedback("scheduleFeedback","");
+ }catch(e){if(request===scheduleRequest)sectionFeedback("scheduleFeedback","Could not refresh the schedule. Previous values are still shown.",true)}
 }
 const savedMonthlyDeposit=localStorage.getItem("bitcoinDcaMonthlyDeposit");
 if(savedMonthlyDeposit!==null&&Number.isFinite(Number(savedMonthlyDeposit))&&Number(savedMonthlyDeposit)>=0)$("monthlyDeposit").value=savedMonthlyDeposit;
@@ -454,9 +485,39 @@ $("monthlyDeposit").addEventListener("change",()=>{
 });
 setInterval(renderPurchaseCountdown,1000);
 setInterval(refreshPurchaseSchedule,30000);
-refreshPurchaseSchedule();
 
 function showError(message){$("error").textContent=message||"";$("error").classList.toggle("hidden",!message)}
+function sectionFeedback(id,message,error=false){const el=$(id);el.textContent=message;el.classList.toggle("hidden",!message);el.classList.toggle("is-error",error)}
+function readReportView(){try{return JSON.parse(localStorage.getItem("bitcoinDcaReportView")||"null")}catch(e){return null}}
+function saveReportView(){try{localStorage.setItem("bitcoinDcaReportView",JSON.stringify({interval:$("interval").value,start:$("start").value,end:$("end").value,pageSize:$("pageSize").value}))}catch(e){}}
+function restoreReportView(){
+ const saved=readReportView();if(!saved||typeof saved!=="object")return;
+ if(["5","10","20","50","100","500","1000"].includes(String(saved.pageSize)))$("pageSize").value=String(saved.pageSize);
+ const start=Date.parse(saved.start),end=Date.parse(saved.end);
+ if(Number.isFinite(start)&&Number.isFinite(end)&&start<end){
+  $("start").value=saved.start;$("end").value=saved.end;
+  $("interval").value=saved.interval||"";
+  if(!$("interval").value)$("interval").value="";
+ }
+}
+let reportRequest=0,scheduleRequest=0;
+function knownNumber(value){return value!==null&&value!==undefined&&String(value).trim()!==""&&Number.isFinite(Number(value))}
+function activityBtc(value){return knownNumber(value)?btc(value):"—"}
+function activityMoney(value,rate,currency,suffix=""){return knownNumber(value)?money(Number(value)*rate,currency)+suffix:"—"}
+function confirmWithdrawal(preview){
+ const dialog=$("confirmationDialog");
+ $("confirmDestination").textContent=preview.destination||"—";
+ $("confirmGross").textContent=activityBtc(preview.availableBtc);
+ $("confirmFee").textContent=knownNumber(preview.feeBtc)?btc(preview.feeBtc):"Determined by the exchange";
+ $("confirmNet").textContent=knownNumber(preview.netBtc)?btc(preview.netBtc):"Available BTC minus the exchange fee";
+ $("confirmationHint").textContent="Confirmation expires after two minutes. No transfer is submitted until you confirm.";
+ dialog.returnValue="";$("acceptConfirmation").disabled=false;
+ return new Promise(resolve=>{
+  const timer=setTimeout(()=>{if(dialog.open)dialog.close("expired")},120000);
+  dialog.addEventListener("close",()=>{clearTimeout(timer);resolve(dialog.returnValue==="confirm")},{once:true});
+  dialog.showModal();
+ });
+}
 function selectedPeriod(){const start=parseInput($("start")),end=parseInput($("end"));if(!Number.isFinite(start)||!Number.isFinite(end)||start>=end)throw new Error("Please choose a valid date range.");return {start:start,end:end}}
 function applySelectedInterval(){if(!$("interval").value)return;const p=$("interval").value.split(",").map(Number);$("start").value=localInput(p[0]);$("end").value=localInput(p[1])}
 async function loadIntervals(){
@@ -467,7 +528,8 @@ async function loadIntervals(){
  const now=Date.now();if(withdrawals.length>=2){select.value=withdrawals[withdrawals.length-2].timestamp+","+withdrawals[withdrawals.length-1].timestamp;applySelectedInterval()}
  else {select.value="";$("start").value=localInput(withdrawals.length===1?withdrawals[0].timestamp:now-90*86400000);$("end").value=localInput(now)}
 }
-$("interval").addEventListener("change",()=>{applySelectedInterval();currentPage=1;loadAnalytics()});
+$("interval").addEventListener("change",()=>{applySelectedInterval();saveReportView();currentPage=1;loadAnalytics()});
+["start","end"].forEach(id=>$(id).addEventListener("change",()=>{$("interval").value="";saveReportView()}));
 function renderActivities(){
  const body=$("activities");body.innerHTML="";
  const pageSize=Number($("pageSize").value),total=activityTotal,totalPages=activityPages;
@@ -475,7 +537,7 @@ function renderActivities(){
  const start=(currentPage-1)*pageSize,end=Math.min(start+pageSize,total);
  for(const row of activityRows){
   const rate=Number.isFinite(activityRates[row.currency])?activityRates[row.currency]:1,currency=Number.isFinite(activityRates[row.currency])?displayCurrency:row.currency;
-  const tr=document.createElement("tr"),type=row.simulated?"Simulated buy (dry run)":(row.type==="TransferOut"?"Withdrawal":row.type),vals=[dateLabel(Date.parse(row.datetime)),type,btc(row.shares),money(Number(row.price)*rate,currency)+"/BTC",money(Number(row.amount)*rate,currency),(row.simulated?"~":"")+money(Number(row.fee)*rate,currency)];
+  const tr=document.createElement("tr"),type=row.simulated?"Simulated buy (dry run)":(row.type==="TransferOut"?"Withdrawal":row.type),vals=[Number.isFinite(Date.parse(row.datetime))?dateLabel(Date.parse(row.datetime)):"—",type||"—",activityBtc(row.shares),activityMoney(row.price,rate,currency,"/BTC"),activityMoney(row.amount,rate,currency),(row.simulated&&knownNumber(row.fee)?"~":"")+activityMoney(row.fee,rate,currency)];
   vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i>=2)td.className="num";tr.appendChild(td)});
   body.appendChild(tr)
  }
@@ -485,7 +547,7 @@ function renderActivities(){
  $("pageNumber").value=currentPage;$("pageNumber").max=totalPages;
  $("pageNumber").disabled=!total;$("goToPage").disabled=!total;
 }
-$("pageSize").addEventListener("change",()=>{currentPage=1;loadAnalytics()});
+$("pageSize").addEventListener("change",()=>{saveReportView();currentPage=1;loadAnalytics()});
 $("previousPage").addEventListener("click",()=>{if(currentPage>1){currentPage--;loadAnalytics()}});
 $("nextPage").addEventListener("click",()=>{currentPage++;loadAnalytics()});
 $("pageJump").addEventListener("submit",event=>{
@@ -495,7 +557,8 @@ $("pageJump").addEventListener("submit",event=>{
 });
 $("displayCurrency").addEventListener("change",()=>{displayCurrency=$("displayCurrency").value;renderExchangeBtcValue();localStorage.setItem("bitcoinDcaDisplayCurrency",displayCurrency);loadAnalytics()});
 async function loadAnalytics(){
- try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end+"&page="+currentPage+"&limit="+$("pageSize").value);const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load the report.");quote=d.quote;
+ const request=++reportRequest;saveReportView();sectionFeedback("reportFeedback","Updating report…");
+ try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end+"&page="+currentPage+"&limit="+$("pageSize").value);const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load the report.");if(request!==reportRequest)return;quote=d.quote;
  if(!displayCurrency){const saved=localStorage.getItem("bitcoinDcaDisplayCurrency");displayCurrency=["EUR","USD"].includes(saved)?saved:(["EUR","USD"].includes(quote)?quote:"EUR")}
  $("displayCurrency").value=displayCurrency;
  const ex=d.exchange==="KRAKEN"?"Kraken":d.exchange==="BITVAVO"?"Bitvavo":d.exchange;document.title="Bitcoin DCA Dashboard";
@@ -503,14 +566,17 @@ async function loadAnalytics(){
  const currencies=Object.keys(d.summaryByCurrency||{});
  try{
   const priceResponse=await fetch("/api/market-price?currency="+displayCurrency+"&currencies="+encodeURIComponent(currencies.join(",")));const market=await priceResponse.json();if(!priceResponse.ok)throw new Error(market.error||"Could not load current BTC price.");
+  if(request!==reportRequest)return;sectionFeedback("priceFeedback","");
   fxRate=Number(market.conversionRate);livePrice=Number(market.price);currencyRates=Object.fromEntries(Object.entries(market.conversionRates||{[quote]:fxRate})
    .map(([currency,rate])=>[currency,Number(rate)]).filter(([,rate])=>Number.isFinite(rate)&&rate>0));
   currencyRates[displayCurrency]=1;
   $("spotUpdated").textContent=(market.stale?"Cached Kraken price · fetched ":"Kraken public price page · fetched ")+new Date(Number(market.updatedAt)*1000).toLocaleTimeString("en-GB");
  }catch(priceError){
+  if(request!==reportRequest)return;
   displayCurrency=quote;fxRate=1;$("displayCurrency").value=quote;
-  $("spotUpdated").textContent=livePrice>0?"Last price saved by the bot":"Live price unavailable";
-  showError("Could not fetch a live BTC price. Showing saved activity and values in "+quote+" where available.");
+  if(!(livePrice>0)&&balanceDisplayCurrency===quote&&balanceDisplayPrice>0)livePrice=balanceDisplayPrice;
+  $("spotUpdated").textContent=livePrice>0?"Last available price":"Live price unavailable";
+  sectionFeedback("priceFeedback","Live price unavailable; showing the saved bot price where available.",true);
  }
  balanceDisplayPrice=livePrice;balanceDisplayCurrency=displayCurrency;renderExchangeBtcValue();
  $("spot").textContent=livePrice>0?money(livePrice,displayCurrency)+"/BTC":"—";
@@ -542,7 +608,8 @@ async function loadAnalytics(){
  $("tradeFees").textContent=moneyAvailable?money(converted.tradeFees,displayCurrency):"—";$("withdrawBtc").textContent=btc(d.summary.withdrawnBtc);$("withdrawCount").textContent=d.summary.withdrawalCount+" confirmed · "+(d.summary.pendingWithdrawalCount||0)+" pending";
  $("withdrawFees").textContent=moneyAvailable?money(converted.withdrawalFees,displayCurrency):"—";$("netBtc").textContent=btc(d.summary.netBtc);
  activityRates=currencyRates;activityRows=d.activities;activityTotal=d.pagination.total;activityPages=d.pagination.pages;currentPage=d.pagination.page;renderActivities();
- }catch(e){showError(e.message)}
+ }catch(e){if(request===reportRequest)showError(e.message)}
+ finally{if(request===reportRequest)sectionFeedback("reportFeedback","")}
 }
 $("refresh").addEventListener("click",()=>{currentPage=1;loadAnalytics()});
 $("download").addEventListener("click",async()=>{
@@ -563,7 +630,7 @@ async function withdrawalPost(path, body){
  const response=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json","X-DCA-Action":"withdrawal"},body:JSON.stringify(body)});
  const result=await response.json();if(!response.ok)throw new Error(result.error||"Withdrawal request failed.");
  if(!result.jobId)return result;
- $("withdrawMessage").textContent="Request queued. Waiting for the account worker…";
+ showWithdrawalMessage("Request queued. Waiting for the account worker…",false);
  for(let i=0;i<600;i++){
   const check=await fetch("/api/withdrawal/jobs/"+encodeURIComponent(result.jobId));const job=await check.json();
   if(!check.ok)throw new Error(job.error||"Could not check the request. Check exchange status before trying again.");
@@ -596,20 +663,27 @@ function showWithdrawalMessage(message,error=true){
 $("manualWithdraw").addEventListener("click",async()=>{
  const button=$("manualWithdraw");button.disabled=true;\n $("withdrawalFeedback").textContent="";$("withdrawalFeedback").classList.add("hidden");
  try{
+ showWithdrawalMessage("Preparing withdrawal preview…",false);
  const configuration=await loadWithdrawalConfiguration();
  if(!configuration.enabled){showWithdrawalMessage(configuration.reason||"Manual withdrawal is not configured. See Notes.");return}
  const p=await withdrawalPost("/api/withdrawal/preview",{});
- const fee=p.feeBtc!==null&&p.feeBtc!==undefined?"Withdrawal fee: "+p.feeBtc+" BTC\\nNet sent: "+p.netBtc+" BTC":"Bitvavo deducts its withdrawal fee from this balance; the final fee is returned on submission.";
- if(!confirm("Confirm BTC withdrawal?\\n\\n"+p.destination+"\\nAvailable balance to withdraw: "+p.availableBtc+" BTC\\n"+fee+"\\n\\nThis transfer cannot be reversed. Submit withdrawal?"))return;
- $("withdrawMessage").textContent="Submitting withdrawal…";
+ if(!await confirmWithdrawal(p)){showWithdrawalMessage("Withdrawal not submitted.",false);return;}
+ showWithdrawalMessage("Submitting withdrawal…",false);
  const result=await withdrawalPost("/api/withdrawal/confirm",{token:p.token});showWithdrawalMessage(result.message,false);
  $("interval").value="";$("end").value=localInput(Date.now()+60000);currentPage=1;await loadAnalytics();
  }catch(e){showWithdrawalMessage(e.message)}
  finally{button.disabled=false}
 });
-loadWithdrawalConfiguration().catch(e=>{$("withdrawMessage").textContent=e.message});
+loadWithdrawalConfiguration().catch(e=>{showWithdrawalMessage(e.message)});
+refreshPurchaseSchedule();
 
-(async()=>{try{await loadIntervals();await loadAnalytics()}catch(e){showError(e.message)}})();
+(async()=>{
+ try{await loadIntervals()}catch(e){
+  $("interval").value="";$("start").value=localInput(Date.now()-90*86400000);$("end").value=localInput(Date.now());
+  sectionFeedback("intervalFeedback","Withdrawal intervals unavailable. Custom dates remain available.",true);
+ }
+ restoreReportView();await loadAnalytics();
+})();
 </script></body></html>
 """
 

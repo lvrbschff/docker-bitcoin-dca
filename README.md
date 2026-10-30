@@ -95,6 +95,8 @@ Submitted withdrawals block further withdrawals until resolved. Uncertain Kraken
 - **Schedule:** exchange balances, purchase timing and estimated automatic withdrawal timing. **Expected monthly deposit** is a browser-saved forecast assumption; it adds funds on each deposit day and recalculates future intervals using actual calendar months. It does not initiate deposits or change trading.
 - **Period Analysis:** date filters, summary, paginated activity and CSV export. Activities cannot be deleted through the UI.
 
+Panel expansion, selected dates and entries per page are remembered in this browser. Refreshes retain existing values while loading; errors appear beside the affected section. Manual withdrawals use a confirmation dialog showing destination, gross BTC, fee and net BTC; unavailable fee estimates are explicitly labelled.
+
 Display currencies are EUR and USD. Reference BTC prices come from Kraken’s public [BTC/EUR](https://www.kraken.com/convert/btc/eur) and [BTC/USD](https://www.kraken.com/convert/btc/usd) pages, including when trading on Bitvavo. Saved or cached prices are labelled.
 
 **Download Parqet CSV** exports one consolidated Buy row for the **last confirmed withdrawal in the selected range**:

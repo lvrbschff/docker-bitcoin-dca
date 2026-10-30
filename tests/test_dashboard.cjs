@@ -7,19 +7,23 @@ const script=html.split('<script>')[1].split('</script>')[0];
 class Element{
  constructor(){this.value='';this.children=[];this.handlers={};this.textContent='';this.disabled=false;this.classList={toggle(){},add(){},remove(){}}}
  appendChild(e){this.children.push(e)} append(...e){this.children.push(...e)} replaceChildren(...e){this.children=e}
+ showModal(){this.open=true} close(value=''){this.returnValue=value;this.open=false;this.handlers.close?.()}
  set innerHTML(v){this.children=[]} addEventListener(event,handler){this.handlers[event]=handler}
 }
 const elements={},get=id=>{assert(!["balance","balanceValue"].includes(id),"Removed portfolio element must not be accessed");return elements[id]??=new Element()};get('pageSize').value=html.match(/<option selected>(\d+)<\/option>/)[1];
 const records=Array.from({length:45},(_,i)=>({activityId:String(i),datetime:'2026-10-22T12:00:00Z',type:'Buy',identifier:'BTC',shares:'.001',currency:i<22?'EUR':'USD',price:i<22?'80000':'100000',amount:i<22?'80':'100',fee:i<22?'.2':'.25'}));
-const requests=[];let checks=0,eurOnly=false,priceUnavailable=false,invalidUsdRate=false,withdrawalUnavailable=false;
+const stored=new Map();let expiryCallback;
+const requests=[];let reportFails=false,scheduleFails=false,checks=0,eurOnly=false,priceUnavailable=false,invalidUsdRate=false,withdrawalUnavailable=false;
 const response=data=>({ok:true,json:async()=>data});
-const context={document:{getElementById:get,createElement:()=>new Element()},localStorage:{getItem:()=>null,setItem(){}},Intl,Date,URL,console,alert(){throw Error('Withdrawal must not use a browser alert')},confirm:()=>false,setInterval(){},setTimeout(fn){queueMicrotask(fn)},window:{location:{reload(){throw Error('Unexpected reload')}}},fetch:async(url,options)=>{
+const context={document:{getElementById:get,createElement:()=>new Element()},localStorage:{getItem:key=>stored.get(key)??null,setItem:(key,value)=>stored.set(key,value)},Intl,Date,URL,console,alert(){throw Error('Withdrawal must not use a browser alert')},confirm:()=>false,setInterval(){},setTimeout(fn,ms){if(ms===120000){expiryCallback=fn;return 1}queueMicrotask(fn)},clearTimeout(){},window:{location:{reload(){throw Error('Unexpected reload')}}},fetch:async(url,options)=>{
  requests.push(url);const parsed=new URL(url,'http://example.test');
+ if(parsed.pathname==='/api/schedule'&&scheduleFails)throw Error('Schedule offline');
  if(parsed.pathname==='/api/schedule')return response({quote:'EUR',exchange:'KRAKEN',quoteBalance:'72.7719',balanceUpdatedAt:'2026-10-29T12:00:00Z',nextPurchaseAt:new Date(Date.now()+3600000).toISOString(),serverTime:new Date().toISOString(),timezone:'Europe/Berlin'});
  if(parsed.pathname==='/api/withdrawals')return response([{timestamp:Date.parse('2026-10-20T12:00:00Z')},{timestamp:Date.parse('2026-10-23T12:00:00Z')}]);
  if(parsed.pathname==='/api/withdrawal/config')return response({enabled:!withdrawalUnavailable,destination:'fictional wallet',reason:withdrawalUnavailable?'Manual withdrawal is unavailable: set KRAKEN_WITHDRAW_KEY to your saved Bitcoin withdrawal method in .env.':''});
  if(parsed.pathname==='/api/market-price')return priceUnavailable?{ok:false,json:async()=>({error:'offline'})}:response({price:'80000',conversionRate:'1',conversionRates:{EUR:'1',USD:invalidUsdRate?'invalid':'0.9'},updatedAt:Date.now()/1000});
  if(parsed.pathname==='/api/analytics'){
+  if(reportFails)throw Error('Report offline');
   const limit=Number(parsed.searchParams.get('limit'))||10,pages=Math.ceil(records.length/limit);
   const page=Math.max(1,Math.min(pages,Number(parsed.searchParams.get('page'))||1));
   return response({quote:'EUR',exchange:'KRAKEN',configuration:{liveTrading:true,buyAmount:0,depositDay:1,withdrawalsEnabled:false,withdrawalThreshold:1000},snapshot:{price:80000,balance:'.045',updatedAt:new Date().toISOString()},summary:{buyCount:45,boughtBtc:'.045',withdrawnBtc:0,withdrawalCount:0,pendingWithdrawalCount:0,netBtc:'.045'},summaryByCurrency:eurOnly?{EUR:{buyVolume:3600,tradeFees:9,withdrawalFees:0}}:{EUR:{buyVolume:1760,tradeFees:4.4,withdrawalFees:0},USD:{buyVolume:2300,tradeFees:5.75,withdrawalFees:0}},activities:records.slice((page-1)*limit,page*limit),pagination:{page,pageSize:limit,total:45,pages}});
@@ -75,8 +79,65 @@ const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate)};
  await get('manualWithdraw').handlers.click();
  assert(get('withdrawalFeedback').textContent.includes('KRAKEN_WITHDRAW_KEY'),'Missing configuration is displayed inline');
  assert(html.includes('id="withdrawalFeedback" class="export-feedback withdraw-feedback hidden"'),'Uses the export feedback style');
- assert(!html.includes('<dialog'),'Withdrawal feedback must not open a dialog');
+ assert(html.includes('<dialog'),'Financial confirmation uses a styled dialog');
+ assert(!/\b(confirm|alert|prompt)\(/.test(script),'No browser dialogs remain');
  assert.equal(get('manualWithdraw').disabled,false,'Button is available after displaying feedback');
  assert.equal(requests.filter(u=>u==='/api/withdrawal/preview'||u==='/api/withdrawal/confirm').length,submissions,'Missing configuration cannot submit financial actions');
+
+ const lastBalance=get('quoteBalance').textContent;
+ scheduleFails=true;await vm.runInContext('refreshPurchaseSchedule()',context);
+ assert.equal(get('quoteBalance').textContent,lastBalance);
+ assert(get('scheduleFeedback').textContent.includes('Previous values'));
+ scheduleFails=false;
+ const lastRows=get('activities').children;
+ reportFails=true;await vm.runInContext('loadAnalytics()',context);
+ assert.equal(get('activities').children,lastRows,'Failed refresh preserves existing rows');
+ assert.equal(get('error').textContent,'Report offline');reportFails=false;
+ assert.equal(vm.runInContext('activityMoney(null,1,"EUR")',context),'—');
+ assert.equal(vm.runInContext('activityMoney("",1,"EUR")',context),'—');
+ assert.equal(vm.runInContext('activityMoney("0",1,"EUR")',context),'€0.00');
+ assert.equal(vm.runInContext('activityBtc(undefined)',context),'—');
+ get('pageSize').value='20';get('start').value='2026-10-01T00:00';get('end').value='2026-10-29T12:00';get('interval').value='';
+ vm.runInContext('saveReportView()',context);
+ get('pageSize').value='10';get('start').value='';get('end').value='';vm.runInContext('restoreReportView()',context);
+ assert.equal(get('pageSize').value,'20');assert.equal(get('start').value,'2026-10-01T00:00');
+ let decision=vm.runInContext('confirmWithdrawal({destination:"Example wallet",availableBtc:".01",feeBtc:".0001",netBtc:".0099"})',context);
+ assert(get('confirmationDialog').open);assert.equal(get('confirmGross').textContent,'0.01 BTC');assert.equal(get('confirmFee').textContent,'0.0001 BTC');assert.equal(get('confirmNet').textContent,'0.0099 BTC');
+ get('confirmationDialog').close('cancel');assert.equal(await decision,false);
+ decision=vm.runInContext('confirmWithdrawal({destination:"Example wallet",availableBtc:".01",feeBtc:null,netBtc:null})',context);
+ assert.equal(get('confirmFee').textContent,'Determined by the exchange');
+ expiryCallback();assert.equal(await decision,false,'Expired previews cannot confirm');
+ decision=vm.runInContext('confirmWithdrawal({destination:"Example wallet",availableBtc:".01"})',context);
+ get('confirmationDialog').close('confirm');assert.equal(await decision,true);
+ assert.equal(requests.filter(u=>u==='/api/withdrawal/confirm').length,0,'Dialog tests never submit a withdrawal');
+
+ const originalFetch=context.fetch;let release;
+ let hold=true;context.fetch=(url,options)=>{
+  if(hold&&url.startsWith('/api/analytics')){hold=false;return new Promise(resolve=>{release=()=>originalFetch(url,options).then(resolve)})}
+  return originalFetch(url,options);
+ };
+ invalidUsdRate=false;
+ const rowsBefore=get('activities').children;
+ const earlier=vm.runInContext('currentPage=1;loadAnalytics()',context);
+ assert.equal(get('activities').children,rowsBefore,'Loading keeps current rows');
+ assert.equal(get('reportFeedback').textContent,'Updating report…');
+ await vm.runInContext('currentPage=2;loadAnalytics()',context);
+ const latestRows=get('activities').children;release();await earlier;
+ assert.equal(get('activities').children,latestRows,'A late response cannot overwrite the newer report');
+ context.fetch=originalFetch;
+ withdrawalUnavailable=false;
+ const cancelAction=get('manualWithdraw').handlers.click();await settle();
+ assert(get('confirmationDialog').open,'Enabled manual withdrawal opens its confirmation dialog');
+ get('confirmationDialog').close('cancel');await cancelAction;
+ assert.equal(get('manualWithdraw').disabled,false);
+ assert.equal(requests.filter(u=>u==='/api/withdrawal/confirm').length,0,'Cancel never submits a withdrawal');
+ // Main panel state is restored and saved independently from report data.
+ const panel={open:true,getAttribute:()=>"configurationHeading",addEventListener(event,fn){this.toggle=fn}};
+ stored.set('bitcoinDcaPanels',JSON.stringify({configurationHeading:false}));
+ const savedDocument=context.document;context.document={querySelectorAll:()=>[panel]};
+ vm.runInContext(html.split('<script data-ui-view>')[1].split('</script>')[0],context);
+ assert.equal(panel.open,false);panel.open=true;panel.toggle();
+ assert.equal(JSON.parse(stored.get('bitcoinDcaPanels')).configurationHeading,true);
+ context.document=savedDocument;
  console.log('Dashboard regressions passed: interval dates, server pages, mixed-currency rows/totals and queued preview polling');
 })().catch(e=>{console.error(e);process.exit(1)});
