@@ -14,6 +14,8 @@ from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 LOG = logging.getLogger('bitcoin-dca.settings')
+CONFIG_PATH = Path('/webui-data/config.json')
+LEGACY_CONFIG_PATH = Path('/data/config.json')
 
 SECRET_FIELDS = tuple(f'{exchange}_api_{part}' for exchange in ('kraken', 'bitvavo') for part in ('key', 'secret'))
 DEFAULTS = dict(exchange='KRAKEN', quote='EUR', buy_amount='0', deposit_day=1,
@@ -115,15 +117,18 @@ def validate(values, previous=None, require_credentials=True):
 
 
 class ConfigStore:
-    def __init__(self, path='/data/config.json', environ=None):
-        self.path = Path(path)
+    def __init__(self, path=None, environ=None):
+        self.path = Path(path) if path is not None else CONFIG_PATH
         self.lock = threading.RLock()
         env = os.environ if environ is None else environ
         if self.path.exists():
-            os.chmod(self.path, 0o600)
-            self.data = json.loads(self.path.read_text())
-            self.data['settings'] = validate(self.data['settings'], require_credentials=self.data['complete'])
+            self.data = self._read(self.path)
             LOG.debug('Stored application configuration loaded; setup complete=%s', self.data['complete'])
+            return
+        if path is None and LEGACY_CONFIG_PATH.exists():
+            self.data = self._read(LEGACY_CONFIG_PATH)
+            self._write(self.data)
+            LOG.info('Application configuration migrated to the persistent web UI volume; dashboard account and settings retained')
             return
         values = dict(DEFAULTS)
         for key, env_name in ENV_NAMES.items():
@@ -138,6 +143,13 @@ class ConfigStore:
             self.data['account'] = dict(username=env.get('WEB_UI_USERNAME') or 'admin', password_hash=password_hash(password), password_change_required=len(password) < 12 or password == 'admin')
             self._write(self.data)
             LOG.info('Legacy environment configuration imported: exchange=%s; password change required=%s', self.data['settings']['exchange'], self.data['account']['password_change_required'])
+
+    @staticmethod
+    def _read(path):
+        os.chmod(path, 0o600)
+        data = json.loads(path.read_text())
+        data['settings'] = validate(data['settings'], require_credentials=data['complete'])
+        return data
 
     def _write(self, data):
         self.path.parent.mkdir(parents=True, exist_ok=True)

@@ -27,7 +27,7 @@ Open `http://<docker-host-ip>:6890`. The setup wizard first creates your usernam
 
 **Test connection** reads balances without trading; progress and results appear beside the button. API access and internet are required even for dry runs. Exchange, credential, currency and trading-mode changes are blocked while transactions remain unresolved.
 
-Settings persist in `./state/config.json`; passwords are hashed and API credentials stay private. Empty API fields keep saved credentials. Protect this file and backups; never commit credentials or `.env`. Existing saved configurations are retained.
+Settings persist as `config.json` in the named volume `bitcoin-dca-webui-data`; passwords are hashed and API credentials stay private. Empty API fields keep saved credentials. Protect this file and backups; never commit credentials or `.env`. Existing `./state/config.json` is copied there automatically on the first updated start. Reuse the same volume when redeploying to retain your login and settings.
 
 Compose manages only port, log level, volumes and restart policy. Optional `.env` overrides are `WEB_UI_PORT` (6890) and `LOG_LEVEL` (INFO). HTTP is unencrypted; use HTTPS on untrusted networks. See [Architecture and operation](docs/architecture.md) for migration and headless operation.
 

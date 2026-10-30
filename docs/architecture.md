@@ -25,7 +25,7 @@ The application source lives in `app/`; tests live in `tests/`. Docker copies `a
 
 - `Dockerfile` builds the image; `docker-compose.yml` configures runtime, port and storage.
 
-**Keep and back up both mounts:** `./state` holds private configuration, pending requests and scheduling state; `bitcoin-dca-webui-data` holds `activity.sqlite3`, FX cache and `dashboard.json`. Stop the bot for a consistent backup, or use a SQLite-aware backup. Legacy JSON activity is imported once; downgrading to a JSON-only release loses access to newer SQLite activity.
+**Keep and back up both mounts:** `./state` holds pending requests and scheduling state; `bitcoin-dca-webui-data` holds private `config.json`, `activity.sqlite3`, FX cache and `dashboard.json`. Stop the bot for a consistent backup, or use a SQLite-aware backup. Legacy JSON activity is imported once; downgrading to a JSON-only release loses access to newer SQLite activity.
 
 Back up both `./state` and `bitcoin-dca-webui-data`. After updating the source, run `docker compose up -d --build`. **Do not run `docker compose down -v`: it deletes the activity volume.**
 
@@ -58,7 +58,7 @@ Repeated waiting observations are DEBUG after their first state-change message. 
 
 ## Configuration and migration
 
-`/data/config.json` is written atomically with owner-only permissions. It contains the account name, a salted scrypt password hash and application settings, including API secrets. Protect this file and backups as credentials. The browser receives only masked credential-presence flags; leaving API fields empty keeps their values. Changing account credentials invalidates dashboard sessions. Restarting the container also invalidates sessions and withdrawal previews.
+`/webui-data/config.json` in the named `bitcoin-dca-webui-data` volume is written atomically with owner-only permissions. It contains the account name, a salted scrypt password hash and application settings, including API secrets. Protect this file and backups as credentials. The browser receives only masked credential-presence flags; leaving API fields empty keeps their values. Changing account credentials invalidates dashboard sessions. Restarting the container also invalidates sessions and withdrawal previews.
 
 A fresh installation opens account creation, then authenticated configuration. The first successful account creation closes anonymous registration. An incomplete setup cannot access account actions or reports. New settings default to dry run. The connection test reads balances only; it does not prove trading or withdrawal permission.
 
@@ -70,7 +70,7 @@ Automatic withdrawals, manual withdrawals and Parqet export have separate settin
 
 ### Environment-only operation
 
-With `WEB_UI_ENABLED=false`, the bot continues to use environment variables directly. Legacy names are `EXCHANGE`, `QUOTE_CURRENCY`, `BUY_AMOUNT`, `DEPOSIT_DAY`, `startup_delay_seconds`, `TIMEZONE`, `LIVE_TRADING`, `CHECK_INTERVAL_SECONDS`, `ORDER_STATUS_CHECK_SECONDS`, `WITHDRAWALS_ENABLED`, `WITHDRAW_THRESHOLD_QUOTE`, `KRAKEN_WITHDRAW_KEY`, `WITHDRAW_ADDRESS`, `WITHDRAW_NETWORK`, and each exchange’s `*_API_KEY` / `*_API_SECRET`. Dashboard deployments import these only when no saved configuration exists and legacy variables are explicitly passed (for example with the previous Compose file). The simplified Compose file no longer forwards credentials or bot settings. Retain an existing `state/config.json`, or migrate with the previous Compose configuration before removing legacy environment values.
+With `WEB_UI_ENABLED=false`, the bot continues to use environment variables directly. Legacy names are `EXCHANGE`, `QUOTE_CURRENCY`, `BUY_AMOUNT`, `DEPOSIT_DAY`, `startup_delay_seconds`, `TIMEZONE`, `LIVE_TRADING`, `CHECK_INTERVAL_SECONDS`, `ORDER_STATUS_CHECK_SECONDS`, `WITHDRAWALS_ENABLED`, `WITHDRAW_THRESHOLD_QUOTE`, `KRAKEN_WITHDRAW_KEY`, `WITHDRAW_ADDRESS`, `WITHDRAW_NETWORK`, and each exchange’s `*_API_KEY` / `*_API_SECRET`. Dashboard deployments import these only when no saved configuration exists and legacy variables are explicitly passed (for example with the previous Compose file). The simplified Compose file no longer forwards credentials or bot settings. An existing `/data/config.json` is copied atomically into `/webui-data/config.json` when the destination does not exist; the old file is retained. An existing volume configuration always takes precedence, and an unreadable configuration stops startup instead of silently restarting setup. Reuse the same named volume on redeployment. For environment-only legacy installations, migrate with the previous Compose configuration before removing legacy environment values.
 
 Setup and Settings log account creation, one-time environment import, configuration completion, changed field names, session invalidation, read-only connection tests and explicit dialog cancellations at INFO. Expected validation or pending-transaction rejections are INFO; exchange/network failures are WARNING and unexpected failures are ERROR. Stored configuration reads and sanitized failure locations are DEBUG. Passwords, API credential values, session/confirmation tokens and raw settings exception messages are never included in these logs.
 
