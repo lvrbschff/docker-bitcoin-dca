@@ -502,6 +502,9 @@ setInterval(renderPurchaseCountdown,1000);
 setInterval(refreshPurchaseSchedule,30000);
 
 function showError(message){$("error").textContent=message||"";$("error").classList.toggle("hidden",!message)}
+function logUiEvent(event){
+ fetch("/api/ui-events",{method:"POST",headers:{"Content-Type":"application/json","X-DCA-Action":"ui-event"},body:JSON.stringify({event}),keepalive:true}).catch(()=>{});
+}
 function sectionFeedback(id,message,error=false){const el=$(id);el.textContent=message;el.classList.toggle("hidden",!message);el.classList.toggle("is-error",error)}
 function readReportView(){try{return JSON.parse(localStorage.getItem("bitcoinDcaReportView")||"null")}catch(e){return null}}
 function saveReportView(){try{localStorage.setItem("bitcoinDcaReportView",JSON.stringify({interval:$("interval").value,start:$("start").value,end:$("end").value,pageSize:$("pageSize").value}))}catch(e){}}
@@ -529,7 +532,7 @@ function confirmWithdrawal(preview){
  dialog.returnValue="";$("acceptConfirmation").disabled=false;
  return new Promise(resolve=>{
   const timer=setTimeout(()=>{if(dialog.open)dialog.close("expired")},120000);
-  dialog.addEventListener("close",()=>{clearTimeout(timer);resolve(dialog.returnValue==="confirm")},{once:true});
+  dialog.addEventListener("close",()=>{clearTimeout(timer);logUiEvent(dialog.returnValue==="confirm"?"withdrawal_confirmed":dialog.returnValue==="expired"?"withdrawal_expired":"withdrawal_cancelled");resolve(dialog.returnValue==="confirm")},{once:true});
   dialog.showModal();
  });
 }
@@ -636,7 +639,7 @@ async function loadAnalytics(){
 }
 $("refresh").addEventListener("click",()=>{currentPage=1;loadAnalytics()});
 $("download").addEventListener("click",async()=>{
- const button=$("download"),message=$("exportMessage");
+ logUiEvent("export_clicked");\n const button=$("download"),message=$("exportMessage");
  message.textContent="";message.classList.add("hidden");
  button.disabled=true;button.textContent="Generating CSV…";
  try{
@@ -684,7 +687,7 @@ function showWithdrawalMessage(message,error=true){
  feedback.classList.toggle("success",!error);
 }
 $("manualWithdraw").addEventListener("click",async()=>{
- const button=$("manualWithdraw");button.disabled=true;\n $("withdrawalFeedback").textContent="";$("withdrawalFeedback").classList.add("hidden");
+ logUiEvent("withdrawal_clicked");\n const button=$("manualWithdraw");button.disabled=true;\n $("withdrawalFeedback").textContent="";$("withdrawalFeedback").classList.add("hidden");
  try{
  showWithdrawalMessage("Preparing withdrawal preview…",false);
  const configuration=await loadWithdrawalConfiguration();
@@ -952,6 +955,30 @@ class Handler(BaseHTTPRequestHandler):
             return
         if not self._require_authentication():
             return
+        if parsed.path == "/api/ui-events":
+            if self.headers.get("X-DCA-Action") != "ui-event" or self.headers.get("Content-Type") != "application/json":
+                self._json(403, {"error": "Invalid UI event"})
+                return
+            messages = {
+                "withdrawal_clicked": "Manual withdrawal button clicked",
+                "withdrawal_confirmed": "Manual withdrawal confirmed in dashboard; submission requested",
+                "withdrawal_cancelled": "Manual withdrawal cancelled in dashboard; no submission",
+                "withdrawal_expired": "Manual withdrawal confirmation expired; no submission",
+                "export_clicked": "Parqet CSV export button clicked",
+            }
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if not 0 < length <= 256:
+                    raise ValueError("Invalid UI event")
+                payload = json.loads(self.rfile.read(length).decode("utf-8"))
+                event = payload.get("event") if isinstance(payload, dict) else None
+                if not isinstance(event, str) or event not in messages:
+                    raise ValueError("Invalid UI event")
+                LOG.info(messages[event])
+                self._json(200, {"logged": True})
+            except (ValueError, UnicodeDecodeError):
+                self._json(400, {"error": "Invalid UI event"})
+            return
         if parsed.path in ("/api/withdrawal/preview", "/api/withdrawal/confirm"):
             # A custom header plus JSON prevents cross-origin form submissions.
             if self.headers.get("X-DCA-Action") != "withdrawal" or self.headers.get("Content-Type") != "application/json":
@@ -969,6 +996,7 @@ class Handler(BaseHTTPRequestHandler):
                 if parsed.path.endswith("/confirm") and not isinstance(token, str):
                     raise ValueError("Confirmation token is required")
                 result = self.withdrawal_service("preview" if parsed.path.endswith("/preview") else "confirm", session, token)
+                LOG.info("Manual withdrawal %s request accepted", "confirmation" if parsed.path.endswith("/confirm") else "preview")
                 self._json(202 if "jobId" in result else 200, result)
             except (ValueError, UnicodeDecodeError) as exc:
                 self._json(400, {"error": str(exc)})
@@ -1088,6 +1116,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, withdrawals)
                 return
             if parsed.path in ("/api/analytics", "/api/export.csv"):
+                if parsed.path == "/api/export.csv":
+                    LOG.info("Parqet CSV export requested")
                 start_ms, end_ms = _period(query)
                 if parsed.path == "/api/export.csv":
                     selected_records=parqet_interval_records(start_ms,end_ms)
@@ -1112,7 +1142,9 @@ class Handler(BaseHTTPRequestHandler):
                             "and one bot-recorded BTC withdrawal."
                         )
                     filename = "parqet_btc_" + str(start_ms) + "_" + str(end_ms) + ".csv"
-                    self._send(200, parqet_csv(rows), "text/csv; charset=utf-8", filename)
+                    csv_data = parqet_csv(rows)
+                    self._send(200, csv_data, "text/csv; charset=utf-8", filename)
+                    LOG.info("Parqet CSV export response sent: rows=%s; selected period=%s..%s", len(rows), start_ms, end_ms)
                 else:
                     page=int(query.get('page',['1'])[0]);limit=int(query.get('limit',['10'])[0])
                     page_records,total,page,totals,balance=read_report(start_ms,end_ms,page,limit)
@@ -1126,8 +1158,12 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._json(404, {"error": "Not found"})
         except ValueError as exc:
+            if parsed.path == "/api/export.csv":
+                LOG.info("Parqet CSV export rejected: %s", exc)
             self._json(400, {"error": str(exc)})
         except Exception as exc:
+            if parsed.path == "/api/export.csv":
+                LOG.info("Parqet CSV export failed: %s", type(exc).__name__)
             LOG.exception("Web UI request failed")
             self._json(502, {"error": "Stored bot activity could not be loaded. Check the container logs."})
 
