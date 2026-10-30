@@ -113,7 +113,7 @@ Import using [Parqet’s CSV importer](https://faq.parqet.com/de/articles/870989
 
 Back up both `./state` and `bitcoin-dca-webui-data`. After updating the source, run `docker compose up -d --build`. **Do not run `docker compose down -v`: it deletes the activity volume.**
 
-See [Architecture and operation](docs/architecture.md) for components, storage, health checks, logs and image publishing.
+See [Architecture and operation](docs/architecture.md) for components, storage, health checks, logs and image publishing. Release history is in the [Changelog](docs/CHANGELOG.md).
 
 ## Limitations
 
