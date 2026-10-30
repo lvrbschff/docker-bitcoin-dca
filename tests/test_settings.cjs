@@ -19,26 +19,29 @@ vm.runInNewContext(script,context);
 async function event(id,name='click'){return elements[id].listeners[name]({preventDefault(){},submitter:elements[id]})}
 (async()=>{
  assert.equal(elements.kraken_api_key.value,'');assert.equal(elements.kraken_api_key.placeholder,'Saved · leave empty to keep');
+ assert.equal(elements.timezone.value,'Europe/Berlin');assert.equal(elements.timezone.tag,'select');assert.equal(elements.timezone.children.length,6);
+ assert(elements.timezone.children.some(group=>group.children.some(option=>option.value==='Asia/Tokyo')));
  assert.equal(elements.settingsForm.hidden,false);assert.equal(elements.accountPanel.hidden,true);
  elements.exchange.value='BITVAVO';await event('exchange','change');assert.equal(elements.quote.value,'EUR');assert.equal(elements.quote.options[1].disabled,true);assert.equal(elements.kraken_api_key.parentElement.hidden,true);
  elements.bitvavo_api_key.value='fictional-key';elements.bitvavo_api_secret.value='fictional-secret';
  const testing=event('testConnection');assert.equal(elements.connectionStatus.textContent,'Testing connection…');assert.equal(elements.testConnection.disabled,true);await testing;assert.equal(requests.at(-1).url,'/api/settings/test');assert.equal(requests.at(-1).body.bitvavo_api_key,'fictional-key');assert.equal(elements.connectionStatus.textContent,'Connected');
- const count=requests.length;elements.display_currency.value='USD';elements.withdrawals_enabled.checked=true;elements.withdraw_threshold.value='1200';
+ const count=requests.length;elements.display_currency.value='USD';elements.timezone.value='Asia/Tokyo';elements.withdrawals_enabled.checked=true;elements.withdraw_threshold.value='1200';
  await event('settingsForm','submit');assert.equal(elements.review.open,true);assert.equal(requests.length,count,'Review must not save yet');
  const text=elements.reviewValues.children.map(x=>x.textContent).join(' ');assert.match(text,/LIVE|Dry run/);assert.match(text,/1200 EUR/);
  await event('cancel');assert.equal(elements.review.open,false);await event('confirm');assert.equal(requests.filter(r=>r.url==='/api/settings').length,0,'Cancelled review must not submit');assert.equal(requests.at(-1).body.event,'settings_save_cancelled');
- await event('settingsForm','submit');await event('confirm');assert.equal(requests.at(-1).url,'/api/settings');assert.equal(requests.at(-1).body.settings.withdrawals_enabled,true);assert.equal(requests.at(-1).body.settings.display_currency,'USD');
+ await event('settingsForm','submit');await event('confirm');assert.equal(requests.at(-1).url,'/api/settings');assert.equal(requests.at(-1).body.settings.withdrawals_enabled,true);assert.equal(requests.at(-1).body.settings.display_currency,'USD');assert.equal(requests.at(-1).body.settings.timezone,'Asia/Tokyo');
  elements.password.value='new-long-password';elements.passwordConfirm.value='different';const before=requests.length;await event('settingsForm','submit');assert.equal(requests.length,before);assert.match(elements.status.textContent,/do not match/);
  reject=true;await event('testConnection');assert.equal(elements.testConnection.disabled,false);assert.equal(elements.connectionStatus.textContent,'Connection failed');
  console.log('Settings UI passed: credentials, exchange fields, read-only test, review/cancel/save and validation');
 })().catch(error=>{console.error(error);process.exitCode=1});
 
 // Step two uses the actual server-rendered page without Dashboard Credentials.
-const setupPage=execFileSync('python3',['-c',`import sys;from types import SimpleNamespace;sys.path.insert(0,'app');from configuration import DEFAULTS;from settings_ui import settings_page;print(settings_page(SimpleNamespace(public=lambda:dict(settings=DEFAULTS,username='operator',complete=False,passwordChangeRequired=False))))`],{cwd:root,encoding:'utf8'});
+const setupPage=execFileSync('python3',['-c',`import sys;from types import SimpleNamespace;sys.path.insert(0,'app');from configuration import DEFAULTS;from settings_ui import settings_page;print(settings_page(SimpleNamespace(public=lambda:dict(settings={**DEFAULTS,'timezone':'Pacific/Chatham'},username='operator',complete=False,passwordChangeRequired=False))))`],{cwd:root,encoding:'utf8'});
 const setupElements={};
 class SetupElement extends Element{append(...children){for(const child of children){child.parentElement=this;this.children.push(child);if(child.id)setupElements[child.id]=child}}}
 for(const match of setupPage.matchAll(/<(\w+)\b([^>]*\bid="([^"]+)"[^>]*)>/g)){const el=new SetupElement(match[1]);el.id=match[3];el.type=(match[2].match(/type="([^"]+)"/)||[])[1]||'';if(match[2].includes('data-setting'))el.dataset.setting='';setupElements[el.id]=el}
 const setupRequests=[];vm.runInNewContext(setupPage.match(/<script>([\s\S]*?)<\/script>/)[1],{document:{getElementById:id=>setupElements[id],createElement:tag=>new SetupElement(tag),querySelectorAll:()=>Object.values(setupElements).filter(el=>'setting'in el.dataset)},location:{href:''},fetch:async(url,options)=>{setupRequests.push({url,body:JSON.parse(options.body)});return {ok:true,json:async()=>({})}}});
+assert.equal(setupElements.timezone.value,'Pacific/Chatham');assert.equal(setupElements.timezone.children.at(-1).value,'Pacific/Chatham');
 assert.equal(setupElements.dashboardCredentials,undefined);assert.equal(setupElements.username,undefined);
 setupElements.settingsForm.listeners.submit({preventDefault(){}});assert.equal(setupElements.review.open,true);
 assert.equal(setupRequests.length,0,'Step two reviews settings without editing account credentials');
