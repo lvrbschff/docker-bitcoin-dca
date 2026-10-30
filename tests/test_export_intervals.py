@@ -27,7 +27,7 @@ def stamp(day):return int(datetime.fromisoformat(f'2026-10-{day:02d}T12:00:00+00
 class ExportIntervals(unittest.TestCase):
     def setUp(self):
         temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup)
-        for name,value in [('ACTIVITY_PATH',Path(temp.name)/'activity.json'),('LEGACY_ACTIVITY_PATHS',())]:
+        for name,value in [('ACTIVITY_PATH',Path(temp.name)/'activity.json')]:
             p=patch.object(activity,name,value);p.start();self.addCleanup(p.stop)
         self.records=[record('old-buy',1),record('previous',5,'TransferOut'),
                       record('buy-one',6),record('buy-two',8,amount='160'),

@@ -21,7 +21,7 @@ class LoggingLevelTests(TestCase):
 
     def test_worker_network_failures_warn_but_programming_failures_have_error_trace(self):
         for error,level,trace in [(requests.ReadTimeout('offline'),logging.WARNING,False),(RuntimeError('bug'),logging.ERROR,True)]:
-            w=worker.Worker(None,None,lambda:None,300,0)
+            w=worker.Worker(None,None,300)
             def cycle():w.stop.set();raise error
             w.cycle=cycle
             with patch.object(worker,'write_json_atomic'):

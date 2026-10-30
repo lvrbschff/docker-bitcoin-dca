@@ -62,3 +62,19 @@ class StorageTests(TestCase):
         self.assertEqual(runtime.STATE_PATH,bot.STATE_PATH)
         self.assertEqual(worker.HEALTH_PATH,Path('/webui-data/worker-health.json'))
         self.assertEqual(healthcheck.healthy.__defaults__[0],worker.HEALTH_PATH)
+
+
+class AtomicFileTests(TestCase):
+    def test_atomic_writers_are_shared_private_and_preserve_previous_data_on_error(self):
+        import activity
+        import configuration
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'nested'/'data.json'
+            self.assertIs(activity.write_json_atomic,storage.write_json_atomic)
+            self.assertIs(configuration.write_json_atomic,storage.write_json_atomic)
+            storage.write_json_atomic(path,{'value':'€'})
+            self.assertEqual(path.stat().st_mode & 0o777,0o600)
+            with patch.object(storage.os,'replace',side_effect=OSError('full disk')):
+                with self.assertRaises(OSError):storage.write_json_atomic(path,{'value':'new'})
+            self.assertEqual(json.loads(path.read_text()),{'value':'€'})
+            self.assertEqual([p.name for p in path.parent.iterdir()],['data.json'])

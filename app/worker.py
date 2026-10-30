@@ -15,15 +15,12 @@ HEARTBEAT_WRITE_INTERVAL_SECONDS=300
 
 
 class Worker:
-    def __init__(self, cycle, action, startup, interval, startup_delay, on_error=None):
-        self.on_error=on_error
+    def __init__(self, cycle, action, interval):
         self.last_error=None
         self.last_success=None
         self.cycle=cycle
         self.action=action
-        self.startup=startup
         self.interval=interval
-        self.startup_delay=startup_delay
         self.queue=queue.Queue(maxsize=16)
         self.jobs={}
         self.lock=threading.RLock()
@@ -71,8 +68,7 @@ class Worker:
 
     def run(self):
         self.running=True
-        due=time.monotonic()+self.startup_delay
-        started=False
+        due=time.monotonic()
         try:
             while not self.stop.is_set():
                 self.heartbeat()
@@ -83,9 +79,6 @@ class Worker:
                 except queue.Empty:
                     if time.monotonic()<due: continue
                     try:
-                        if not started:
-                            self.startup()
-                            started=True
                         wait=self.cycle()
                         self.last_error=None
                         self.last_success=time.time()
@@ -97,9 +90,6 @@ class Worker:
                             LOG.debug('Account check network failure', exc_info=True)
                         else:
                             LOG.exception('Account check failed; worker will retry.')
-                        if self.on_error:
-                            try:self.on_error()
-                            except Exception:LOG.exception('Could not update account-error status.')
                         due=time.monotonic()+self.interval
                     continue
                 with self.lock:self.jobs[job_id]['state']='running'
@@ -117,7 +107,8 @@ class Worker:
                         LOG.debug('Manual account network failure', exc_info=True)
                     else:
                         LOG.exception('Manual account request failed unexpectedly')
-                    with self.lock:self.jobs[job_id].update(state='failed',error=str(exc))
+                    message = str(exc) if isinstance(exc, (ValueError, UncertainWithdrawalError)) else 'Account request failed. Check the container logs and exchange status before trying again.'
+                    with self.lock:self.jobs[job_id].update(state='failed',error=message)
                 finally:
                     self.queue.task_done()
                     self.heartbeat()

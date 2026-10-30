@@ -130,10 +130,24 @@ class Bitvavo:
         return self.request("POST", "/order", body=body, private=True)
 
     def btc_withdrawals(self, start_ms=0, end_ms=None):
-        params = {"symbol": "BTC", "start": start_ms, "limit": 1000}
-        if end_ms is not None:
-            params["end"] = end_ms
-        return self.request("GET", "/withdrawalHistory", params=params, private=True)
+        # Split saturated time windows so equal timestamps are never skipped.
+        windows = [(int(start_ms), int(end_ms) if end_ms is not None else int(time.time() * 1000))]
+        result = []
+        for _ in range(100):
+            if not windows: return result
+            start, end = windows.pop()
+            rows = self.request('GET', '/withdrawalHistory', params={
+                'symbol': 'BTC', 'start': start, 'end': end, 'limit': 1000}, private=True)
+            if not isinstance(rows, list) or any(not isinstance(item, dict) for item in rows):
+                raise ValueError('Bitvavo withdrawal history could not be verified.')
+            if len(rows) < 1000:
+                result.extend(rows)
+                continue
+            if start >= end:
+                raise ValueError('Bitvavo withdrawal history exceeds the limit at one timestamp.')
+            middle = (start + end) // 2
+            windows.extend([(start, middle), (middle + 1, end)])
+        raise ValueError('Bitvavo withdrawal-history page limit reached.')
 
     def open_orders(self):
         result = self.request('GET', '/ordersOpen', private=True)

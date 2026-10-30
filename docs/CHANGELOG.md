@@ -4,6 +4,14 @@ Release history based on the published [GitHub Releases](https://github.com/oli7
 
 ## Unreleased
 
+- Bounded concurrent HTTPS requests and rechecked sessions before queued manual withdrawals execute.
+- Followed paginated withdrawal histories and rejected incomplete or stalled responses safely.
+- Shared private atomic JSON writes, restricted ledger permissions and reused exchange connections for cosmetic settings changes.
+- Excluded failed foreign-currency withdrawals from monetary currency grouping.
+- Removed redundant worker startup hooks, unused legacy path placeholders and an unreachable balance branch.
+- Consolidated small Python suites by domain and added regression checks before container publishing.
+- Shortened forecast and manual-withdrawal notes and removed cancellation feedback from the notes.
+
 - Persisted the expected monthly deposit in the named volume, starting empty without importing browser values.
 - Vertically aligned header buttons with the dashboard title.
 

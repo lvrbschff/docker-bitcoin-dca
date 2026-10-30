@@ -24,15 +24,14 @@ class BitcoinOnlyTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.directory = Path(temporary.name)
         for name, value in [('ACTIVITY_PATH', self.directory / 'activity.json'),
-                            ('SNAPSHOT_PATH', self.directory / 'dashboard.json'),
-                            ('LEGACY_ACTIVITY_PATHS', ()), ('LEGACY_SNAPSHOT_PATHS', ())]:
+                            ('SNAPSHOT_PATH', self.directory / 'dashboard.json')]:
             replacement = patch.object(activity, name, value)
             replacement.start()
             self.addCleanup(replacement.stop)
         self.settings = {'exchange': 'KRAKEN', 'quote': 'EUR', 'live': True,
                          'timezone': 'Europe/Berlin', 'deposit_day': 1,
                          'buy_amount': Decimal('0'), 'withdrawals_enabled': False,
-                         'withdraw_threshold': Decimal('1000'), 'first_purchase_done': False,
+                         'withdraw_threshold': Decimal('1000'), 
                          'startup_delay_seconds': 0, 'order_status_check_seconds': 30}
 
     @staticmethod

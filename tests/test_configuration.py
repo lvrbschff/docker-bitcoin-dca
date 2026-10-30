@@ -1,13 +1,10 @@
 """Configuration lifecycle and financial guards, without live exchange requests."""
-import copy
-import http.client
 import io
 import json
 import os
 import logging
 import requests
 import tempfile
-import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -30,8 +27,8 @@ class ConfigurationTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.store = config.ConfigStore(self.root / 'config.json')
-        for name, value in [('ACTIVITY_PATH', self.root / 'activity.json'), ('LEGACY_ACTIVITY_PATHS', ()),
-                            ('SNAPSHOT_PATH', self.root / 'dashboard.json'), ('LEGACY_SNAPSHOT_PATHS', ())]:
+        for name, value in [('ACTIVITY_PATH', self.root / 'activity.json'),
+                            ('SNAPSHOT_PATH', self.root / 'dashboard.json')]:
             p = patch.object(activity, name, value)
             p.start(); self.addCleanup(p.stop)
         self.factory = patch.object(runtime, 'create_exchange', side_effect=lambda settings: Mock(open_orders=Mock(return_value=[]), btc_withdrawals=Mock(return_value=[])))
@@ -43,6 +40,19 @@ class ConfigurationTests(unittest.TestCase):
         self.account()
         self.app.save({'current_password':PASSWORD,'settings': {**CREDENTIALS, **settings}})
         self.app.worker.reconfigure.clear()
+
+    def test_cosmetic_save_reuses_adapter_and_validation_failure_closes_replacement(self):
+        self.ready()
+        old=self.app.api
+        with patch.object(runtime,'create_exchange') as factory:
+            self.app.save({'settings':{'display_currency':'USD'}})
+            factory.assert_not_called();old.session.close.assert_not_called()
+        replacement=Mock();replacement.validate_withdrawal_settings.side_effect=ValueError('invalid target')
+        with patch.object(runtime,'create_exchange',return_value=replacement):
+            with self.assertRaises(ValueError):
+                self.app.save({'settings':{'kraken_withdraw_key':'other','withdrawals_enabled':True},'current_password':PASSWORD})
+        replacement.session.close.assert_called_once();old.session.close.assert_not_called()
+        self.assertIs(self.app.api,old)
 
     def test_no_default_account_or_exchange_calls_before_configuration(self):
         self.assertIsNone(self.store.snapshot()['account'])
@@ -310,7 +320,7 @@ class ConfigurationTests(unittest.TestCase):
             self.app.api.open_orders.side_effect=requests.ReadTimeout('offline')
             with self.assertRaises(requests.ReadTimeout):self.app.cycle()
             self.app.api.open_orders.side_effect=None
-            for response in [None,[{}],[{'status':'unknown'}],[{'status':'completed'}]*500]:
+            for response in [None,[{}],[{'status':'unknown'}]]:
                 self.app.api.btc_withdrawals.return_value=response
                 try:self.app.cycle()
                 except ValueError:pass

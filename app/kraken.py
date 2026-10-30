@@ -278,34 +278,31 @@ class Kraken:
             "limit": 500,
             "cursor": "true",
         }
-        result = self.private("WithdrawStatus", params)
-        if isinstance(result, dict):
-            # Kraken's paginated response may be wrapped instead of returned as
-            # the plain list shown in the legacy endpoint examples.
-            rows = next(
-                (result[key] for key in ("withdrawals", "items", "data", "results")
-                 if isinstance(result.get(key), list)),
-                None,
-            )
-            if rows is None and result and all(
-                isinstance(value, dict) and "status" in value and "time" in value
-                for value in result.values()
-            ):
-                rows = list(result.values())
-            if rows is None and not result:
-                rows = []
-            if rows is None:
-                keys = ", ".join(sorted(result.keys())[:10])
-                raise KrakenAPIError(
-                    f"Unexpected Kraken withdrawal-history response object "
-                    f"(keys: {keys or 'none'})"
-                )
-            result = rows
-        if not isinstance(result, list):
-            raise KrakenAPIError(
-                f"Unexpected Kraken withdrawal-history response type: "
-                f"{type(result).__name__}"
-            )
+        result = []
+        cursors = set()
+        for _ in range(100):
+            page = self.private("WithdrawStatus", dict(params))
+            cursor = page.get('cursor') if isinstance(page, dict) else None
+            rows = page
+            if isinstance(page, dict):
+                rows = next((page[key] for key in ('withdrawals', 'items', 'data', 'results')
+                             if isinstance(page.get(key), list)), None)
+                if rows is None and page and all(isinstance(value, dict) and 'status' in value and 'time' in value for value in page.values()):
+                    rows = list(page.values())
+                if not page: rows = []
+            if not isinstance(rows, list) or any(not isinstance(item, dict) for item in rows):
+                raise KrakenAPIError('Unexpected Kraken withdrawal-history response')
+            result.extend(rows)
+            if not cursor:
+                if len(rows) >= params['limit'] and not (isinstance(page, dict) and 'cursor' in page):
+                    raise KrakenAPIError('Complete Kraken withdrawal history could not be verified: missing cursor')
+                break
+            if not isinstance(cursor, str) or cursor in cursors:
+                raise KrakenAPIError('Kraken withdrawal-history cursor did not advance')
+            cursors.add(cursor)
+            params['cursor'] = cursor
+        else:
+            raise KrakenAPIError('Kraken withdrawal-history page limit reached')
         withdrawals = []
         for item in result:
             status = str(item.get("status", "")).lower()

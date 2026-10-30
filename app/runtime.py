@@ -22,11 +22,12 @@ class Runtime:
         self.settings = runtime_settings(self.store.snapshot()['settings'])
         self.api = None
         self.service = None
+        self.session_validator = lambda token: False
         self.password_attempts = AttemptLimiter(capacity=1)
         self.startup_pending = True
         self.exchange_check_pending = True
         self.ready_at = time.monotonic() + self.settings['startup_delay_seconds']
-        self.worker = Worker(self.cycle, self.action, lambda: None, self.settings['check_interval_seconds'], 0)
+        self.worker = Worker(self.cycle, self.action, self.settings['check_interval_seconds'])
         if self.store.snapshot()['complete']:
             self.api = create_exchange(self.settings)
             self._synchronize_state()
@@ -41,8 +42,7 @@ class Runtime:
         if not isinstance(orders, list):
             raise ValueError('Open exchange orders could not be verified.')
         transfers = self.api.btc_withdrawals(0, int(time.time() * 1000))
-        limit = 500 if self.settings['exchange'] == 'KRAKEN' else 1000
-        if not isinstance(transfers, list) or len(transfers) >= limit:
+        if not isinstance(transfers, list):
             raise ValueError('Complete withdrawal status could not be verified.')
         terminal = {'completed', 'success', 'failed', 'failure', 'canceled', 'cancelled'}
         pending = any(not isinstance(item, dict) or str(item.get('status', '')).lower() not in terminal for item in transfers)
@@ -114,6 +114,8 @@ class Runtime:
                 raise ValueError('Waiting for the automatic exchange check and any open orders or withdrawals to close.')
             if self.store.snapshot()['account'].get('password_change_required'):
                 raise ValueError('Change your initial dashboard password in Settings first.')
+            if not self.session_validator(session):
+                raise ValueError("Your session expired. Sign in again before requesting a withdrawal.")
             if not self.service:
                 self.service = manual_withdrawal_service(self.api, self.settings)
             return self.service(action, session, token)
@@ -155,13 +157,14 @@ class Runtime:
                 LOG.info('Settings update blocked: unresolved transactions or queued account actions; configuration unchanged')
                 raise ValueError('Resolve pending orders, withdrawals and queued requests before changing exchange, credentials, currency or trading mode.')
             settings = runtime_settings(values)
-            adapter = create_exchange(settings)
-            if values['withdrawals_enabled']:
-                adapter.validate_withdrawal_settings(settings)
+            adapter_changed = self.api is None or identity_changed or values['kraken_withdraw_key'] != previous['settings']['kraken_withdraw_key']
+            adapter = create_exchange(settings) if adapter_changed else self.api
             try:
+                if values['withdrawals_enabled']:
+                    adapter.validate_withdrawal_settings(settings)
                 self.store.commit(values, account)
             except Exception:
-                if hasattr(adapter, 'session'): adapter.session.close()
+                if adapter_changed and hasattr(adapter, 'session'): adapter.session.close()
                 raise
             # A shared mapping keeps existing HTTP handlers up to date. Preserve running
             # scheduling metadata for cosmetic feature toggles and account edits.
@@ -170,7 +173,7 @@ class Runtime:
             self.settings.update(settings)
             old_api = self.api
             self.api = adapter
-            if old_api and hasattr(old_api, 'session'): old_api.session.close()
+            if adapter_changed and old_api and hasattr(old_api, 'session'): old_api.session.close()
             self.service = None  # Invalidate all previews after any configuration change.
             self.worker.interval = values['check_interval_seconds']
             if identity_changed:

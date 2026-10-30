@@ -18,12 +18,15 @@ def _read(path):
     return data
 
 
-def _write(path, data):
+def write_json_atomic(path, data):
+    """Replace a JSON file durably without exposing partial or public data."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary = tempfile.mkstemp(prefix='.storage-', dir=path.parent)
     try:
-        with os.fdopen(descriptor, 'w') as stream:
+        with os.fdopen(descriptor, 'w', encoding='utf-8') as stream:
             os.fchmod(stream.fileno(), 0o600)
-            json.dump(data, stream, indent=2)
+            json.dump(data, stream, ensure_ascii=False, indent=2)
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
@@ -41,13 +44,14 @@ def prepare_storage(data_dir=None):
     state = destination / 'state.json'
     if state.exists():
         _read(state)
+        os.chmod(state, 0o600)
         return
     configuration = destination / 'config.json'
     saved = _read(configuration) if configuration.exists() else {}
     has_history = (destination / 'activity.sqlite3').exists() or (destination / 'activity.json').exists()
     if saved.get('complete') or has_history:
-        _write(state, {})
+        write_json_atomic(state, {})
         LOG.warning('Scheduling state is missing; initialized empty state. Automatic exchange checks must pass before new transactions.')
         return
-    _write(state, {})
+    write_json_atomic(state, {})
     LOG.info('Persistent storage initialized in the named web UI volume')

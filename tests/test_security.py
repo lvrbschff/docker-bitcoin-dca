@@ -186,3 +186,36 @@ class HandshakeFailureTests(unittest.TestCase):
             try:raise RuntimeError('internal failure')
             except RuntimeError:server.handle_error(request,peer)
         fallback.assert_called_once_with(request,peer)
+
+
+class ConnectionLimitTests(unittest.TestCase):
+    def test_saturated_server_closes_connections_and_releases_slots_on_failure(self):
+        import threading
+        server=object.__new__(tls.HTTPSWebServer)
+        server._connections=threading.BoundedSemaphore(1)
+        server.shutdown_request=Mock()
+        request=Mock();peer=('192.0.2.1',1234)
+        with patch.object(tls.ThreadingHTTPServer,'process_request') as dispatch:
+            server.process_request(request,peer)
+            dispatch.assert_called_once()
+            server.process_request(request,peer)
+            server.shutdown_request.assert_called_once_with(request)
+        with patch.object(tls.ThreadingHTTPServer,'process_request_thread',side_effect=RuntimeError('handler failed')):
+            with self.assertRaises(RuntimeError):server.process_request_thread(request,peer)
+        with patch.object(tls.ThreadingHTTPServer,'process_request',side_effect=RuntimeError('thread failed')):
+            with self.assertRaises(RuntimeError):server.process_request(request,peer)
+        self.assertTrue(server._connections.acquire(blocking=False))
+
+    def test_queued_withdrawal_rechecks_session_before_accessing_exchange(self):
+        app=object.__new__(runtime.Runtime)
+        import threading
+        app.lock=threading.RLock();app.api=Mock();app.settings={'manual_withdrawal_enabled':True}
+        app.exchange_check_pending=False;app.store=Mock();app.store.snapshot.return_value={'account':{}}
+        app.service=Mock(return_value={'ok':True});app.session_validator=web_ui.session_is_valid
+        with patch.object(web_ui,'_SESSIONS',{'active':200,'expired':99}),patch.object(web_ui.time,'monotonic',return_value=100):
+            for token in ('expired','logged-out'):
+                with self.subTest(token=token),self.assertRaisesRegex(ValueError,'session expired'):
+                    app.action('confirm',token,'preview')
+            app.service.assert_not_called()
+            self.assertEqual(app.action('confirm','active','preview'),{'ok':True})
+            app.service.assert_called_once_with('confirm','active','preview')

@@ -1,5 +1,4 @@
 """Offline regression tests for Kraken connection recovery and balance scope."""
-import os
 import tempfile
 import unittest
 from decimal import Decimal
@@ -166,11 +165,10 @@ class KrakenTransportTests(unittest.TestCase):
         self.api.estimate_taker_fee = Mock(return_value=Decimal('.02'))
         settings = {'exchange': 'KRAKEN', 'quote': 'EUR', 'live': False, 'timezone': 'Europe/Berlin',
                     'deposit_day': 1, 'buy_amount': Decimal(0), 'withdrawals_enabled': False,
-                    'withdraw_threshold': Decimal('1000'), 'first_purchase_done': False,
+                    'withdraw_threshold': Decimal('1000'), 
                     'startup_delay_seconds': 0, 'order_status_check_seconds': 30}
         with tempfile.TemporaryDirectory() as directory, \
                 patch.object(activity, 'ACTIVITY_PATH', Path(directory) / 'activity.json'), \
-                patch.object(activity, 'LEGACY_ACTIVITY_PATHS', ()), \
                 patch.object(bot, 'read_state', return_value={}), patch.object(bot, 'save_state'), \
                 patch.object(bot, 'update_dashboard_snapshot'), patch.object(bot, 'update_dashboard_schedule'):
             bot.run_once(self.api, settings, 300)

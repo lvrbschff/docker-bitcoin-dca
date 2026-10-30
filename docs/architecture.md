@@ -33,7 +33,7 @@ View recent logs with `docker compose logs --tail=200`. INFO logs show schedule 
 
 Docker checks health every five minutes; the saved heartbeat must be running and less than 15 minutes old. A supervisor exits the process if the worker stops or stalls for ten minutes, allowing `restart: unless-stopped` to restart it. Docker’s unhealthy status alone does not restart a container. Health monitors worker responsiveness, not exchange availability or trading success.
 
-The [publish workflow](../.github/workflows/publish.yml) builds GHCR images on main pushes, version tags and manual runs; it does not run the test suite. Credentials belong on the Docker host and are not included in the image.
+The [publish workflow](../.github/workflows/publish.yml) builds GHCR images on main pushes, version tags and manual runs; it runs the Python and JavaScript regression suites before publishing. Credentials belong on the Docker host and are not included in the image.
 
 
 ## Development checks
@@ -62,7 +62,7 @@ Repeated waiting observations are DEBUG after their first state-change message. 
 
 A fresh installation opens account creation, then authenticated configuration. The first successful account creation closes anonymous registration. An incomplete setup cannot access account actions or reports. New settings default to dry run. The connection test reads balances only; it does not prove trading or withdrawal permission.
 
-The web UI always runs. All bot settings, exchange credentials and dashboard login credentials come exclusively from the saved web configuration. Without it, first-run setup is required and exchange actions remain paused; environment variables cannot skip setup or override saved trading settings. Only `WEB_UI_PORT` and `LOG_LEVEL` remain Docker deployment parameters. Display currency is saved with the application settings. Existing configuration files gain EUR as the default display currency without changing credentials.
+The web UI always runs. All bot settings, exchange credentials and dashboard login credentials come exclusively from the saved web configuration. Without it, first-run setup is required and exchange actions remain paused; environment variables cannot skip setup or override saved trading settings. Only `WEB_UI_PORT`, `WEB_UI_TLS_HOSTS` and `LOG_LEVEL` remain Docker deployment parameters. Display currency is saved with the application settings. Existing configuration files gain EUR as the default display currency without changing credentials.
 
 Runtime edits and financial actions are serialized. Changes to exchange, currency, credentials or live mode are rejected while persistent transactions or queued actions are unresolved. Exchange/currency and dry-run/live switches archive resolved scheduling state, reset the account snapshot and select purchase history for the active exchange; activity records keep their original exchange. Settings affecting scheduling request a fresh check; toggling presentation/export features does not change the existing account-check deadline. Manual withdrawal previews and submissions do not recalculate purchase intervals.
 
@@ -81,7 +81,7 @@ Only executed live fills are stored as buys; these display Confirmed. Simulation
 
 After setup, restart, or exchange/credential/trading-mode changes, the worker reads open account orders and BTC withdrawal status before allowing new transactions. Open or unverifiable outcomes keep purchases and withdrawals paused; checks retry at the account-check interval. HTTP polling and manual withdrawal clicks do not trigger these checks. The configured startup delay still applies.
 
-Missing scheduling state is initialized without resetting saved configuration or activity. Recorded purchases anchor the rebuilt schedule; existing pending requests retain their normal reconciliation. Lost request identifiers and unrecorded executions cannot be reconstructed from this check; restore a consistent volume backup when historical data is missing. No host migration or manual recovery menu is used. A full withdrawal-history response reaching the exchange response limit is treated as unverifiable rather than assumed complete.
+Missing scheduling state is initialized without resetting saved configuration or activity. Recorded purchases anchor the rebuilt schedule; existing pending requests retain their normal reconciliation. Lost request identifiers and unrecorded executions cannot be reconstructed from this check; restore a consistent volume backup when historical data is missing. No host migration or manual recovery menu is used. Withdrawal history is paginated with a bounded request count. Missing or repeated Kraken cursors, saturated Bitvavo timestamp windows and exhausted page limits keep the startup gate closed.
 
 ## HTTPS and session security
 
@@ -102,3 +102,13 @@ Session cookies use `Secure`, `HttpOnly` and `SameSite=Strict`, with a fixed 30-
 If a client reports `certificate unknown`, it rejected the certificate before an HTTP request was sent. Trust the current volume's `tls/ca.pem` on that device and ensure `WEB_UI_TLS_HOSTS` contains the server address used in the URL. The client IP in the log is not the server address. The first certificate rejection is WARNING; repetitions, disconnects and handshake timeouts are DEBUG. Unexpected internal request failures retain their traceback.
 
 The expected monthly deposit used by the withdrawal forecast is stored with the saved configuration in the named volume. It starts empty; browser-stored values are not imported. Updating it does not recreate the exchange adapter, advance the account-check deadline, or change actual deposits/purchases.
+
+## Resource and security boundaries
+
+The HTTPS server permits at most 64 concurrent connections; excess connections close immediately. Queued manual withdrawals revalidate the dashboard session immediately before execution. Cosmetic settings reuse the existing exchange connection pool. Unexpected worker errors return a generic browser message; diagnostic details remain in container logs.
+
+Persistent JSON files share a durable atomic writer with private temporary files and owner-only permissions. Existing scheduling state and the SQLite ledger are restricted to the owner; the process uses a private file-creation mask. API secrets remain plaintext in the protected volume: volume access or Docker-host administration still grants access to them. The container currently runs as root; changing this requires an explicit ownership plan for existing volumes.
+
+Tests are grouped by behavior rather than individual historical bug reports. Financial uncertainty, duplicate prevention, credential access, session expiry, storage failure and schedule boundaries retain regression coverage. Exchange responses are mocked; these tests do not place real orders or prove live exchange permissions. Local TLS handshakes use in-memory sockets.
+
+Kraken funding calls currently use its supported legacy endpoints. Track the [official funding API notice](https://docs.kraken.com/api-reference/funding/get-status-of-recent-withdrawals) before a future adapter migration; changing financial endpoints requires separate compatibility validation.

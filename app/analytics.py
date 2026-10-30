@@ -11,8 +11,10 @@ def report(settings, groups, snapshot, records):
             if g['kind']=='Buy':
                 summary['simulatedBuyCount']+=g['count'];summary['simulatedBtc']+=Decimal(g['shares'])
             continue
-        currency=g['currency']
-        values=money.setdefault(currency,dict(buyVolume=Decimal(0),tradeFees=Decimal(0),withdrawalFees=Decimal(0)))
+        values = None
+        if g['kind'] == 'Buy' or g['kind'] == 'TransferOut' and g['status'] == 'completed':
+            currency=g['currency']
+            values=money.setdefault(currency,dict(buyVolume=Decimal(0),tradeFees=Decimal(0),withdrawalFees=Decimal(0)))
         if g['kind']=='Buy':
             summary['buyCount']+=g['count'];summary['boughtBtc']+=Decimal(g['shares'])
             values['buyVolume']+=Decimal(g['amount']);values['tradeFees']+=Decimal(g['fee'])

@@ -7,7 +7,7 @@ from decimal import Decimal as D
 from pathlib import Path
 from unittest.mock import Mock,patch
 import requests
-import activity,bitvavo,bot,kraken,web_ui,healthcheck
+import bitvavo,kraken,web_ui,healthcheck
 from exchange_errors import DefinitiveRejection
 
 
@@ -24,7 +24,7 @@ class AdapterReviewTests(unittest.TestCase):
             configured=kraken.Kraken('EUR',api_key='saved-key',api_secret='dGVzdA==')
             self.assertEqual(configured.key,'saved-key')
 
-    def test_recovery_open_order_queries_are_read_only_and_validate_responses(self):
+    def test_startup_open_order_queries_are_read_only_and_validate_responses(self):
         kraken_api=kraken.Kraken('EUR',api_key='fictional',api_secret='dGVzdA==')
         kraken_api.private=Mock(return_value={'open':{'id':{'status':'open'}}})
         self.assertEqual(kraken_api.open_orders(),[{'status':'open'}])
@@ -130,3 +130,29 @@ class AdapterReviewTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class WithdrawalHistoryTests(unittest.TestCase):
+    def test_kraken_follows_cursor_and_rejects_repeated_or_missing_pagination(self):
+        api=kraken.Kraken('EUR',api_key='fictional',api_secret='dGVzdA==')
+        row={'time':1,'refid':'old','status':'Success'}
+        api.private=Mock(side_effect=[{'withdrawals':[row]*500,'cursor':'next'},
+                                     {'withdrawals':[dict(row,refid='pending',status='Pending')],'cursor':None}])
+        rows=api.btc_withdrawals(0,2000)
+        self.assertEqual(len(rows),501);self.assertEqual(rows[-1]['status'],'pending')
+        self.assertEqual(api.private.call_args.args[1]['cursor'],'next')
+        for pages in ([{'withdrawals':[row],'cursor':'same'}]*2, [[row]*500]):
+            api.private=Mock(side_effect=pages)
+            with self.subTest(pages=len(pages)),self.assertRaises(kraken.KrakenAPIError):api.btc_withdrawals()
+        api.session.close()
+
+    def test_bitvavo_splits_full_windows_and_rejects_unverifiable_history(self):
+        api=bitvavo.Bitvavo(api_key='fictional',api_secret='fictional')
+        row={'timestamp':2,'status':'completed'}
+        api.request=Mock(side_effect=[[row]*1000,[row],[dict(row,timestamp=1,status='sending')]])
+        rows=api.btc_withdrawals(0,3)
+        self.assertEqual(len(rows),2);self.assertEqual(rows[-1]['status'],'sending')
+        self.assertEqual([call.kwargs['params']['start'] for call in api.request.call_args_list],[0,2,0])
+        api.request=Mock(return_value=[row]*1000)
+        with self.assertRaises(ValueError):api.btc_withdrawals(2,2)
+        api.session.close()

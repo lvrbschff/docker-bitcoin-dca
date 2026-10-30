@@ -10,12 +10,11 @@ import web_ui
 
 
 class FaviconTests(unittest.TestCase):
-    def test_ico_contains_classic_16_32_and_48_pixel_images(self):
+    def test_icon_assets_have_expected_formats_and_sizes(self):
         data=favicon_assets.FAVICON_ICO
         self.assertEqual(struct.unpack_from('<HHH',data),(0,1,3))
         self.assertEqual([tuple(data[6+i*16:8+i*16]) for i in range(3)],[(16,16),(32,32),(48,48)])
 
-    def test_png_fallback_and_opaque_apple_icon_dimensions(self):
         for data,size in [(favicon_assets.FAVICON_PNG,32),(favicon_assets.APPLE_TOUCH_ICON_PNG,180)]:
             self.assertEqual(data[:8],b'\x89PNG\r\n\x1a\n')
             self.assertEqual(struct.unpack('>II',data[16:24]),(size,size))
@@ -54,7 +53,6 @@ class FaviconTests(unittest.TestCase):
             self.assertTrue(any(link.get('rel')=='apple-touch-icon' and link['href']=='/bitcoin-dca-icon-v3.png' for link in parser.links))
             self.assertTrue(any(link.get('rel')=='mask-icon' and link['href']=='/safari-pinned-tab-v3.svg' and link['color']=='#8bafff' for link in parser.links))
 
-    def test_pinned_tab_mask_is_a_single_black_vector_layer(self):
         svg=ET.fromstring(favicon_assets.FAVICON_MASK_SVG)
         self.assertEqual(svg.attrib['viewBox'],'0 0 16 16')
         self.assertEqual(len(svg),1);self.assertTrue(svg[0].tag.endswith('path'))

@@ -365,8 +365,8 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 <footer class="dashboard-footnotes" aria-labelledby="notesHeading">
 <h2 id="notesHeading">Notes</h2>
 <ol>
-<li id="schedule-note"><strong>Schedule and automatic withdrawal</strong><p>Purchase interval = time from the last purchase to the next deposit day ÷ purchases affordable with the current fiat balance, including estimated fees and a planning buffer. Without a previous purchase, planning starts from now. Next purchase = last purchase + interval; elapsed time reduces the wait. Open orders block further purchases. Balances reflect the last account check; the display BTC price comes from Kraken’s public converter pages.</p><p id="automatic-withdrawal-note"><span id="automaticWithdrawalDestination"></span> The automatic withdrawal threshold uses all available exchange BTC valued in the purchase currency, including BTC acquired outside this bot. Remaining purchases = (threshold ÷ current BTC price − available BTC) ÷ BTC per purchase, rounded up. The forecast projects these purchases using the current budget, price and order costs. Expected monthly deposit adds assumed funds on each deposit day; unused funds carry over and intervals are recalculated for actual calendar months. This volume-saved setting affects only the forecast. The estimated date is the final required purchase; withdrawal follows an eligible bot check. If the threshold is already reached, the estimate is now. Countdown = estimated date − current time, with a minimum of zero. Estimates require automatic withdrawals and live trading; future prices, fees, deposits and execution may change them.</p><div id="withdrawal-note" class="note-subsection"><h3 class="note-subheading">Manual withdrawal</h3><p id="withdrawalDestination">Loading withdrawal configuration…</p><p id="withdrawMessage" role="status" aria-live="polite"></p><p>After confirmation, sends all available BTC minus the exchange withdrawal fee. Requires LIVE_TRADING; the automatic withdrawal setting and threshold do not apply. Withdrawals appear immediately in Period activity.<span id="manual-export-note"> Only confirmed ones qualify for export.</span></p></div></li>
-<li id="report-note"><strong>Period analysis and Parqet export</strong><p>Choose a custom range or an interval between withdrawals. Historical amounts are converted from their original currencies to the display currency.</p><p id="parqet-note">The EUR CSV exports only the complete cycle after the previous confirmed withdrawal through the last confirmed withdrawal in the selected range. It includes real purchase costs and trading fees, and the ending withdrawal’s net BTC after network fees. Later purchases, simulations and unconfirmed or failed withdrawals are excluded. A confirmed withdrawal and at least one real purchase in its cycle are required.</p></li>
+<li id="schedule-note"><strong>Schedule and automatic withdrawal</strong><p>Purchase interval = time from the last purchase to the next deposit day ÷ purchases affordable with the current fiat balance, including estimated fees and a planning buffer. Without a previous purchase, planning starts from now. Next purchase = last purchase + interval; elapsed time reduces the wait. Open orders block further purchases. Balances reflect the last account check; the display BTC price comes from Kraken’s public converter pages.</p><p id="automatic-withdrawal-note"><span id="automaticWithdrawalDestination"></span> The automatic withdrawal threshold uses all available exchange BTC valued in the purchase currency, including BTC acquired outside this bot. Remaining purchases = (threshold ÷ current BTC price − available BTC) ÷ BTC per purchase, rounded up. The forecast projects these purchases using the current budget, price and order costs. Expected monthly deposit adds assumed funds on each deposit day; unused funds carry over and intervals are recalculated for actual calendar months. This affects only the forecast. The estimated date is the final required purchase; withdrawal follows an eligible bot check. If the threshold is already reached, the estimate is now. Countdown = estimated date − current time, with a minimum of zero. Estimates require automatic withdrawals and live trading; future prices, fees, deposits and execution may change them.</p><div id="withdrawal-note" class="note-subsection"><h3 class="note-subheading">Manual withdrawal</h3><p id="withdrawalDestination">Loading withdrawal configuration…</p><p id="withdrawMessage" role="status" aria-live="polite"></p><p>After confirmation, sends all available BTC minus the exchange withdrawal fee. Requires live trading activated; the automatic withdrawal setting and threshold do not apply. Withdrawals appear immediately in Period activity.<span id="manual-export-note"> Only confirmed ones qualify for export.</span></p></div></li>
+<li id="report-note"><strong>Period analysis and Parqet export</strong><p>Choose a custom range or an interval between withdrawals. Historical amounts are converted from their original currencies to the display currency.</p><p id="parqet-note">The Parqet-readable CSV exports only the complete cycle after the previous confirmed withdrawal through the last confirmed withdrawal in the selected range. It includes real purchase costs and trading fees, and the ending withdrawal’s net BTC after network fees. Later purchases, simulations and unconfirmed or failed withdrawals are excluded. A confirmed withdrawal and at least one real purchase in its cycle are required.</p></li>
 </ol>
 </footer>
 </main>
@@ -715,7 +715,11 @@ $("manualWithdraw").addEventListener("click",async()=>{
  const configuration=await loadWithdrawalConfiguration();
  if(!configuration.enabled){showWithdrawalMessage(configuration.reason||"Manual withdrawal is not configured. See Notes.");return}
  const p=await withdrawalPost("/api/withdrawal/preview",{});
- if(!await confirmWithdrawal(p)){showWithdrawalMessage("Withdrawal not submitted.",false);return;}
+ if(!await confirmWithdrawal(p)){
+  $("withdrawMessage").textContent=configuration.reason||"";
+  $("withdrawalFeedback").textContent="";$("withdrawalFeedback").classList.add("hidden");
+  return;
+ }
  showWithdrawalMessage("Submitting withdrawal…",false);
  const result=await withdrawalPost("/api/withdrawal/confirm",{token:p.token});showWithdrawalMessage(result.message,false);
  $("interval").value="";$("end").value=localInput(Date.now()+60000);currentPage=1;await loadAnalytics();
@@ -871,6 +875,17 @@ def _period(query):
     return start_ms, end_ms
 
 
+def session_is_valid(token):
+    with _SESSION_LOCK:
+        expires_at = _SESSIONS.get(token)
+        if expires_at is None:
+            return False
+        if expires_at <= time.monotonic():
+            _SESSIONS.pop(token, None)
+            return False
+        return True
+
+
 class Handler(BaseHTTPRequestHandler):
     settings = None
     runtime = None
@@ -919,15 +934,7 @@ class Handler(BaseHTTPRequestHandler):
         if morsel is None:
             return False
         token = morsel.value
-        now = time.monotonic()
-        with _SESSION_LOCK:
-            expires_at = _SESSIONS.get(token)
-            if expires_at is None:
-                return False
-            if expires_at <= now:
-                _SESSIONS.pop(token, None)
-                return False
-            return True
+        return session_is_valid(token)
 
     def _require_authentication(self):
         if self._has_valid_session():
@@ -1380,6 +1387,8 @@ def serve(settings, port, withdrawal_service=None, worker=None, runtime=None):
     import os
     from tls import certificate_hosts, https_context, renew_certificates, HTTPSWebServer
     from threading import Thread, Event
+    if runtime is not None:
+        runtime.session_validator = session_is_valid
     hosts = certificate_hosts(os.getenv("WEB_UI_TLS_HOSTS", ""))
     context = https_context(hosts)
     handler = type("ConfiguredHandler", (Handler,), {"settings": settings, "withdrawal_service": staticmethod(withdrawal_service), "worker":worker, "runtime":runtime, "tls_context":context})

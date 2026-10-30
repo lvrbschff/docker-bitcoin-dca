@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import secrets
-import tempfile
+from storage import write_json_atomic
 import threading
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -135,20 +135,7 @@ class ConfigStore:
         return data
 
     def _write(self, data):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        descriptor, name = tempfile.mkstemp(prefix='.config-', dir=self.path.parent)
-        try:
-            with os.fdopen(descriptor, 'w') as handle:
-                os.fchmod(handle.fileno(), 0o600)
-                json.dump(data, handle, indent=2)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(name, self.path)
-            directory = os.open(self.path.parent, os.O_RDONLY)
-            try: os.fsync(directory)
-            finally: os.close(directory)
-        finally:
-            if os.path.exists(name): os.unlink(name)
+        write_json_atomic(self.path, data)
 
     def snapshot(self):
         with self.lock: return copy.deepcopy(self.data)

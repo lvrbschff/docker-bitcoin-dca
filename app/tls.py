@@ -3,6 +3,7 @@ import ipaddress
 import json
 import logging
 import sys
+import threading
 from http.server import ThreadingHTTPServer
 from logging_utils import log_transition
 import os
@@ -98,6 +99,26 @@ class TLSHandshakeError(Exception):
 
 
 class HTTPSWebServer(ThreadingHTTPServer):
+    def __init__(self, *args, **kwargs):
+        self._connections = threading.BoundedSemaphore(64)
+        super().__init__(*args, **kwargs)
+
+    def process_request(self, request, client_address):
+        if not self._connections.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self._connections.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._connections.release()
+
     def handle_error(self, request, client_address):
         error = sys.exception()
         if not isinstance(error, TLSHandshakeError):

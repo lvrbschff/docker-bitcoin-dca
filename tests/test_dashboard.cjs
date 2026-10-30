@@ -147,6 +147,8 @@ const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate)};
  const cancelAction=get('manualWithdraw').handlers.click();await settle();
  assert(get('confirmationDialog').open,'Enabled manual withdrawal opens its confirmation dialog');
  get('confirmationDialog').close('cancel');await cancelAction;
+ assert(!get('withdrawMessage').textContent.includes('Withdrawal not submitted'));
+ assert.equal(get('withdrawalFeedback').textContent,'');
  assert.equal(get('manualWithdraw').disabled,false);
  assert.equal(requests.filter(u=>u==='/api/withdrawal/confirm').length,0,'Cancel never submits a withdrawal');
  // Main panel state is restored and saved independently from report data.

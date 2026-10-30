@@ -469,14 +469,6 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
     market = cycle_data['market'] if cycle_data else api.market(symbol, refresh=True)
     cycle_data = {'balance':balance,'price':price,'market':market,'fee_rate':fee_rate,'btc_balance':exchange_btc}
     update_dashboard_snapshot(settings, balance, price, exchange_btc)
-    if balance_after_simulated_spend <= 0:
-        update_dashboard_schedule(None, "Waiting for available quote-currency funds")
-        simulated_spent = spent if not settings["live"] else Decimal(0)
-        LOG.info(
-            "No available %s balance for DCA purchases (balance=%s, simulated spend=%s).",
-            quote, balance, simulated_spent,
-        )
-        return check_interval
     if market.get("status") != "trading":
         update_dashboard_schedule(None, f"Waiting for market status: {market.get('status')}")
         log_transition(LOG, api, "purchase-wait", "market-" + str(market.get("status")), logging.INFO, "Market %s is %s; waiting.", symbol, market.get("status"))
@@ -665,6 +657,7 @@ def withdrawal_destination(settings):
 
 
 def main():
+    os.umask(0o077)
     logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(), format="%(asctime)s %(levelname)s %(message)s")
     prepare_storage()
     from runtime import Runtime

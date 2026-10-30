@@ -16,11 +16,11 @@ class ReviewTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
-        for name,value in [('ACTIVITY_PATH',self.root/'activity.json'),('SNAPSHOT_PATH',self.root/'dashboard.json'),('LEGACY_ACTIVITY_PATHS',()),('LEGACY_SNAPSHOT_PATHS',())]:
+        for name,value in [('ACTIVITY_PATH',self.root/'activity.json'),('SNAPSHOT_PATH',self.root/'dashboard.json')]:
             p=patch.object(activity,name,value);p.start();self.addCleanup(p.stop)
         self.settings={'exchange':'KRAKEN','quote':'EUR','live':True,'timezone':'Europe/Berlin','deposit_day':1,
                        'buy_amount':D(0),'withdrawals_enabled':False,'withdraw_threshold':D(1000),
-                       'first_purchase_done':False,'startup_delay_seconds':0,'order_status_check_seconds':30}
+                       'startup_delay_seconds':0,'order_status_check_seconds':30}
         price_cache._values.clear()
 
     def record(self, id='buy', kind='Buy', currency='EUR', status=None, when='2026-10-20T12:00:00Z'):
@@ -243,7 +243,7 @@ class ReviewTests(unittest.TestCase):
         entered=threading.Event();release=threading.Event();finished=threading.Event()
         def cycle():entered.set();release.wait(2);return 100
         def action(*args):finished.set();return {'token':'preview'}
-        account=worker.Worker(cycle,action,lambda:None,100,0)
+        account=worker.Worker(cycle,action,100)
         with patch.object(worker,'HEALTH_PATH',self.root/'health.json'):
             account.start();self.assertTrue(entered.wait(1))
             begin=time.monotonic();job=account.submit('preview','owner')
@@ -255,13 +255,13 @@ class ReviewTests(unittest.TestCase):
             self.assertFalse(account.thread.is_alive())
             self.assertFalse(healthcheck.healthy(self.root/'health.json'))
 
-    def test_worker_retries_failed_startup_instead_of_silently_stopping(self):
+    def test_worker_retries_failed_cycle_instead_of_silently_stopping(self):
         succeeded=threading.Event();calls=[]
-        def startup():
+        def cycle():
             calls.append(1)
             if len(calls)==1:raise ValueError('corrupt input')
-        def cycle():succeeded.set();return 100
-        account=worker.Worker(cycle,Mock(),startup,.01,0)
+            succeeded.set();return 100
+        account=worker.Worker(cycle,Mock(),.01)
         with patch.object(worker,'HEALTH_PATH',self.root/'health.json'):
             account.start();self.assertTrue(succeeded.wait(2));self.assertEqual(len(calls),2)
             account.stop.set();account.thread.join(2)

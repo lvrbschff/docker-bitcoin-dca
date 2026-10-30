@@ -1,4 +1,4 @@
-import sys, types, unittest, tempfile, json, io
+import unittest, tempfile, io
 from pathlib import Path
 from decimal import Decimal as D
 from unittest.mock import patch
@@ -29,7 +29,7 @@ class Tests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.state={}
-        self.patches=[patch.object(bot,'read_state',lambda *a:self.state),patch.object(bot,'save_state',lambda *a:None),patch.object(activity,'ACTIVITY_PATH',Path(self.tmp.name)/'activity.json'),patch.object(activity,'LEGACY_ACTIVITY_PATHS',())]
+        self.patches=[patch.object(bot,'read_state',lambda *a:self.state),patch.object(bot,'save_state',lambda *a:None),patch.object(activity,'ACTIVITY_PATH',Path(self.tmp.name)/'activity.json')]
         for p in self.patches:p.start();self.addCleanup(p.stop)
         self.s={'live':True,'quote':'EUR','exchange':'KRAKEN','timezone':'Europe/Berlin','deposit_day':1,'withdrawals_enabled':False,'withdraw_threshold':D('1000'),'kraken_withdraw_key':'wallet','withdraw_address':'bc1test','withdraw_network':'BTC'}
     def service(self, exchange='KRAKEN'):

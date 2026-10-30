@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import sqlite3
+from storage import write_json_atomic
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -12,8 +13,6 @@ from threading import RLock
 
 ACTIVITY_PATH = Path('/webui-data/activity.json')  # Legacy source; never overwritten.
 SNAPSHOT_PATH = Path('/webui-data/dashboard.json')
-LEGACY_ACTIVITY_PATHS = ()
-LEGACY_SNAPSHOT_PATHS = ()
 _ACTIVITY_LOCK = RLock()
 
 
@@ -69,6 +68,7 @@ def _db():
         connection = sqlite3.connect(path, timeout=30)
         connection.create_aggregate('decimal_sum', 1, _DecimalSum)
         try:
+            os.chmod(path, 0o600)
             connection.execute('PRAGMA journal_mode=WAL')
             connection.execute('PRAGMA synchronous=FULL')
             connection.executescript('''
@@ -82,7 +82,7 @@ def _db():
                 CREATE TABLE IF NOT EXISTS cache(key TEXT PRIMARY KEY,value TEXT,updated REAL);
             ''')
             if not connection.execute("SELECT 1 FROM metadata WHERE key='json_migrated'").fetchone():
-                source = next((p for p in (ACTIVITY_PATH, *LEGACY_ACTIVITY_PATHS) if p.exists()), None)
+                source = ACTIVITY_PATH if ACTIVITY_PATH.exists() else None
                 if source:
                     payload = json.loads(source.read_text(encoding='utf-8'))
                     records = payload.get('records', []) if isinstance(payload, dict) else payload
@@ -185,7 +185,7 @@ def withdrawal_records(unresolved=False):
 
 def read_dashboard_snapshot():
     with _ACTIVITY_LOCK:
-        source = next((p for p in (SNAPSHOT_PATH,*LEGACY_SNAPSHOT_PATHS) if p.exists()),None)
+        source = SNAPSHOT_PATH if SNAPSHOT_PATH.exists() else None
         if not source: return {}
         try:value = json.loads(source.read_text(encoding='utf-8'))
         except (ValueError,OSError):
@@ -198,17 +198,6 @@ def write_dashboard_snapshot(snapshot):
     with _ACTIVITY_LOCK: write_json_atomic(SNAPSHOT_PATH,snapshot)
 
 
-def write_json_atomic(path, payload):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix+'.tmp')
-    with temporary.open('w',encoding='utf-8') as stream:
-        json.dump(payload,stream,ensure_ascii=False,indent=2)
-        stream.flush()
-        os.fsync(stream.fileno())
-    os.replace(temporary,path)
-    descriptor = os.open(path.parent,os.O_RDONLY)
-    try: os.fsync(descriptor)
-    finally: os.close(descriptor)
 
 
 def cache_get_many(keys):
