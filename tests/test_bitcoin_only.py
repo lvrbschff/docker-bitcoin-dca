@@ -41,15 +41,16 @@ class BitcoinOnlyTests(unittest.TestCase):
                     'datetime': '2026-10-20T12:00:00Z', 'shares': '.001',
                     'amount': '80', 'fee': '.2', 'price': '80000', 'currency': 'EUR'}}
 
-    def test_legacy_asset_environment_does_not_choose_purchase_asset(self):
-        with patch.dict(os.environ, {'BASE_ASSET': 'ETH', 'WEB_UI_ENABLED': 'false'}, clear=True), \
-                patch.object(bot, 'create_exchange') as create_exchange, \
-                patch.object(bot, 'bot_loop') as loop, patch.object(bot, 'prepare_storage'):
+    def test_web_ui_always_starts_using_the_saved_runtime_settings(self):
+        with patch.dict(os.environ,{'WEB_UI_ENABLED':'false','EXCHANGE':'BITVAVO','LIVE_TRADING':'false'},clear=True), \
+                patch('runtime.Runtime') as runtime_class, patch('web_ui.serve') as serve, \
+                patch.object(bot,'prepare_storage'),patch.object(bot.threading,'Thread'):
+            app=runtime_class.return_value;app.settings=self.settings
             bot.main()
-        settings = loop.call_args.args[1]
-        self.assertNotIn('base', settings)
-        self.assertEqual(settings['quote'], 'EUR')
-        create_exchange.assert_called_once_with(settings)
+        runtime_class.assert_called_once_with()
+        app.worker.start.assert_called_once_with()
+        serve.assert_called_once_with(self.settings,6890,app.worker.submit,worker=app.worker,runtime=app)
+
 
     def test_live_purchase_uses_bitcoin_interface_and_market(self):
         # Even a legacy caller's base setting cannot select another asset.

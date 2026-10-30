@@ -28,7 +28,7 @@ class ConfigurationTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.store = config.ConfigStore(self.root / 'config.json', environ={})
+        self.store = config.ConfigStore(self.root / 'config.json')
         for name, value in [('ACTIVITY_PATH', self.root / 'activity.json'), ('LEGACY_ACTIVITY_PATHS', ()),
                             ('SNAPSHOT_PATH', self.root / 'dashboard.json'), ('LEGACY_SNAPSHOT_PATHS', ())]:
             p = patch.object(activity, name, value)
@@ -78,7 +78,7 @@ class ConfigurationTests(unittest.TestCase):
         self.assertNotIn('fictional-key', json.dumps(public))
         self.assertNotIn('c2VjcmV0', settings_ui.settings_page(self.store))
         self.assertNotIn(PASSWORD, settings_ui.settings_page(self.store))
-        reloaded = config.ConfigStore(self.store.path, environ={'KRAKEN_API_KEY': 'different'})
+        reloaded = config.ConfigStore(self.store.path)
         self.assertEqual(reloaded.snapshot(), self.store.snapshot())
 
     def test_failed_atomic_save_leaves_memory_and_file_unchanged(self):
@@ -100,16 +100,36 @@ class ConfigurationTests(unittest.TestCase):
             with self.subTest(values=values), self.assertRaises(ValueError):
                 self.app.save({'settings': values})
 
-    def test_legacy_environment_is_imported_once_with_password_upgrade(self):
-        env = {'KRAKEN_API_KEY': 'old-key', 'KRAKEN_API_SECRET': 'c2VjcmV0', 'LIVE_TRADING': 'true',
-               'BUY_AMOUNT': '.0006', 'WEB_UI_USERNAME': 'old-user', 'WEB_UI_PASSWORD': 'admin'}
-        store = config.ConfigStore(self.root / 'legacy.json', environ=env)
-        self.assertTrue(store.snapshot()['complete'])
-        self.assertTrue(store.public()['passwordChangeRequired'])
-        self.assertTrue(store.authenticate('old-user', 'admin'))
-        self.assertTrue(store.snapshot()['settings']['live'])
-        self.assertEqual(store.snapshot()['settings']['buy_amount'], '0.0006')
-        self.assertEqual(config.ConfigStore(store.path, environ={}).snapshot(), store.snapshot())
+    def test_environment_cannot_create_account_or_enable_trading(self):
+        env={'WEB_UI_ENABLED':'false','EXCHANGE':'BITVAVO','KRAKEN_API_KEY':'old-key',
+             'KRAKEN_API_SECRET':'c2VjcmV0','BITVAVO_API_KEY':'old-key','BITVAVO_API_SECRET':'old-secret',
+             'LIVE_TRADING':'true','BUY_AMOUNT':'10','WEB_UI_USERNAME':'old-user','WEB_UI_PASSWORD':'admin'}
+        with patch.dict(os.environ,env,clear=True):
+            store=config.ConfigStore(self.root/'fresh.json')
+        self.assertFalse(store.snapshot()['complete'])
+        self.assertIsNone(store.snapshot()['account'])
+        self.assertFalse(store.snapshot()['settings']['live'])
+        self.assertEqual(store.snapshot()['settings']['exchange'],'KRAKEN')
+        self.assertEqual(store.snapshot()['settings']['buy_amount'],'0')
+        self.assertFalse(store.authenticate('old-user','admin'))
+
+    def test_environment_cannot_override_saved_settings_or_keys(self):
+        self.ready(buy_amount='.0006')
+        previous=self.store.snapshot()
+        with patch.dict(os.environ,{'EXCHANGE':'BITVAVO','BUY_AMOUNT':'100','LIVE_TRADING':'true',
+                                   'KRAKEN_API_KEY':'wrong-key','WEB_UI_PASSWORD':'admin'},clear=True):
+            reloaded=config.ConfigStore(self.store.path)
+        self.assertEqual(reloaded.snapshot(),previous)
+        self.assertTrue(reloaded.authenticate('operator',PASSWORD))
+        self.assertFalse(reloaded.authenticate('operator','admin'))
+
+    def test_login_has_no_environment_or_default_account_fallback(self):
+        h=object.__new__(web_ui.Handler);h.runtime=None
+        body=b'username=admin&password=admin';h.headers={'Content-Length':str(len(body))}
+        h.rfile=io.BytesIO(body);h._send=Mock()
+        with patch.dict(os.environ,{'WEB_UI_USERNAME':'admin','WEB_UI_PASSWORD':'admin'}):
+            h._handle_login()
+        self.assertEqual(h._send.call_args.args[0],401)
 
     def test_pending_and_queued_actions_block_identity_or_live_changes(self):
         self.ready()
@@ -226,14 +246,14 @@ class ConfigurationTests(unittest.TestCase):
         self.assertEqual(self.store.public()['settings']['display_currency'],'USD')
         self.assertEqual(self.app.settings['display_currency'],'USD')
         self.assertFalse(self.app.worker.reconfigure.is_set())
-        self.assertEqual(config.ConfigStore(self.store.path,environ={}).public()['settings']['display_currency'],'USD')
+        self.assertEqual(config.ConfigStore(self.store.path).public()['settings']['display_currency'],'USD')
         with self.assertRaises(ValueError): self.app.save({'settings':{'display_currency':'GBP'}})
 
     def test_old_configuration_gains_display_currency_default(self):
         self.ready()
         data=self.store.snapshot();data['settings'].pop('display_currency')
         self.store.path.write_text(json.dumps(data))
-        reloaded=config.ConfigStore(self.store.path,environ={})
+        reloaded=config.ConfigStore(self.store.path)
         self.assertEqual(reloaded.public()['settings']['display_currency'],'EUR')
         self.assertTrue(reloaded.authenticate('operator',PASSWORD))
 
@@ -252,10 +272,10 @@ class ConfigurationTests(unittest.TestCase):
     def test_fresh_default_setup_writes_account_and_settings_to_volume(self):
         volume=self.root/'webui-data'/'config.json'
         with patch.object(config,'CONFIG_PATH',volume):
-            fresh=config.ConfigStore(environ={})
+            fresh=config.ConfigStore()
             fresh.create_account('new-operator',PASSWORD)
             fresh.commit(config.validate(CREDENTIALS))
-            reloaded=config.ConfigStore(environ={})
+            reloaded=config.ConfigStore()
         self.assertTrue(reloaded.authenticate('new-operator',PASSWORD))
         self.assertTrue(reloaded.snapshot()['complete'])
         self.assertEqual(reloaded.path,volume)

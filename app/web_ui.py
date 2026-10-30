@@ -1,9 +1,7 @@
 """Local read-only portfolio dashboard and on-demand Parqet export."""
-import hmac
 import html
 import json
 import logging
-import os
 import re
 import requests
 from datetime import datetime, timezone, timedelta
@@ -955,11 +953,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, _login_page("Please enter your username and password."), "text/html; charset=utf-8")
             return
 
-        expected_username = (os.getenv("WEB_UI_USERNAME", "admin") or "admin").encode("utf-8")
-        expected_password = (os.getenv("WEB_UI_PASSWORD", "admin") or "admin").encode("utf-8")
-        username_matches = hmac.compare_digest(username.encode("utf-8"), expected_username)
-        password_matches = hmac.compare_digest(password.encode("utf-8"), expected_password)
-        valid = self.runtime.store.authenticate(username, password) if self.runtime else username_matches and password_matches
+        valid = bool(self.runtime and self.runtime.store.authenticate(username, password))
         if not valid:
             self._send(401, _login_page("The username or password is incorrect."), "text/html; charset=utf-8")
             return

@@ -32,16 +32,6 @@ from storage import STATE_PATH, prepare_storage
 LOG = logging.getLogger("bitcoin-dca")
 
 
-def env_decimal(name, default=None):
-    raw = os.getenv(name)
-    if raw is None and default is None:
-        raise ValueError(f"Missing required environment variable: {name}")
-    value = Decimal(raw if raw is not None else str(default))
-    if not value.is_finite() or value < 0:
-        raise ValueError(f"{name} must be a finite non-negative number")
-    return value
-
-
 def cycle_dates(now, deposit_day):
     """Return this deposit cycle's key and next deposit instant in configured local time."""
     def deposit_date(year, month):
@@ -675,14 +665,6 @@ def make_worker(api, settings, interval):
                   on_error=lambda:update_dashboard_schedule(None,'Account check failed; waiting for retry'))
 
 
-def bot_loop(api, settings, interval):
-    from worker import supervise
-    worker=make_worker(api,settings,interval)
-    worker.start()
-    threading.Thread(target=supervise,args=(worker,),daemon=True).start()
-    worker.thread.join()
-
-
 def manual_withdrawal_service(api, settings):
     previews = {}
 
@@ -740,54 +722,17 @@ def withdrawal_destination(settings):
 def main():
     logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(), format="%(asctime)s %(levelname)s %(message)s")
     prepare_storage()
-    if os.getenv("WEB_UI_ENABLED", "true").lower() == "true":
-        from runtime import Runtime
-        from worker import supervise
-        from web_ui import serve
-        runtime = Runtime()
-        port = int(os.getenv("WEB_UI_PORT", "6890"))
-        if not 1 <= port <= 65535:
-            raise ValueError("WEB_UI_PORT must be between 1 and 65535")
-        runtime.worker.start()
-        threading.Thread(target=supervise, args=(runtime.worker,), daemon=True).start()
-        serve(runtime.settings, port, runtime.worker.submit, worker=runtime.worker, runtime=runtime)
-        return
-    deposit_day = int(os.getenv("DEPOSIT_DAY", "1"))
-    if not 1 <= deposit_day <= 31:
-        raise ValueError("DEPOSIT_DAY must be between 1 and 31")
-    settings = {
-        "exchange": os.getenv("EXCHANGE", "KRAKEN").upper(),
-        "quote": os.getenv("QUOTE_CURRENCY", "EUR").upper(),
-        "buy_amount": env_decimal("BUY_AMOUNT", 0),
-        "deposit_day": deposit_day,
-        "startup_delay_seconds": int(os.getenv("startup_delay_seconds", "60")),
-        "first_purchase_done": False,
-        "order_status_check_seconds": int(os.getenv("ORDER_STATUS_CHECK_SECONDS", "30")),
-        "timezone": os.getenv("TIMEZONE", "Europe/Berlin"),
-        "live": os.getenv("LIVE_TRADING", "false").lower() == "true",
-        "withdrawals_enabled": os.getenv("WITHDRAWALS_ENABLED", "false").lower() == "true",
-        "withdraw_threshold": env_decimal("WITHDRAW_THRESHOLD_QUOTE", 1000),
-        "withdraw_address": os.getenv("WITHDRAW_ADDRESS", "").strip(),
-        "withdraw_network": os.getenv("WITHDRAW_NETWORK", "BTC").upper(),
-        "kraken_withdraw_key": os.getenv("KRAKEN_WITHDRAW_KEY", "").strip(),
-    }
-    if settings["startup_delay_seconds"] < 0:
-        raise ValueError("startup_delay_seconds must be zero or greater")
-    if settings["order_status_check_seconds"] < 1:
-        raise ValueError("ORDER_STATUS_CHECK_SECONDS must be greater than zero")
-    api = create_exchange(settings)
-    if settings["withdrawals_enabled"]:
-        api.validate_withdrawal_settings(settings)
-        if settings["withdraw_threshold"] <= 0:
-            raise ValueError("WITHDRAW_THRESHOLD_QUOTE must be greater than zero")
-    interval = max(60, int(os.getenv("CHECK_INTERVAL_SECONDS", "300")))
-    buy_amount_mode = "exchange minimum will be used" if settings["buy_amount"] == 0 else "fixed requested amount"
-    LOG.info("Starting on %s: %s; live trading=%s; quote currency=%s; BUY_AMOUNT=%s %s (%s); deposit day=%s; startup delay=%ss; timezone=%s; check interval=%ss; order status check delay=%ss", settings["exchange"], f"BTC-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], "BTC", buy_amount_mode, deposit_day, settings["startup_delay_seconds"], settings["timezone"], interval, settings["order_status_check_seconds"])
-
-    bot_loop(api, settings, interval)
+    from runtime import Runtime
+    from worker import supervise
+    from web_ui import serve
+    runtime = Runtime()
+    port = int(os.getenv("WEB_UI_PORT", "6890"))
+    if not 1 <= port <= 65535:
+        raise ValueError("WEB_UI_PORT must be between 1 and 65535")
+    runtime.worker.start()
+    threading.Thread(target=supervise, args=(runtime.worker,), daemon=True).start()
+    serve(runtime.settings, port, runtime.worker.submit, worker=runtime.worker, runtime=runtime)
 
 
 if __name__ == "__main__":
     main()
-
-

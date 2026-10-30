@@ -13,16 +13,22 @@ from exchange_errors import DefinitiveRejection
 
 class AdapterReviewTests(unittest.TestCase):
     def setUp(self):
-        creds=patch.dict(os.environ,{'BITVAVO_API_KEY':'fictional','BITVAVO_API_SECRET':'fictional','KRAKEN_API_KEY':'fictional','KRAKEN_API_SECRET':'dGVzdA=='})
-        creds.start();self.addCleanup(creds.stop)
         session=patch.object(requests,'Session',return_value=Mock())
         session.start();self.addCleanup(session.stop)
+
+    def test_exchange_credentials_never_fall_back_to_environment(self):
+        with patch.dict(os.environ,{'KRAKEN_API_KEY':'environment-key','KRAKEN_API_SECRET':'dGVzdA==',
+                                   'BITVAVO_API_KEY':'environment-key','BITVAVO_API_SECRET':'environment-secret'}):
+            with self.assertRaisesRegex(ValueError,'Settings'):kraken.Kraken('EUR')
+            with self.assertRaisesRegex(ValueError,'Settings'):bitvavo.Bitvavo()
+            configured=kraken.Kraken('EUR',api_key='saved-key',api_secret='dGVzdA==')
+            self.assertEqual(configured.key,'saved-key')
 
     def pair(self,minimum,status='online'):
         return {'XXBTZEUR':{'base':'XXBT','quote':'ZEUR','altname':'XBTEUR','ordermin':minimum,'status':status}}
 
     def test_kraken_market_minimum_status_and_force_refresh(self):
-        api=kraken.Kraken('EUR');api.public=Mock(side_effect=[self.pair('.0001'),self.pair('.0002','cancel_only'),self.pair('.0003')])
+        api=kraken.Kraken('EUR',api_key='fictional',api_secret='dGVzdA==');api.public=Mock(side_effect=[self.pair('.0001'),self.pair('.0002','cancel_only'),self.pair('.0003')])
         with patch.object(kraken.time,'monotonic',return_value=100):self.assertEqual(api.market('BTC-EUR')['minOrderInBaseAsset'],'.0001')
         with patch.object(kraken.time,'monotonic',return_value=130):self.assertEqual(api.market('BTC-EUR')['minOrderInBaseAsset'],'.0001')
         with patch.object(kraken.time,'monotonic',return_value=161):self.assertEqual(api.market('BTC-EUR')['status'],'cancel_only')
@@ -31,14 +37,14 @@ class AdapterReviewTests(unittest.TestCase):
         self.assertEqual(api.public.call_args.args[1]['pair'],'XBTEUR')
 
     def test_bitvavo_queries_only_selected_market(self):
-        api=bitvavo.Bitvavo();api.request=Mock(side_effect=[[{'market':'BTC-EUR','minOrderInBaseAsset':'.0001'}],[{'market':'BTC-EUR','minOrderInBaseAsset':'.0002'}]])
+        api=bitvavo.Bitvavo(api_key='fictional',api_secret='fictional');api.request=Mock(side_effect=[[{'market':'BTC-EUR','minOrderInBaseAsset':'.0001'}],[{'market':'BTC-EUR','minOrderInBaseAsset':'.0002'}]])
         first=api.market('BTC-EUR');self.assertEqual(api.market('BTC-EUR'),first)
         self.assertEqual(api.market('BTC-EUR',refresh=True)['minOrderInBaseAsset'],'.0002')
         self.assertEqual(api.request.call_count,2)
         self.assertEqual(api.request.call_args.kwargs['params'],{'market':'BTC-EUR'})
 
     def test_bitvavo_cycle_reuses_balance_and_price_but_not_next_cycle(self):
-        api=bitvavo.Bitvavo()
+        api=bitvavo.Bitvavo(api_key='fictional',api_secret='fictional')
         def read(method,path,**kwargs):
             if path=='/balance':return [{'symbol':'BTC','available':'.001'},{'symbol':'EUR','available':'100'}]
             return {'price':'80000'}
@@ -51,14 +57,14 @@ class AdapterReviewTests(unittest.TestCase):
         self.assertEqual(api.request.call_count,3)
 
     def test_fee_rate_cache_expires(self):
-        api=bitvavo.Bitvavo();api.request=Mock(side_effect=[{'fees':{'taker':'.0025'}},{'fees':{'taker':'.003'}}])
+        api=bitvavo.Bitvavo(api_key='fictional',api_secret='fictional');api.request=Mock(side_effect=[{'fees':{'taker':'.0025'}},{'fees':{'taker':'.003'}}])
         with patch.object(bitvavo.time,'monotonic',return_value=100):self.assertEqual(api.estimate_taker_fee('BTC-EUR',D(100)),D('.25'))
         with patch.object(bitvavo.time,'monotonic',return_value=200):self.assertEqual(api.estimate_taker_fee('BTC-EUR',D(200)),D('.5'))
         with patch.object(bitvavo.time,'monotonic',return_value=401):self.assertEqual(api.estimate_taker_fee('BTC-EUR',D(100)),D('.3'))
         self.assertEqual(api.request.call_count,2)
 
     def test_bitvavo_known_rejection_is_distinct_from_duplicate_and_timeout(self):
-        api=bitvavo.Bitvavo();response=Mock();api.session.request.return_value=response
+        api=bitvavo.Bitvavo(api_key='fictional',api_secret='fictional');response=Mock();api.session.request.return_value=response
         response.status_code=400;response.json.return_value={'errorCode':216,'error':'Insufficient funds'}
         with self.assertRaises(DefinitiveRejection):api.buy_btc('EUR',D('.001'),'client')
         response.json.return_value={'errorCode':220,'error':'Duplicate client reference'}
@@ -68,7 +74,7 @@ class AdapterReviewTests(unittest.TestCase):
         with self.assertRaises(requests.ReadTimeout):api.buy_btc('EUR',D('.001'),'client')
 
     def test_bitvavo_withdrawal_transports_asset_and_accepts_empty_201(self):
-        api=bitvavo.Bitvavo();response=Mock(status_code=201,content=b'')
+        api=bitvavo.Bitvavo(api_key='fictional',api_secret='fictional');response=Mock(status_code=201,content=b'')
         response.json.side_effect=ValueError('empty accepted response')
         api.session.request.return_value=response
         self.assertEqual(api.withdraw_btc({'symbol':'BTC','amount':'.001','address':'fictional','network':'BTC','idempotencyKey':'unique-example'}),{})
@@ -77,12 +83,12 @@ class AdapterReviewTests(unittest.TestCase):
         self.assertEqual(payload['asset'],'BTC');self.assertNotIn('symbol',payload)
 
     def test_kraken_unknown_server_error_is_not_definitive(self):
-        api=kraken.Kraken('EUR')
+        api=kraken.Kraken('EUR',api_key='fictional',api_secret='dGVzdA==')
         with self.assertRaises(kraken.KrakenAPIError):api._check_response(Mock(json=lambda:{'error':['EGeneral:Internal error']}))
         with self.assertRaises(DefinitiveRejection):api._check_response(Mock(json=lambda:{'error':['EOrder:Insufficient funds']}))
 
     def test_kraken_settled_and_success_status_are_distinct(self):
-        api=kraken.Kraken('EUR');api.private=Mock(return_value=[{'time':1,'refid':'a','txid':'tx-a','status':'Settled','amount':'.001','fee':'.0001'},{'time':2,'refid':'b','status':'Success','amount':'.001','fee':'.0001'}])
+        api=kraken.Kraken('EUR',api_key='fictional',api_secret='dGVzdA==');api.private=Mock(return_value=[{'time':1,'refid':'a','txid':'tx-a','status':'Settled','amount':'.001','fee':'.0001'},{'time':2,'refid':'b','status':'Success','amount':'.001','fee':'.0001'}])
         rows=api.btc_withdrawals()
         self.assertEqual(rows[0]['status'],'settled');self.assertEqual(rows[1]['status'],'completed')
         self.assertEqual(rows[0]['id'],'a');self.assertEqual(rows[0]['txId'],'tx-a')

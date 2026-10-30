@@ -1,4 +1,4 @@
-"""Private, atomic application configuration; environment import is migration-only."""
+"""Private, atomic application configuration managed exclusively through the web UI."""
 import base64
 import copy
 import hashlib
@@ -23,12 +23,6 @@ DEFAULTS = dict(exchange='KRAKEN', quote='EUR', buy_amount='0', deposit_day=1,
                 withdraw_threshold='1000', withdraw_address='', withdraw_network='BTC', kraken_withdraw_key='',
                 manual_withdrawal_enabled=True, parqet_enabled=True, display_currency='EUR',
                 **{key: '' for key in SECRET_FIELDS})
-ENV_NAMES = dict(exchange='EXCHANGE', quote='QUOTE_CURRENCY', buy_amount='BUY_AMOUNT', deposit_day='DEPOSIT_DAY',
-                 startup_delay_seconds='startup_delay_seconds', order_status_check_seconds='ORDER_STATUS_CHECK_SECONDS',
-                 check_interval_seconds='CHECK_INTERVAL_SECONDS', timezone='TIMEZONE', live='LIVE_TRADING',
-                 withdrawals_enabled='WITHDRAWALS_ENABLED', withdraw_threshold='WITHDRAW_THRESHOLD_QUOTE',
-                 withdraw_address='WITHDRAW_ADDRESS', withdraw_network='WITHDRAW_NETWORK', kraken_withdraw_key='KRAKEN_WITHDRAW_KEY',
-                 **{key: key.upper() for key in SECRET_FIELDS})
 
 
 def password_hash(password):
@@ -120,27 +114,14 @@ def validate(values, previous=None, require_credentials=True):
 
 
 class ConfigStore:
-    def __init__(self, path=None, environ=None):
+    def __init__(self, path=None):
         self.path = Path(path) if path is not None else CONFIG_PATH
         self.lock = threading.RLock()
-        env = os.environ if environ is None else environ
         if self.path.exists():
             self.data = self._read(self.path)
             LOG.debug('Stored application configuration loaded; setup complete=%s', self.data['complete'])
             return
-        values = dict(DEFAULTS)
-        for key, env_name in ENV_NAMES.items():
-            if env_name in env:
-                raw = env[env_name]
-                values[key] = raw.lower() == 'true' if isinstance(DEFAULTS[key], bool) else int(raw) if isinstance(DEFAULTS[key], int) else raw
-        prefix = values['exchange'].lower()
-        legacy = bool(values.get(f'{prefix}_api_key') and values.get(f'{prefix}_api_secret'))
-        self.data = dict(version=1, complete=legacy, account=None, settings=validate(values, require_credentials=legacy))
-        if legacy:
-            password = env.get('WEB_UI_PASSWORD') or 'admin'
-            self.data['account'] = dict(username=env.get('WEB_UI_USERNAME') or 'admin', password_hash=password_hash(password), password_change_required=len(password) < 12 or password == 'admin')
-            self._write(self.data)
-            LOG.info('Legacy environment configuration imported: exchange=%s; password change required=%s', self.data['settings']['exchange'], self.data['account']['password_change_required'])
+        self.data = dict(version=1, complete=False, account=None, settings=validate({}, require_credentials=False))
 
     @staticmethod
     def _read(path):

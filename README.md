@@ -16,7 +16,7 @@ cd docker-bitcoin-dca
 docker compose up -d --build
 ~~~
 
-Open `http://<docker-host-ip>:6890`. The setup wizard first creates your username and password (12+ characters), then configures the exchange, API access and purchases. There is no default account; new installations start in dry run.
+Open `http://<docker-host-ip>:6890`. The setup wizard first creates your username and password (12+ characters), then configures the exchange, API access and purchases. The web UI is always enabled. Bot settings and credentials come only from the saved web configuration; new installations start in dry run.
 
 **Settings**, beside **Log out**, opens a dialog with separate buttons for editing **Dashboard Credentials** and API access/withdrawal targets. **Bot Configuration** groups purchase settings and the withdrawal threshold, each with a short explanation. **Trading and dashboard** groups the live-trading, automatic/manual withdrawal and Parqet switches with display currency. Disabled features also hide their controls and notes.
 
@@ -29,7 +29,7 @@ Open `http://<docker-host-ip>:6890`. The setup wizard first creates your usernam
 
 Settings persist as `config.json` in the named volume `bitcoin-dca-webui-data`; passwords are hashed and API credentials stay private. Empty API fields keep saved credentials. Protect this file and backups; never commit credentials or `.env`. All runtime state and activity also live in this volume; no host state directory is required. Reuse the same volume on redeployment.
 
-Compose manages only port, log level, volumes and restart policy. Optional `.env` overrides are `WEB_UI_PORT` (6890) and `LOG_LEVEL` (INFO). HTTP is unencrypted; use HTTPS on untrusted networks. See [Architecture and operation](docs/architecture.md) for storage and headless operation.
+Compose manages only port, log level, volumes and restart policy. Optional `.env` overrides are `WEB_UI_PORT` (6890) and `LOG_LEVEL` (INFO). HTTP is unencrypted; use HTTPS on untrusted networks. See [Architecture and operation](docs/architecture.md) for storage and operation.
 
 ## Purchases and withdrawals
 

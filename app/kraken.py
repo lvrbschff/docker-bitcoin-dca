@@ -3,7 +3,6 @@ import base64
 import hashlib
 import hmac
 import logging
-import os
 import threading
 import time
 from datetime import datetime, timezone
@@ -52,10 +51,10 @@ class Kraken:
     supports_withdrawal_idempotency = False
 
     def __init__(self, quote_currency, withdraw_key="", api_key=None, api_secret=None):
-        self.key = os.getenv("KRAKEN_API_KEY", "") if api_key is None else api_key
-        self.secret = os.getenv("KRAKEN_API_SECRET", "") if api_secret is None else api_secret
+        self.key = api_key
+        self.secret = api_secret
         if not self.key or not self.secret:
-            raise ValueError("Set KRAKEN_API_KEY and KRAKEN_API_SECRET for EXCHANGE=KRAKEN")
+            raise ValueError("Configure the Kraken API key and secret in Settings")
         try:
             self.secret_bytes = base64.b64decode(self.secret, validate=True)
         except Exception as exc:

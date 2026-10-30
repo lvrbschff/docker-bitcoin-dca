@@ -26,10 +26,7 @@ class KrakenTransportTests(unittest.TestCase):
         self.factory = patch.object(kraken.requests, 'Session', side_effect=new_session)
         self.factory.start()
         self.addCleanup(self.factory.stop)
-        credentials = patch.dict(os.environ, {'KRAKEN_API_KEY': 'fictional-key', 'KRAKEN_API_SECRET': 'dGVzdA=='})
-        credentials.start()
-        self.addCleanup(credentials.stop)
-        self.api = kraken.Kraken('EUR', 'fictional-wallet')
+        self.api = kraken.Kraken('EUR', 'fictional-wallet', api_key='fictional-key', api_secret='dGVzdA==')
 
     @staticmethod
     def response(result):
