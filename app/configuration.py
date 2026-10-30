@@ -21,7 +21,7 @@ DEFAULTS = dict(exchange='KRAKEN', quote='EUR', buy_amount='0', deposit_day=1,
                 startup_delay_seconds=60, order_status_check_seconds=30, check_interval_seconds=300,
                 timezone='Europe/Berlin', live=False, withdrawals_enabled=False,
                 withdraw_threshold='1000', withdraw_address='', withdraw_network='BTC', kraken_withdraw_key='',
-                manual_withdrawal_enabled=True, parqet_enabled=True, display_currency='EUR',
+                manual_withdrawal_enabled=True, parqet_enabled=True, display_currency='EUR', expected_monthly_deposit='',
                 **{key: '' for key in SECRET_FIELDS})
 
 
@@ -77,13 +77,17 @@ def validate(values, previous=None, require_credentials=True):
         raise ValueError('Select Kraken or Bitvavo and EUR or USD.')
     if result['exchange'] == 'BITVAVO' and result['quote'] != 'EUR':
         raise ValueError('Bitvavo supports EUR purchases only.')
-    for key in ('buy_amount', 'withdraw_threshold'):
+    for key in ('buy_amount', 'withdraw_threshold', 'expected_monthly_deposit'):
+        if key == 'expected_monthly_deposit' and result[key] == '':
+            continue
         try:
             number = Decimal(result[key])
             if not number.is_finite() or number < 0 or (key == 'withdraw_threshold' and number <= 0):
                 raise InvalidOperation
             result[key] = str(number)
         except InvalidOperation:
+            if key == 'expected_monthly_deposit':
+                raise ValueError('Expected monthly deposit must be a finite non-negative amount.') from None
             raise ValueError(f'{key} must be a finite positive amount (purchase amount may be zero).') from None
     if not 1 <= result['deposit_day'] <= 31 or not 0 <= result['startup_delay_seconds'] <= 86400:
         raise ValueError('Deposit day must be 1–31; startup delay must be 0–86400 seconds.')

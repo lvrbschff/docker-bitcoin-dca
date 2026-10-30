@@ -115,7 +115,7 @@ HTML = """<!doctype html>
 <style>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#26324a;--text:#edf2ff;--muted:#9ba9c4;--accent:#8bafff;--green:#61d7ae;--red:#ff8f9e}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#1b2a49 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
-.dashboard-brand{display:flex;align-items:center;gap:12px;margin-bottom:6px;min-width:0}.dashboard-logo{display:block;width:48px;height:48px;flex:0 0 48px;border-radius:11px}.dashboard-brand h1{min-width:0;overflow-wrap:anywhere}
+.dashboard-brand{display:flex;align-items:center;gap:12px;margin-bottom:0;min-width:0}.dashboard-logo{display:block;width:48px;height:48px;flex:0 0 48px;border-radius:11px}.dashboard-brand h1{min-width:0;overflow-wrap:anywhere}
 main{max-width:1180px;margin:0 auto;padding:36px 22px 64px}.top{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:26px}.eyebrow{color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}h1{font-size:30px;margin:4px 0}.sub{color:var(--muted);margin:0}
 .bottom-actions{display:flex;justify-content:flex-end;margin-top:20px}.top-actions{display:flex;flex-direction:column;align-items:flex-end;gap:10px}.top-actions form{margin:0;flex:0 0 auto}.top-actions>button{width:auto;flex:0 0 auto}.withdraw-action{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:0}#withdrawMessage:empty{display:none}.top-actions .field{min-width:170px}.top-actions .field label{margin-bottom:5px}
 .panel{background:linear-gradient(145deg,rgba(21,31,52,.96),rgba(15,22,39,.96));border:1px solid var(--line);border-radius:18px;padding:20px;margin:18px 0;box-shadow:0 14px 40px #0002}
@@ -212,7 +212,7 @@ body.header-actions-hidden .top-actions{opacity:0;transform:translateY(-8px);vis
 @media(prefers-reduced-motion:reduce){.compact-brand-bar,.top-actions{transition:none}}
 
 /* Compact header controls share one row and wrap only when space is limited. */
-.top{align-items:flex-start;flex-wrap:wrap}
+.top{align-items:center;flex-wrap:wrap}
 .top-actions{display:flex;flex-direction:row;align-items:flex-end;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-left:auto}
 .top-actions button,.top-actions select{padding:8px 10px;min-height:38px;font-size:13px;border-radius:9px}
 .top-actions .field{min-width:130px}
@@ -331,7 +331,7 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 <h3 id="withdrawalHeading" class="summary-subheading">Withdrawal</h3>
 <div class="schedule-row-scroll horizontal-scroll" role="region" aria-label="Withdrawal schedule cards" tabindex="0"><div class="grid schedule-grid">
 <div class="card btc-balance-card"><label>Current BTC balance</label><div class="value" id="exchangeBtcBalance">—</div><div class="small" id="exchangeBtcValue">—</div><div class="small" id="exchangeBtcUpdated">Waiting for account check</div><div class="withdraw-action"><button id="manualWithdraw" type="button" aria-describedby="withdrawal-note withdrawalFeedback">Withdraw BTC manually</button><div class="feedback-wrap"><p id="withdrawalFeedback" class="export-feedback withdraw-feedback hidden" role="alert"></p><button class="secondary feedback-close" type="button" data-dismiss="withdrawalFeedback" aria-label="Close withdrawal message">×</button></div></div></div>
-<div class="card"><div class="field"><label for="monthlyDeposit">Expected monthly deposit (<span id="monthlyDepositCurrency">EUR</span>)</label><input id="monthlyDeposit" type="number" min="0" step="0.01" inputmode="decimal" value="0"></div><div class="small">assumes deposits on the configured deposit day</div></div>
+<div class="card"><div class="field"><label for="monthlyDeposit">Expected monthly deposit (<span id="monthlyDepositCurrency">EUR</span>)</label><input id="monthlyDeposit" type="number" min="0" step="0.01" inputmode="decimal" value=""></div><div class="small">assumes deposits on the configured deposit day</div></div>
 <div class="card time-card"><label>Estimated automatic withdrawal date</label><div class="value time-value" id="estimatedWithdrawalAt">—</div><div class="small" id="estimatedWithdrawalStatus">Waiting for account check</div></div>
 <div class="card time-card"><label>Time until automatic withdrawal</label><div class="value countdown-value" id="withdrawalCountdown">—</div><div class="small" id="withdrawalCountdownStatus">Estimate at the current BTC price, deposit and purchase interval</div></div>
 </div></div>
@@ -365,7 +365,7 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 <footer class="dashboard-footnotes" aria-labelledby="notesHeading">
 <h2 id="notesHeading">Notes</h2>
 <ol>
-<li id="schedule-note"><strong>Schedule and automatic withdrawal</strong><p>Purchase interval = time from the last purchase to the next deposit day ÷ purchases affordable with the current fiat balance, including estimated fees and a planning buffer. Without a previous purchase, planning starts from now. Next purchase = last purchase + interval; elapsed time reduces the wait. Open orders block further purchases. Balances reflect the last account check; the display BTC price comes from Kraken’s public converter pages.</p><p id="automatic-withdrawal-note"><span id="automaticWithdrawalDestination"></span> The automatic withdrawal threshold uses all available exchange BTC valued in the purchase currency, including BTC acquired outside this bot. Remaining purchases = (threshold ÷ current BTC price − available BTC) ÷ BTC per purchase, rounded up. The forecast projects these purchases using the current budget, price and order costs. Expected monthly deposit adds assumed funds on each deposit day; unused funds carry over and intervals are recalculated for actual calendar months. This browser-saved setting affects only the forecast. The estimated date is the final required purchase; withdrawal follows an eligible bot check. If the threshold is already reached, the estimate is now. Countdown = estimated date − current time, with a minimum of zero. Estimates require automatic withdrawals and live trading; future prices, fees, deposits and execution may change them.</p><div id="withdrawal-note" class="note-subsection"><h3 class="note-subheading">Manual withdrawal</h3><p id="withdrawalDestination">Loading withdrawal configuration…</p><p id="withdrawMessage" role="status" aria-live="polite"></p><p>After confirmation, sends all available BTC minus the exchange withdrawal fee. Requires LIVE_TRADING; the automatic withdrawal setting and threshold do not apply. Withdrawals appear immediately in Period activity.<span id="manual-export-note"> Only confirmed ones qualify for export.</span></p></div></li>
+<li id="schedule-note"><strong>Schedule and automatic withdrawal</strong><p>Purchase interval = time from the last purchase to the next deposit day ÷ purchases affordable with the current fiat balance, including estimated fees and a planning buffer. Without a previous purchase, planning starts from now. Next purchase = last purchase + interval; elapsed time reduces the wait. Open orders block further purchases. Balances reflect the last account check; the display BTC price comes from Kraken’s public converter pages.</p><p id="automatic-withdrawal-note"><span id="automaticWithdrawalDestination"></span> The automatic withdrawal threshold uses all available exchange BTC valued in the purchase currency, including BTC acquired outside this bot. Remaining purchases = (threshold ÷ current BTC price − available BTC) ÷ BTC per purchase, rounded up. The forecast projects these purchases using the current budget, price and order costs. Expected monthly deposit adds assumed funds on each deposit day; unused funds carry over and intervals are recalculated for actual calendar months. This volume-saved setting affects only the forecast. The estimated date is the final required purchase; withdrawal follows an eligible bot check. If the threshold is already reached, the estimate is now. Countdown = estimated date − current time, with a minimum of zero. Estimates require automatic withdrawals and live trading; future prices, fees, deposits and execution may change them.</p><div id="withdrawal-note" class="note-subsection"><h3 class="note-subheading">Manual withdrawal</h3><p id="withdrawalDestination">Loading withdrawal configuration…</p><p id="withdrawMessage" role="status" aria-live="polite"></p><p>After confirmation, sends all available BTC minus the exchange withdrawal fee. Requires LIVE_TRADING; the automatic withdrawal setting and threshold do not apply. Withdrawals appear immediately in Period activity.<span id="manual-export-note"> Only confirmed ones qualify for export.</span></p></div></li>
 <li id="report-note"><strong>Period analysis and Parqet export</strong><p>Choose a custom range or an interval between withdrawals. Historical amounts are converted from their original currencies to the display currency.</p><p id="parqet-note">The EUR CSV exports only the complete cycle after the previous confirmed withdrawal through the last confirmed withdrawal in the selected range. It includes real purchase costs and trading fees, and the ending withdrawal’s net BTC after network fees. Later purchases, simulations and unconfirmed or failed withdrawals are excluded. A confirmed withdrawal and at least one real purchase in its cycle are required.</p></li>
 </ol>
 </footer>
@@ -459,11 +459,12 @@ function renderPurchaseCountdown(){
 async function refreshPurchaseSchedule(){
  const request=++scheduleRequest;sectionFeedback("scheduleFeedback","Updating schedule…");
  try{
-  const response=await fetch("/api/schedule?monthlyDeposit="+encodeURIComponent($("monthlyDeposit").value||"0"));
+  const response=await fetch("/api/schedule");
   if(response.status===401){window.location.reload();return}
   if(!response.ok)throw new Error("Schedule unavailable");
   const schedule=await response.json();if(request!==scheduleRequest)return;const target=Date.parse(schedule.nextPurchaseAt),serverTime=Date.parse(schedule.serverTime);
   $("monthlyDepositCurrency").textContent=schedule.quote;
+  if(!monthlyDepositDirty&&!monthlyDepositSaving)$("monthlyDeposit").value=schedule.expectedMonthlyDeposit??"";
   if(schedule.configuredBuyAmount!==undefined){
    const minimumMode=Number(schedule.configuredBuyAmount)===0;
    const effective=Number(schedule.effectiveBuyAmount);
@@ -494,12 +495,21 @@ async function refreshPurchaseSchedule(){
   sectionFeedback("scheduleFeedback","");
  }catch(e){if(request===scheduleRequest)sectionFeedback("scheduleFeedback","Could not refresh the schedule. Previous values are still shown.",true)}
 }
-const savedMonthlyDeposit=localStorage.getItem("bitcoinDcaMonthlyDeposit");
-if(savedMonthlyDeposit!==null&&Number.isFinite(Number(savedMonthlyDeposit))&&Number(savedMonthlyDeposit)>=0)$("monthlyDeposit").value=savedMonthlyDeposit;
-$("monthlyDeposit").addEventListener("change",()=>{
- const amount=Number($("monthlyDeposit").value);
- if(!Number.isFinite(amount)||amount<0){$("monthlyDeposit").reportValidity();return}
- localStorage.setItem("bitcoinDcaMonthlyDeposit",String(amount));refreshPurchaseSchedule();
+let monthlyDepositDirty=false,monthlyDepositSaving=false;
+$("monthlyDeposit").addEventListener("input",()=>{monthlyDepositDirty=true});
+$("monthlyDeposit").addEventListener("change",async()=>{
+ const input=$("monthlyDeposit"),amount=input.value.trim();
+ if(amount!==""&&(!Number.isFinite(Number(amount))||Number(amount)<0)){input.reportValidity();return}
+ monthlyDepositDirty=true;monthlyDepositSaving=true;input.disabled=true;
+ sectionFeedback("scheduleFeedback","Saving forecast amount…");
+ try{
+  const response=await fetch("/api/settings/forecast",{method:"POST",headers:{"Content-Type":"application/json","X-DCA-Action":"settings"},body:JSON.stringify({monthlyDeposit:amount})});
+  if(response.status===401){window.location.reload();return}
+  const data=await response.json();if(!response.ok)throw new Error(data.error||"Forecast amount could not be saved.");
+  input.value=data.monthlyDeposit;monthlyDepositDirty=false;
+  await refreshPurchaseSchedule();
+ }catch(error){sectionFeedback("scheduleFeedback",error.message||"Forecast amount could not be saved.",true)}
+ finally{monthlyDepositSaving=false;input.disabled=false}
 });
 setInterval(renderPurchaseCountdown,1000);
 setInterval(refreshPurchaseSchedule,30000);
@@ -1007,7 +1017,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.runtime:
             self._json(404, {'error': 'Settings unavailable.'})
             return
-        operation = {'/api/setup/account': 'Initial account creation', '/api/settings/test': 'Exchange connection test', '/api/settings': 'Settings update'}[path]
+        operation = {'/api/setup/account': 'Initial account creation', '/api/settings/test': 'Exchange connection test', '/api/settings': 'Settings update', '/api/settings/forecast': 'Forecast settings update'}[path]
         if path != '/api/setup/account' and not self._require_authentication():
             LOG.info('%s rejected: authentication required', operation)
             return
@@ -1024,6 +1034,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header('Cache-Control', 'no-store')
                 self.end_headers()
                 self.wfile.write(b'{}')
+            elif path == '/api/settings/forecast':
+                self._json(200, self.runtime.save_forecast_deposit(payload))
             elif path == '/api/settings/test':
                 self._json(200, self.runtime.test_connection(payload))
             else:
@@ -1075,7 +1087,7 @@ class Handler(BaseHTTPRequestHandler):
             from configuration import runtime_settings
             self.settings = runtime_settings(self.runtime.store.snapshot()['settings'])
         parsed = urlparse(self.path)
-        if parsed.path in ('/api/setup/account', '/api/settings', '/api/settings/test'):
+        if parsed.path in ('/api/setup/account', '/api/settings', '/api/settings/test', '/api/settings/forecast'):
             self._settings_post(parsed.path)
             return
         if parsed.path == "/login":
@@ -1266,9 +1278,10 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     forecast_at, forecast_status = withdrawal_forecast(
                         self.settings, snapshot if balance_matches else {},
-                        query.get("monthlyDeposit", ["0"])[0], datetime.now(timezone.utc))
+                        self.settings.get("expected_monthly_deposit") or "0", datetime.now(timezone.utc))
                 self._json(200, {
                     "exchangeCheckPending": exchange_check_pending,
+                    "expectedMonthlyDeposit": self.settings.get("expected_monthly_deposit", ""),
                     "quote": self.settings["quote"],
                     "exchange": self.settings["exchange"],
                     "quoteBalance": snapshot.get("quoteBalance") if balance_matches else None,

@@ -190,6 +190,22 @@ class Runtime:
             LOG.info('Application settings saved: exchange=%s; live trading=%s; automatic withdrawals=%s; manual withdrawals=%s; Parqet=%s', values['exchange'], values['live'], values['withdrawals_enabled'], values['manual_withdrawal_enabled'], values['parqet_enabled'])
             return account_changed
 
+    def save_forecast_deposit(self, payload):
+        """Persist a reporting assumption without touching the exchange worker."""
+        if not isinstance(payload, dict) or set(payload) != {'monthlyDeposit'}:
+            raise ValueError('Invalid monthly deposit request.')
+        with self.store.lock:
+            previous = self.store.snapshot()
+            if not previous['complete']:
+                raise ValueError('Complete initial configuration first.')
+            values = validate({'expected_monthly_deposit': payload['monthlyDeposit']}, previous['settings'])
+            amount = values['expected_monthly_deposit']
+            if amount != previous['settings'].get('expected_monthly_deposit', ''):
+                self.store.commit(values)
+                self.settings['expected_monthly_deposit'] = amount
+                LOG.info('Expected monthly deposit saved: amount=%s %s; forecast only; purchase schedule unchanged', amount or 'unset', values['quote'])
+            return {'monthlyDeposit': amount}
+
     def test_connection(self, payload):
         # Read-only and serialized so a connection test cannot race a financial action.
         with self.lock:

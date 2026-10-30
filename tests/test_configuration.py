@@ -365,6 +365,39 @@ class ConfigurationTests(unittest.TestCase):
         self.assertNotIn('</script><script>alert(1)', page)
         self.assertIn('\\u003c/script', page)
 
+    def test_forecast_deposit_starts_empty_and_is_saved_in_volume_without_exchange_calls(self):
+        self.ready()
+        self.assertEqual(self.store.snapshot()['settings']['expected_monthly_deposit'],'')
+        self.api_factory.reset_mock()
+        self.app.worker.reconfigure.clear()
+        result=self.app.save_forecast_deposit({'monthlyDeposit':'200.50'})
+        self.assertEqual(result,{'monthlyDeposit':'200.50'})
+        reloaded=config.ConfigStore(self.store.path)
+        self.assertEqual(reloaded.snapshot()['settings']['expected_monthly_deposit'],'200.50')
+        self.api_factory.assert_not_called()
+        self.assertFalse(self.app.worker.reconfigure.is_set())
+        self.app.save_forecast_deposit({'monthlyDeposit':''})
+        self.assertEqual(config.ConfigStore(self.store.path).snapshot()['settings']['expected_monthly_deposit'],'')
+
+    def test_forecast_deposit_rejects_invalid_values_without_modifying_config(self):
+        self.ready();before=self.store.path.read_bytes()
+        for payload in [{'monthlyDeposit':'-1'},{'monthlyDeposit':'NaN'},{'monthlyDeposit':'Infinity'},
+                        {'monthlyDeposit':True},{'monthlyDeposit':None},{'monthlyDeposit':'10','live':True}]:
+            with self.subTest(payload=payload),self.assertRaises(ValueError):self.app.save_forecast_deposit(payload)
+            self.assertEqual(self.store.path.read_bytes(),before)
+
+    def test_forecast_endpoint_requires_session_and_action_header_and_ignores_query_override(self):
+        request=self.server()
+        self.assertEqual(request('/api/settings/forecast',{'monthlyDeposit':'200'})[0],401)
+        request('/api/setup/account',{'username':'operator','password':PASSWORD})
+        request('/api/settings',{'settings':CREDENTIALS})
+        self.assertEqual(request('/api/settings/forecast',{'monthlyDeposit':'200'},header=False)[0],400)
+        self.assertEqual(request('/api/settings/forecast',{'monthlyDeposit':'200'})[0],200)
+        status,body=request('/api/schedule?monthlyDeposit=9999')
+        self.assertEqual(status,200)
+        self.assertEqual(json.loads(body)['expectedMonthlyDeposit'],'200')
+        self.assertNotIn('bitcoinDcaMonthlyDeposit',web_ui.HTML)
+
     def server(self):
         # Exercise the real HTTP handlers in memory; no listening socket or exchange.
         self.cookie = ''

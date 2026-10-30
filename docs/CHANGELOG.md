@@ -4,6 +4,9 @@ Release history based on the published [GitHub Releases](https://github.com/oli7
 
 ## Unreleased
 
+- Persisted the expected monthly deposit in the named volume, starting empty without importing browser values.
+- Vertically aligned header buttons with the dashboard title.
+
 - Locked background scrolling while settings, withdrawal and review dialogs are open, restoring the previous position on close.
 - Placed exchange and purchase currency cards in one horizontal row on mobile.
 
