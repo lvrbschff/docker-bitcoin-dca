@@ -52,8 +52,9 @@ class Runtime:
             return False
         state = json.loads(self.state_path.read_text()) if self.state_path.exists() else {}
         # Retire the former manual flag without resetting pending requests or history.
-        state.pop('recoveryRequired', None)
-        write_json_atomic(self.state_path, state)
+        if 'recoveryRequired' in state:
+            state.pop('recoveryRequired')
+            write_json_atomic(self.state_path, state)
         self.exchange_check_pending = False
         LOG.info('Startup exchange check passed: no open orders or Bitcoin withdrawals; scheduling may resume')
         return True
@@ -74,9 +75,10 @@ class Runtime:
             # Keep historical activity untouched; old account scheduling must not carry over.
             write_json_atomic(self.state_path.with_name('previous-account-state.json'), state)
             state = {}
-        state['configuration_account'] = identity
-        state['configuration_live'] = self.settings['live']
-        write_json_atomic(self.state_path, state)
+        if state.get('configuration_account') != identity or state.get('configuration_live') != self.settings['live']:
+            state['configuration_account'] = identity
+            state['configuration_live'] = self.settings['live']
+            write_json_atomic(self.state_path, state)
 
     def cycle(self):
         from bot import run_once, update_dashboard_schedule, latest_recorded_buy_time
@@ -153,8 +155,7 @@ class Runtime:
             # scheduling metadata for cosmetic feature toggles and account edits.
             schedule_fields = ('exchange', 'quote', 'buy_amount', 'deposit_day', 'timezone', 'live', 'check_interval_seconds', 'startup_delay_seconds', 'order_status_check_seconds')
             schedule_changed = not previous['complete'] or identity_changed or any(values[k] != previous['settings'][k] for k in schedule_fields)
-            for key, value in settings.items():
-                if key != 'first_purchase_done': self.settings[key] = value
+            self.settings.update(settings)
             old_api = self.api
             self.api = adapter
             if old_api and hasattr(old_api, 'session'): old_api.session.close()
@@ -166,7 +167,6 @@ class Runtime:
             if not previous['complete'] or identity_changed or financial_mode_changed:
                 self.exchange_check_pending = True
             if schedule_changed:
-                self.settings['first_purchase_done'] = False
                 self.settings.pop('startup_last_buy_at', None)
                 self.startup_pending = True
                 self.ready_at = time.monotonic() + (values['startup_delay_seconds'] if not previous['complete'] else 0)

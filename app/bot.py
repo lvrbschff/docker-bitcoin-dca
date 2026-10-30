@@ -6,7 +6,6 @@ import time
 import uuid
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal, ROUND_CEILING, ROUND_DOWN
-from pathlib import Path
 from zoneinfo import ZoneInfo
 import calendar
 import threading
@@ -26,7 +25,6 @@ def serialized(function):
 
 import requests
 from activity import append_activity_records, read_dashboard_snapshot, write_dashboard_snapshot, ledger_balance, withdrawal_records, write_json_atomic, get_activity_record, latest_real_buy
-from exchange import create_exchange
 from storage import STATE_PATH, prepare_storage
 
 LOG = logging.getLogger("bitcoin-dca")
@@ -157,28 +155,6 @@ def persist_bot_withdrawal(api, withdrawal, result, settings, context):
     return append_activity_records([record])
 
 
-
-def estimate_withdrawal(settings, btc_balance, price, order_amount, possible_buys, due, interval_seconds, now):
-    """Project only purchases affordable with the current budget, at a constant price."""
-    from decimal import ROUND_CEILING
-    if not settings["withdrawals_enabled"]:
-        return None, "Automatic withdrawals disabled"
-    if not settings["live"]:
-        return None, "Unavailable in simulation mode"
-    if btc_balance is None or price <= 0:
-        return None, "Waiting for account balance and price"
-    missing = settings["withdraw_threshold"] / price - btc_balance
-    if missing <= 0:
-        return now, "Threshold reached; awaiting automatic withdrawal check"
-    if order_amount <= 0 or due is None:
-        return None, "Waiting for a purchase schedule"
-    buys = int((missing / order_amount).to_integral_value(rounding=ROUND_CEILING))
-    if buys > possible_buys:
-        return None, "Additional funds required to reach the threshold"
-    return max(now, due) + timedelta(seconds=(buys - 1) * interval_seconds), (
-        f"Estimate after {buys} purchase(s), at the current price and interval")
-
-
 def update_dashboard_snapshot(settings, quote_balance, price, btc_balance=None):
     tracked_btc = ledger_balance()
     previous = read_dashboard_snapshot()
@@ -197,20 +173,14 @@ def update_dashboard_snapshot(settings, quote_balance, price, btc_balance=None):
     })
 
 
-def update_dashboard_schedule(next_purchase_at, status, withdrawal_estimate=None, forecast_plan=None):
+def update_dashboard_schedule(next_purchase_at, status, forecast_plan=None):
     snapshot = read_dashboard_snapshot()
     snapshot["nextPurchaseAt"] = (
         next_purchase_at.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
         if next_purchase_at is not None else None
     )
     snapshot["nextPurchaseStatus"] = status
-    snapshot["estimatedWithdrawalAt"] = None
-    snapshot["estimatedWithdrawalStatus"] = "Waiting for a purchase schedule"
     snapshot["withdrawalForecastPlan"] = forecast_plan
-    if withdrawal_estimate is not None:
-        at, reason = withdrawal_estimate
-        snapshot["estimatedWithdrawalAt"] = at.isoformat() if at else None
-        snapshot["estimatedWithdrawalStatus"] = reason
     write_dashboard_snapshot(snapshot)
 
 
@@ -246,7 +216,6 @@ def persist_simulated_buy(api, settings, amount, price, quote_amount, estimated_
 def ceil_to_places(value, places):
     quantum = Decimal(1).scaleb(-int(places))
     return value.quantize(quantum, rounding=ROUND_CEILING)
-
 
 
 def maybe_withdraw_btc(api, state, settings, manual_request=None):
@@ -439,7 +408,6 @@ def reconcile_pending_order(api, state, state_path, settings, check_interval):
     state["last_order_quote"] = str(order_cost)
     state.pop("pending_order", None)
     save_state(state_path, state)
-    settings["first_purchase_done"] = True
     settings["startup_last_buy_at"] = None
     LOG.info(
         "Confirmed %s order %s ended (status=%s); saved %s activity record(s). Recalculating the purchase schedule.",
@@ -559,9 +527,7 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
     state['schedule']={'fingerprint':fingerprint,'dueAt':due.isoformat()}
     save_state(state_path,state)
     remaining=max(0,int((due.astimezone(timezone.utc)-now.astimezone(timezone.utc)).total_seconds()))
-    withdrawal_estimate = estimate_withdrawal(
-        settings, exchange_btc, price, order_amount, possible_buys, due, interval_seconds, now)
-    update_dashboard_schedule(due, 'Scheduled' if remaining else 'Due now', withdrawal_estimate, {
+    update_dashboard_schedule(due, 'Scheduled' if remaining else 'Due now', {
         "orderAmount": str(order_amount), "plannedCost": str(planned_cost),
         "budget": str(affordable_budget), "intervalSeconds": interval_seconds,
         "nextDepositAt": next_deposit.isoformat(),
@@ -633,7 +599,6 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
         added = persist_simulated_buy(api, settings, order_amount, price, order_quote, estimated_fee)
         LOG.info("Saved %s simulated purchase record(s) for the web UI; excluded from the Parqet CSV export.", added)
 
-    settings["first_purchase_done"] = True
     settings["startup_last_buy_at"] = None
     # Debit budget for dry-run too, to make its monthly schedule representative.
     state["spent"] = str(spent + order_quote + estimated_fee)
@@ -643,26 +608,6 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
     save_state(state_path, state)
     # Reuse this cycle's data for pure schedule recomputation after a simulation.
     return _run_once(api, settings, check_interval, schedule_only=True, cycle_data=cycle_data)
-
-
-def make_worker(api, settings, interval):
-    from worker import Worker
-    def startup():
-        settings['startup_last_buy_at']=latest_recorded_buy_time()
-        settings['startup_schedule_log_pending'] = True
-        last_buy = settings['startup_last_buy_at']
-        if last_buy:
-            LOG.info("Startup history: latest recorded real Bitcoin purchase=%s; aligning the next purchase to this execution time.",
-                     last_buy.astimezone(ZoneInfo(settings['timezone'])).isoformat(timespec='seconds'))
-        else:
-            LOG.info("Startup history: no recorded real Bitcoin purchase found; using saved execution time if available.")
-        update_dashboard_schedule(None,'Calculating purchase schedule')
-    LOG.info('Startup: waiting %ss before checking purchase history and calculating the schedule.',
-             settings['startup_delay_seconds'])
-    update_dashboard_schedule(None,'Waiting for startup delay')
-    return Worker(lambda:run_once(api,settings,interval),manual_withdrawal_service(api,settings),
-                  startup,interval,settings['startup_delay_seconds'],
-                  on_error=lambda:update_dashboard_schedule(None,'Account check failed; waiting for retry'))
 
 
 def manual_withdrawal_service(api, settings):

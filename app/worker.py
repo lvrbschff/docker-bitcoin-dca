@@ -7,7 +7,6 @@ import queue
 import threading
 import time
 import uuid
-from pathlib import Path
 from activity import write_json_atomic
 
 LOG=logging.getLogger('bitcoin-dca.worker')

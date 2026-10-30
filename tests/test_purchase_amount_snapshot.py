@@ -1,7 +1,8 @@
 """Account-check purchase quantities reach both dashboard endpoints."""
+from activity_helpers import totals_from_records
 import unittest
 from decimal import Decimal
-from analytics import report, totals_from_records
+from analytics import report
 
 class PurchaseAmountSnapshotTests(unittest.TestCase):
     def test_report_preserves_exchange_identity_and_calculated_purchase_amount(self):

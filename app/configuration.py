@@ -186,5 +186,5 @@ class ConfigStore:
 
 def runtime_settings(values):
     result = dict(values)
-    result.update(buy_amount=Decimal(values['buy_amount']), withdraw_threshold=Decimal(values['withdraw_threshold']), first_purchase_done=False)
+    result.update(buy_amount=Decimal(values['buy_amount']), withdraw_threshold=Decimal(values['withdraw_threshold']))
     return result

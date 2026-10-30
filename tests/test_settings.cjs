@@ -68,7 +68,7 @@ assert.equal(setupRequests.length,0,'Step two reviews settings without editing a
 console.log('First-run step two passed without credential fields');
 
 // The dashboard owns a native modal and accepts messages only from its settings frame.
-const dashboard=execFileSync('python3',['-c',`import ast;from pathlib import Path;m=ast.parse(Path('app/web_ui.py').read_text());print(next(ast.literal_eval(n.value) for n in m.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='HTML' for t in n.targets)))`],{cwd:root,encoding:'utf8'});
+const dashboard=execFileSync('python3',['-c',`import ast,sys;from pathlib import Path;sys.path.insert(0,'app');from scroll_ui import SCROLL_CSS,SCROLL_SCRIPT;m=ast.parse(Path('app/web_ui.py').read_text());page=next(ast.literal_eval(n.value) for n in m.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='HTML' for t in n.targets) and isinstance(n.value,ast.Constant));print(page.replace('__SCROLL_CSS__',SCROLL_CSS).replace('__SCROLL_SCRIPT__',SCROLL_SCRIPT))`],{cwd:root,encoding:'utf8'});
 const modalScript=dashboard.match(/<script data-ui-settings>([\s\S]*?)<\/script>/)[1];
 const modalElements=Object.fromEntries(['settingsDialog','settingsFrame','openSettings','closeSettings'].map(id=>[id,new Element()]));
 const frameWindow={},events={};modalElements.settingsFrame.contentWindow=frameWindow;let reloads=0;
@@ -82,3 +82,15 @@ events.message({origin:'http://dashboard.test',source:{},data:{type:'dca-setting
 events.message({origin:'http://dashboard.test',source:frameWindow,data:{type:'dca-settings-saved'}});assert.equal(reloads,1);
 events.message({origin:'http://dashboard.test',source:frameWindow,data:{type:'dca-settings-auth-required'}});assert.equal(modalWindow.location.href,'/');
 console.log('Settings modal passed: open/close, secret cleanup, origin/source checks and save/auth handling');
+
+// Settings share dashboard scroll behavior, including resize and disappearing edge hints.
+const scrollSnippet=page.match(/<script data-ui-scroll-areas>([\s\S]*?)<\/script>/)[1];
+const scrollClasses=new Set(),scrollEvents={};let resizeScroll,finishScroll;
+const area={clientWidth:280,scrollWidth:760,scrollLeft:0,firstElementChild:{},classList:{toggle(name,on){on?scrollClasses.add(name):scrollClasses.delete(name)},add(name){scrollClasses.add(name)},remove(name){scrollClasses.delete(name)}},addEventListener(name,fn){scrollEvents[name]=fn}};
+vm.runInNewContext(scrollSnippet,{document:{querySelectorAll:selector=>selector==='.horizontal-scroll'?[area]:[]},ResizeObserver:class{constructor(fn){resizeScroll=fn}observe(){}},WeakMap,setTimeout:fn=>{finishScroll=fn;return 1},clearTimeout(){}});
+assert(scrollClasses.has('has-overflow'));assert(scrollClasses.has('has-more-right'));
+area.scrollLeft=480;scrollEvents.scroll();assert(!scrollClasses.has('has-more-right'));assert(scrollClasses.has('is-scrolling'));finishScroll();assert(!scrollClasses.has('is-scrolling'));
+area.clientWidth=900;resizeScroll();assert(!scrollClasses.has('has-overflow'));
+assert(page.includes('grid-template-rows:repeat(2,auto);grid-auto-flow:column'));
+assert.equal((page.match(/class="horizontal-scroll"/g)||[]).length,7);
+console.log('Settings scrolling passed: two-row layout, overflow, edge fade, resize and scroll feedback');

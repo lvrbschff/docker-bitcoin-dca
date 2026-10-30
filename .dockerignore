@@ -4,3 +4,7 @@
 state
 **/__pycache__
 **/*.pyc
+docs
+tests
+.github
+README.md

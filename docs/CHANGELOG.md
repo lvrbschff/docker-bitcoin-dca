@@ -4,6 +4,12 @@ Release history based on the published [GitHub Releases](https://github.com/oli7
 
 ## Unreleased
 
+- Added responsive horizontal scrolling with two card rows to mobile settings, sharing dashboard scrollbar and edge-fade behavior.
+
+- Removed unused activity deletion/query helpers, the obsolete worker bootstrap and superseded withdrawal estimator.
+- Consolidated report tests around the active runtime and paginated SQLite queries; removed stale imports, flags and styles.
+- Avoided unchanged state rewrites and excluded documentation/tests from the Docker build context.
+
 - Fixed the restart loop when saved settings or history exist but scheduling state is missing.
 - Replaced manual account recovery with automatic startup exchange checks; new purchases and withdrawals wait for open transactions to close.
 - Preserved saved configuration and recorded activity while rebuilding the purchase schedule after startup checks.

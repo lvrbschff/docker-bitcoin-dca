@@ -42,19 +42,6 @@ def withdrawal_gross(record):
     return amount
 
 
-def tracked_bitcoin_balance(records):
-    total = Decimal(0)
-    for record in bitcoin_activity_records(records):
-        if record.get('simulated'):
-            continue
-        row = record['row']
-        if row.get('type') == 'Buy':
-            total += Decimal(row['shares'])
-        elif row.get('type') == 'TransferOut':
-            total -= withdrawal_gross(record)
-    return total
-
-
 class _DecimalSum:
     def __init__(self): self.value = Decimal(0)
     def step(self, value): self.value += Decimal(str(value or '0'))
@@ -139,26 +126,6 @@ def read_activity_records():
         return [json.loads(r[0]) for r in db.execute('SELECT payload FROM activity ORDER BY timestamp,id')]
 
 
-def read_bitcoin_activity_records():
-    with _db() as db:
-        return [json.loads(r[0]) for r in db.execute("SELECT payload FROM activity WHERE asset='BTC' ORDER BY timestamp,id")]
-
-
-def activity_page(start, end, page=1, limit=20):
-    limit = max(1, min(1000, int(limit)))
-    with _db() as db:
-        where = "asset='BTC' AND timestamp>? AND timestamp<=?"
-        total = db.execute('SELECT count(*) FROM activity WHERE '+where, (start,end)).fetchone()[0]
-        page = max(1, min(int(page), max(1, (total+limit-1)//limit)))
-        rows = db.execute('SELECT payload FROM activity WHERE '+where+' ORDER BY timestamp DESC,id DESC LIMIT ? OFFSET ?', (start,end,limit,(page-1)*limit))
-        return [json.loads(r[0]) for r in rows], total, page
-
-
-def period_records(start, end):
-    with _db() as db:
-        return [json.loads(r[0]) for r in db.execute("SELECT payload FROM activity WHERE asset='BTC' AND timestamp>? AND timestamp<=? ORDER BY timestamp,id", (start,end))]
-
-
 def parqet_interval_records(start, end):
     """Return the complete cycle ending at the last selected confirmed withdrawal."""
     with _db() as db:
@@ -214,21 +181,6 @@ def withdrawal_records(unresolved=False):
     if unresolved: query += " AND status NOT IN ('completed','failed','canceled','cancelled')"
     query += ' ORDER BY timestamp,id'
     with _db() as db: return [json.loads(r[0]) for r in db.execute(query)]
-
-
-def delete_activity_record(activity_id):
-    with _db() as db:
-        return db.execute("DELETE FROM activity WHERE id=? AND kind='Buy'", (activity_id,)).rowcount > 0
-
-
-def cache_get(key):
-    with _db() as db:
-        row = db.execute('SELECT value,updated FROM cache WHERE key=?', (key,)).fetchone()
-        return (json.loads(row[0]), row[1]) if row else None
-
-
-def cache_put(key, value):
-    with _db() as db: db.execute('INSERT OR REPLACE INTO cache VALUES(?,?,?)', (key,json.dumps(value),time.time()))
 
 
 def read_dashboard_snapshot():

@@ -2,7 +2,8 @@
 const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
 const html=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',`import ast,json
 from pathlib import Path
-m=ast.parse(Path('app/web_ui.py').read_text());print(json.dumps(next(ast.literal_eval(n.value) for n in m.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='HTML' for t in n.targets))))`],{encoding:'utf8'}));
+import sys;sys.path.insert(0,'app');from scroll_ui import SCROLL_CSS,SCROLL_SCRIPT
+m=ast.parse(Path('app/web_ui.py').read_text());page=next(ast.literal_eval(n.value) for n in m.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='HTML' for t in n.targets) and isinstance(n.value,ast.Constant));print(json.dumps(page.replace('__SCROLL_CSS__',SCROLL_CSS).replace('__SCROLL_SCRIPT__',SCROLL_SCRIPT)))`],{encoding:'utf8'}));
 const script=html.split('<script>')[1].split('</script>')[0];
 class Element{
  constructor(){this.value='';this.children=[];this.handlers={};this.textContent='';this.disabled=false;this.classList={toggle(){},add(){},remove(){}}}
@@ -76,7 +77,7 @@ const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate)};
  eurOnly=false;priceUnavailable=false;invalidUsdRate=true;await vm.runInContext('loadAnalytics()',context);
  assert.equal(get('buyVolume').textContent,'—','Invalid foreign rates must not produce incorrect totals');
  assert.equal(get('error').textContent,'A required currency conversion is unavailable; monetary totals are hidden.');
- assert(html.includes('sup{color:#fff}'),'All superscript references must be white');
+ assert(!html.includes('<sup'),'Superscript references are no longer displayed');
  withdrawalUnavailable=true;
  const submissions=requests.filter(u=>u==='/api/withdrawal/preview'||u==='/api/withdrawal/confirm').length;
  await get('manualWithdraw').handlers.click();

@@ -11,6 +11,7 @@ import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 import activity
 import bot
@@ -325,6 +326,25 @@ class ConfigurationTests(unittest.TestCase):
         self.assertEqual(saved['pending_order'],state['pending_order'])
         self.assertEqual(saved['last_order_at'],state['last_order_at'])
         self.assertNotIn('Account recovery',settings_ui.settings_page(self.store))
+
+    def test_unchanged_account_binding_does_not_rewrite_scheduling_state(self):
+        self.ready(startup_delay_seconds=0)
+        self.app._synchronize_state()
+        before=self.app.state_path.read_bytes()
+        with patch.object(activity,'write_json_atomic') as write:
+            self.app._synchronize_state()
+            self.app._check_exchange_activity()
+        write.assert_not_called()
+        self.assertEqual(self.app.state_path.read_bytes(),before)
+
+    def test_active_runtime_logs_startup_purchase_history(self):
+        self.ready(startup_delay_seconds=0)
+        last=datetime(2026,10,28,11,tzinfo=timezone.utc)
+        with patch.object(bot,'latest_recorded_buy_time',return_value=last),patch.object(bot,'run_once'):
+            with self.assertLogs(runtime.LOG,level='INFO') as logs:self.app.cycle()
+        self.assertTrue(any('Startup history:' in line and str(last) in line for line in logs.output))
+        self.assertEqual(self.app.settings['startup_last_buy_at'],last)
+        self.assertTrue(self.app.settings['startup_schedule_log_pending'])
 
     def test_credential_pages_have_independent_save_scope(self):
         self.ready()

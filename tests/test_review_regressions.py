@@ -47,7 +47,6 @@ class ReviewTests(unittest.TestCase):
         buys=self.record();out=self.record('withdraw','TransferOut',status='completed')
         activity.append_activity_records([buys,out])
         self.assertEqual(activity.ledger_balance(),D(0))
-        self.assertEqual(activity.tracked_bitcoin_balance([buys,out]),D(0))
         row=reporting.parqet_aggregate_rows([buys,out],'KRAKEN')[0]
         self.assertEqual(D(row['shares']),D('.0044'))
         out['withdrawalStatus']='failed';activity.update_activity_record(out)
@@ -78,15 +77,14 @@ class ReviewTests(unittest.TestCase):
     def test_pagination_transfers_only_requested_rows_and_keeps_exact_totals(self):
         records=[self.record(str(i)) for i in range(105)]
         activity.append_activity_records(records)
-        page,total,n=activity.activity_page(0,2**62,3,20)
+        page,total,n,groups,_=activity.read_report(0,2**62,3,20)
         self.assertEqual((len(page),total,n),(20,105,3))
-        groups=activity.activity_totals()
         self.assertEqual(D(groups[0]['amount']),D(359)*105)
         self.assertEqual(D(groups[0]['fee']),D('.8975')*105)
         summary=analytics.report(self.settings,groups,{},page)
         self.assertEqual(summary['summary']['buyCount'],105)
         self.assertEqual(len(summary['activities']),20)
-        page,total,n=activity.activity_page(0,2**62,100,20)
+        page,total,n,_,_=activity.read_report(0,2**62,100,20)
         self.assertEqual((len(page),n),(5,6))
 
     def test_mixed_currency_totals_are_separate(self):
@@ -181,16 +179,6 @@ class ReviewTests(unittest.TestCase):
         self.assertIn('calculated purchase interval=',lines[0])
         self.assertIn('next purchase=',lines[0]);self.assertIn('remaining wait=',lines[0])
         api.buy_btc.assert_not_called()
-
-    def test_startup_logs_history_and_delay(self):
-        last=datetime(2026,10,28,11,tzinfo=timezone.utc)
-        with patch.object(bot,'latest_recorded_buy_time',return_value=last),patch.object(bot,'update_dashboard_schedule'):
-            with self.assertLogs(bot.LOG,level='INFO') as logs:
-                account=bot.make_worker(self.cycle_api(),self.settings,300)
-                account.startup()
-        self.assertTrue(any('Startup: waiting 0s' in line for line in logs.output))
-        self.assertTrue(any('latest recorded real Bitcoin purchase=2026-10-28T12:00:00+01:00' in line for line in logs.output))
-        self.assertTrue(self.settings['startup_schedule_log_pending'])
 
     def test_each_periodic_check_logs_actual_due_time_and_remaining_minutes(self):
         now=datetime(2026,10,28,12,tzinfo=timezone.utc)

@@ -1,4 +1,5 @@
 """Only executed buys and exchange-confirmed withdrawals receive confirmation labels."""
+from activity_helpers import totals_from_records
 from unittest import TestCase
 from unittest.mock import Mock, patch
 from configuration import DEFAULTS, runtime_settings
@@ -18,7 +19,7 @@ class ActivityStatusTests(TestCase):
                  self.record('failed','TransferOut',withdrawalStatus='failed'),
                  self.record('legacy','TransferOut',withdrawalStatus='legacy_unverified')]
         settings=runtime_settings(DEFAULTS);settings['display_currency']='USD'
-        report=analytics.report(settings,analytics.totals_from_records(records),{},records)
+        report=analytics.report(settings,totals_from_records(records),{},records)
         self.assertEqual(report['configuration']['displayCurrency'],'USD')
         rows={r['activityId']:r for r in report['activities']}
         self.assertEqual(rows['buy']['purchaseStatus'],'confirmed')

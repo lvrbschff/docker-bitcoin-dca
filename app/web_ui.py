@@ -20,12 +20,14 @@ from concurrent.futures import ThreadPoolExecutor
 import price_cache
 from exchange_errors import UncertainWithdrawalError
 from favicon_assets import FAVICON_ICO, FAVICON_PNG, APPLE_TOUCH_ICON_PNG, FAVICON_MASK_SVG
-from analytics import report as build_report, totals_from_records
-from activity import activity_page, activity_totals, parqet_interval_records, ledger_balance, withdrawal_records, read_report
+from analytics import report as build_report
+from activity import parqet_interval_records, withdrawal_records, read_report
 
-from activity import bitcoin_activity_records, read_dashboard_snapshot
+from activity import read_dashboard_snapshot
 from reporting import parqet_aggregate_rows, parqet_csv
 
+
+from scroll_ui import SCROLL_CSS, SCROLL_SCRIPT
 
 def withdrawal_forecast(settings, snapshot, monthly_deposit, now):
     """Project monthly deposits and purchases at a constant BTC price and order cost."""
@@ -112,7 +114,7 @@ HTML = """<!doctype html>
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#1b2a49 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
 .dashboard-brand{display:flex;align-items:center;gap:12px;margin-bottom:6px;min-width:0}.dashboard-logo{display:block;width:48px;height:48px;flex:0 0 48px;border-radius:11px}.dashboard-brand h1{min-width:0;overflow-wrap:anywhere}
 main{max-width:1180px;margin:0 auto;padding:36px 22px 64px}.top{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:26px}.eyebrow{color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}h1{font-size:30px;margin:4px 0}.sub{color:var(--muted);margin:0}
-.bottom-actions{display:flex;justify-content:flex-end;margin-top:20px}.badge{border:1px solid var(--line);border-radius:999px;padding:8px 12px;color:var(--muted);font-size:12px}.top-actions{display:flex;flex-direction:column;align-items:flex-end;gap:10px}.top-actions form{margin:0;flex:0 0 auto}.top-actions>button{width:auto;flex:0 0 auto}.withdraw-action{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:0}#withdrawMessage:empty{display:none}.top-actions .field{min-width:170px}.top-actions .field label{margin-bottom:5px}
+.bottom-actions{display:flex;justify-content:flex-end;margin-top:20px}.top-actions{display:flex;flex-direction:column;align-items:flex-end;gap:10px}.top-actions form{margin:0;flex:0 0 auto}.top-actions>button{width:auto;flex:0 0 auto}.withdraw-action{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:0}#withdrawMessage:empty{display:none}.top-actions .field{min-width:170px}.top-actions .field label{margin-bottom:5px}
 .panel{background:linear-gradient(145deg,rgba(21,31,52,.96),rgba(15,22,39,.96));border:1px solid var(--line);border-radius:18px;padding:20px;margin:18px 0;box-shadow:0 14px 40px #0002}
 .panel.activity-panel{margin:0;background:#0c1425a8;box-shadow:none}
 .controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}select,input,button{font:inherit;color:var(--text);background:#0c1425;border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%}button{width:auto;cursor:pointer;background:var(--accent);border-color:var(--accent);color:#081122;font-weight:700}button.secondary{background:transparent;color:var(--text);border-color:var(--line)}
@@ -131,7 +133,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 .value{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .time-value,.countdown-value{white-space:normal;overflow-wrap:anywhere}
 .tablewrap{width:100%;max-width:100%;min-width:0;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
-#activities td{padding:5px 10px}.activity-status{font-size:12px;white-space:nowrap}.status-confirmed{color:#5ed6b0}.status-pending{color:#e7c174}.status-failed{color:#ffacac}.status-muted{color:var(--muted)}#activities button{padding:3px 9px;line-height:1.4;font-size:13px;border-radius:7px}
+#activities td{padding:5px 10px}.activity-status{font-size:12px;white-space:nowrap}.status-confirmed{color:#5ed6b0}.status-pending{color:#e7c174}.status-failed{color:#ffacac}.status-muted{color:var(--muted)}
 .page-jump{display:flex;align-items:center;gap:8px;margin:0;font-size:12px;color:var(--muted)}.page-jump input{width:76px;padding:7px 8px}.page-jump button{flex:none}
 .pagination{flex-wrap:wrap}.pagination .notice{flex:1;min-width:100px}
 @media(max-width:1100px){.period-summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.controls{grid-template-columns:repeat(3,minmax(0,1fr))}.controls>button{grid-column:1/-1}}
@@ -169,7 +171,6 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 .report-controls>.sub{margin-bottom:16px;font-size:14px}
 
 @media(max-width:600px){.report-heading h2,.panel-heading h2{font-size:19px}}
-sup{color:#fff}.footnote-ref{margin-left:3px}
 .dashboard-footnotes{margin-top:30px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
 .dashboard-footnotes h2{color:#c2cde0;font-size:14px;margin:0 0 12px}.dashboard-footnotes ol{list-style:none;margin:0;padding:0}.dashboard-footnotes li{padding-left:0;margin-bottom:14px;scroll-margin-top:20px}.dashboard-footnotes strong{color:var(--muted);font-weight:600}.dashboard-footnotes p{margin:4px 0 0}
 .export-feedback{margin:10px 0 0;text-align:right;color:var(--red);font-size:13px;line-height:1.6;overflow-wrap:anywhere}
@@ -262,16 +263,7 @@ details.panel:not([open])>summary{border-radius:11px}
 body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
 
 /* Scroll only when content cannot fit; preserve a usable card width. */
-.horizontal-scroll{max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:0;scrollbar-width:thin;scrollbar-color:#536987 #111a2d}
-.horizontal-scroll.has-overflow{padding-bottom:16px}
-.horizontal-scroll::-webkit-scrollbar{height:10px}
-.horizontal-scroll::-webkit-scrollbar-track{background:#111a2d;border-radius:6px}
-.horizontal-scroll::-webkit-scrollbar-thumb{background:#536987;border:2px solid #111a2d;border-radius:6px}
-.horizontal-scroll::-webkit-scrollbar-thumb:hover{background:#8bafff}
-.horizontal-scroll::-webkit-scrollbar-thumb:active{background:#b0c6ff}
-.horizontal-scroll.has-overflow:hover,.horizontal-scroll.is-scrolling{scrollbar-color:#8bafff #111a2d}
-.horizontal-scroll.is-scrolling::-webkit-scrollbar-thumb{background:#8bafff}
-.horizontal-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+__SCROLL_CSS__
 .configuration-scroll .configuration-grid{grid-template-columns:repeat(4,minmax(220px,1fr))}
 .report-cards{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:var(--tile-gap);min-width:0}
 .report-scroll .period-summary-grid,.report-scroll .summary-secondary-grid{display:contents}
@@ -289,10 +281,7 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 @media(max-width:480px){.confirmation-dialog{padding:18px}.confirmation-values{grid-template-columns:minmax(0,1fr)}.confirmation-values dd{text-align:left;margin-top:-8px}.confirmation-actions button{flex:1}}
 
 /* Fade only overflowing card rows with more content to their right. */
-.horizontal-scroll:not(.tablewrap).has-more-right{
- -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 32px),rgba(0,0,0,.18));
- mask-image:linear-gradient(to right,#000 calc(100% - 32px),rgba(0,0,0,.18));
-}
+
 #activities tr{height:34px}#activities .activity-placeholder{user-select:none;pointer-events:none}
 
 :root{--subsection-space:20px;--section-space:24px;--tile-gap:14px}
@@ -421,30 +410,7 @@ document.querySelectorAll("[data-dismiss]").forEach(button=>button.addEventListe
  });
 })();
 </script>
-<script data-ui-scroll-areas>
-(()=>{
- const areas=[...document.querySelectorAll(".horizontal-scroll")];
- const timers=new WeakMap();
- function update(area){
-  const overflow=area.clientWidth>0&&area.scrollWidth>area.clientWidth+1;
-  area.classList.toggle("has-overflow",overflow);
-  area.classList.toggle("has-more-right",overflow&&area.scrollLeft+area.clientWidth<area.scrollWidth-2);
- }
- const observer=new ResizeObserver(()=>areas.forEach(update));
- areas.forEach(area=>{
-  observer.observe(area);
-  if(area.firstElementChild)observer.observe(area.firstElementChild);
-  area.addEventListener("scroll",()=>{
-   update(area);
-   area.classList.add("is-scrolling");
-   clearTimeout(timers.get(area));
-   timers.set(area,setTimeout(()=>area.classList.remove("is-scrolling"),180));
-  },{passive:true});
-  update(area);
- });
- document.querySelectorAll("details.panel").forEach(panel=>panel.addEventListener("toggle",()=>areas.forEach(update)));
-})();
-</script>
+__SCROLL_SCRIPT__
 <script data-ui-scroll>
 (()=>{
  const brand=document.querySelector(".top .dashboard-brand");
@@ -812,6 +778,8 @@ _SESSION_LOCK = RLock()
 _SESSIONS = {}
 
 
+HTML = HTML.replace("__SCROLL_CSS__", SCROLL_CSS).replace("__SCROLL_SCRIPT__", SCROLL_SCRIPT)
+
 def _login_page(error=""):
     return LOGIN_HTML.replace("{{ERROR}}", html.escape(error))
 
@@ -887,7 +855,6 @@ def _period(query):
     if start_ms < 0 or end_ms <= start_ms or end_ms > now_ms + 60_000:
         raise ValueError("Invalid period; end must be after start and not in the future")
     return start_ms, end_ms
-
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -1349,11 +1316,6 @@ class Handler(BaseHTTPRequestHandler):
 def _row_timestamp_ms(row):
     value = datetime.fromisoformat(row["datetime"].replace("Z", "+00:00"))
     return int(value.timestamp() * 1000)
-
-
-def _analytics_from_rows(settings, records, snapshot):
-    records=bitcoin_activity_records(records)
-    return build_report(settings,totals_from_records(records),snapshot,records)
 
 
 def serve(settings, port, withdrawal_service=None, worker=None, runtime=None):

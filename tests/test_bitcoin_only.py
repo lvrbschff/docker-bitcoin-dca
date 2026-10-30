@@ -1,4 +1,5 @@
 """Bitcoin-only trading, legacy-history isolation, and configuration regressions."""
+from activity_helpers import totals_from_records
 import os
 import time
 import tempfile
@@ -9,6 +10,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import activity
+import analytics
 import bitvavo
 import bot
 import kraken
@@ -164,7 +166,7 @@ class BitcoinOnlyTests(unittest.TestCase):
         bitcoin, ether = self.record('BTC'), self.record('ETH')
         ether['row']['datetime'] = '2026-10-25T12:00:00Z'
         activity.append_activity_records([bitcoin, ether])
-        self.assertEqual(activity.read_bitcoin_activity_records(), [bitcoin])
+        self.assertEqual(activity.read_report(0,2**63-1)[0], [bitcoin])
         self.assertEqual(bot.latest_recorded_buy_time(), datetime(2026, 10, 20, 12, tzinfo=timezone.utc))
         bot.update_dashboard_snapshot(self.settings, Decimal('10'), Decimal('80000'))
         self.assertEqual(Decimal(activity.read_dashboard_snapshot()['trackedBtc']), Decimal('.001'))
@@ -182,11 +184,11 @@ class BitcoinOnlyTests(unittest.TestCase):
         self.assertEqual(Decimal(result[0]['shares']), Decimal('.001'))
         self.assertEqual(result[0]['assetType'], 'Crypto')  # Required by Parqet's format.
         self.assertEqual(reporting.parqet_aggregate_rows([self.record('ETH'), self.record('ETH', 'TransferOut')], 'KRAKEN'), [])
-        analytics = web_ui._analytics_from_rows(self.settings, records, {})
-        self.assertEqual(analytics['summary']['buyCount'], 1)
-        self.assertEqual(analytics['summary']['withdrawalCount'], 1)
-        self.assertEqual(len(analytics['activities']), 3)
-        self.assertNotIn('baseAsset', analytics['configuration'])
+        result_analytics = analytics.report(self.settings, totals_from_records(records), {}, activity.bitcoin_activity_records(records))
+        self.assertEqual(result_analytics['summary']['buyCount'], 1)
+        self.assertEqual(result_analytics['summary']['withdrawalCount'], 1)
+        self.assertEqual(len(result_analytics['activities']), 3)
+        self.assertNotIn('baseAsset', result_analytics['configuration'])
 
     def test_http_report_replaces_stale_mixed_asset_balance(self):
         activity.append_activity_records([self.record('BTC'), self.record('ETH')])
