@@ -18,7 +18,7 @@ docker compose up -d --build
 
 Open `http://<docker-host-ip>:6890`. The setup wizard first creates your username and password (12+ characters), then configures the exchange, API access and purchases. There is no default account; new installations start in dry run.
 
-**Settings**, beside **Log out**, opens a dialog for **Dashboard Credentials**, exchange access, purchases and withdrawal settings. **Trading and dashboard** groups the live-trading, automatic/manual withdrawal and Parqet switches with display currency. Disabled features also hide their controls and notes.
+**Settings**, beside **Log out**, opens a dialog with separate buttons for editing **Dashboard Credentials** and API access/withdrawal targets. **Bot Configuration** groups purchase settings and the withdrawal threshold, each with a short explanation. **Trading and dashboard** groups the live-trading, automatic/manual withdrawal and Parqet switches with display currency. Disabled features also hide their controls and notes.
 
 | Exchange | API permissions | Bitcoin withdrawal destination |
 | --- | --- | --- |
