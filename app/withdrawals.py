@@ -1,9 +1,13 @@
 """Reconcile submitted withdrawals conservatively against exchange history."""
 import time
+import logging
+from logging_utils import log_transition
 from decimal import Decimal
 from datetime import datetime, timezone
 from activity import withdrawal_records, update_activity_record
 
+
+LOG = logging.getLogger("bitcoin-dca.withdrawals")
 
 def reconcile_withdrawals(api, settings, force=False):
     now=time.monotonic()
@@ -37,6 +41,12 @@ def reconcile_withdrawals(api, settings, force=False):
                     and gross==Decimal(str(record.get('grossWithdrawalAmountBtc','-1')))):
                 matches.append(candidate)
         if len(matches)!=1:
+            legacy = record.get('withdrawalStatus') == 'legacy_unverified'
+            overdue = not legacy and time.time() - stamp / 1000 >= 3600
+            level = logging.DEBUG if legacy else logging.ERROR if overdue else logging.WARNING
+            log_transition(LOG, api, 'withdrawal-verification:' + record['id'], 'overdue' if overdue else 'ambiguous', level,
+                           'BTC withdrawal %s has no unique exchange-history match; verification deferred%s.',
+                           identifier, '; unresolved for at least one hour, check exchange status' if overdue else '')
             record['nextVerificationAt']=time.time()+(86400 if record.get('withdrawalStatus')=='legacy_unverified' else 300)
             record['verificationNote']='No unique exchange-history match; not exportable.'
             update_activity_record(record)
@@ -49,6 +59,7 @@ def reconcile_withdrawals(api, settings, force=False):
         record.pop('nextVerificationAt',None)
         record.pop('verificationNote',None)
         record['exchange']=settings['exchange']
+        previous_status = record.get('withdrawalStatus')
         record['withdrawalStatus']=status
         record['exchangeStatus']=str(found.get('status',''))
         record['txId']=found.get('txId','')
@@ -62,3 +73,8 @@ def reconcile_withdrawals(api, settings, force=False):
         row['amount']=str(net*Decimal(row['price']))
         row['fee']=str(fee*Decimal(row['price']))
         update_activity_record(record)
+        if previous_status != status:
+            LOG.log(logging.WARNING if status == 'failed' else logging.INFO,
+                    'BTC withdrawal %s status changed: %s -> %s (exchange status=%s)',
+                    identifier, previous_status, status, record['exchangeStatus'])
+

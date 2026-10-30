@@ -11,7 +11,8 @@ from zoneinfo import ZoneInfo
 import calendar
 import threading
 from functools import wraps
-from exchange_errors import DefinitiveRejection
+from exchange_errors import DefinitiveRejection, UncertainWithdrawalError
+from logging_utils import log_transition, clear_transition
 from withdrawals import reconcile_withdrawals
 
 BOT_LOCK = threading.RLock()
@@ -265,7 +266,7 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
     if not settings["withdrawals_enabled"] and manual_request is None and not state.get("pending_withdrawal"):
         return
     if not settings["live"]:
-        LOG.warning("Automatic withdrawal is enabled but LIVE_TRADING is false; no withdrawal will be sent.")
+        log_transition(LOG, api, "withdrawal-wait", "dry-run", logging.WARNING, "Automatic withdrawal is enabled but LIVE_TRADING is false; no withdrawal will be sent.")
         return
 
     pending = state.get("pending_withdrawal")
@@ -280,7 +281,7 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
         result = context.get("result")
         if result is None:
             if not getattr(api, "supports_withdrawal_idempotency", False):
-                LOG.error("A previous withdrawal request has an unknown outcome. Verify its status with the exchange; it will not be resent.")
+                log_transition(LOG, api, "withdrawal-unknown", str(pending), logging.ERROR, "A previous withdrawal request has an unknown outcome. Verify its status with the exchange; it will not be resent.")
                 return
             try:
                 result = api.withdraw_btc(pending)
@@ -290,7 +291,8 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
                 save_state(Path("/data/state.json"), state)
                 raise
             except requests.RequestException:
-                LOG.exception("Withdrawal outcome is uncertain; the same idempotent request will be retried next check.")
+                LOG.warning("Withdrawal outcome is uncertain; the same idempotent request will be retried next check.")
+                LOG.debug("Idempotent withdrawal retry failure", exc_info=True)
                 return
             context["result"] = result
             state["pending_withdrawal_context"] = context
@@ -325,15 +327,15 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
             save_state(Path("/data/state.json"), state)
             LOG.info("BTC balance is below the withdrawal threshold again; automatic withdrawal is re-armed.")
         else:
-            LOG.info("Waiting for %s to reflect the previous withdrawal before another automatic withdrawal.", settings["exchange"])
+            log_transition(LOG, api, "withdrawal-wait", "balance-not-updated", logging.INFO, "Waiting for %s to reflect the previous withdrawal before another automatic withdrawal.", settings["exchange"])
         return
     if manual_request is None and value < settings["withdraw_threshold"]:
-        LOG.info("BTC withdrawal threshold not reached: available value %s %s, threshold %s %s.", value, settings["quote"], settings["withdraw_threshold"], settings["quote"])
+        LOG.debug("BTC withdrawal threshold not reached: available value %s %s, threshold %s %s.", value, settings["quote"], settings["withdraw_threshold"], settings["quote"])
         return
 
     amount = available.quantize(Decimal("0.00000001"), rounding=ROUND_DOWN)
     if amount <= 0:
-        LOG.info("No withdrawable BTC remains after applying Bitcoin precision.")
+        log_transition(LOG, api, "withdrawal-wait", "empty", logging.INFO, "No withdrawable BTC remains after applying Bitcoin precision.")
         return
     idempotency_key = str(uuid.uuid4())
     withdrawal = manual_request or api.withdrawal_request(amount, idempotency_key, settings)
@@ -375,7 +377,7 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
     state.pop("pending_withdrawal_context", None)
     state["withdrawal_armed"] = False
     save_state(Path("/data/state.json"), state)
-    LOG.warning("BTC withdrawal submitted: amount=%s BTC (fee deducted from amount), value at submission=%s %s, withdrawalId=%s", withdrawal["amount"], value, settings["quote"], result.get("id"))
+    LOG.info("BTC withdrawal submitted: amount=%s BTC (fee deducted from amount), value at submission=%s %s, withdrawalId=%s", withdrawal["amount"], value, settings["quote"], result.get("id"))
 
 
 def defer_order_check(state, state_path, settings):
@@ -409,7 +411,7 @@ def reconcile_pending_order(api, state, state_path, settings, check_interval):
 
     status = str(order.get("status", "")).lower()
     if status not in ("closed", "filled", "canceled", "cancelled", "expired", "rejected"):
-        LOG.info(
+        log_transition(LOG, api, "order-wait", (pending["clientOrderId"], status), logging.INFO,
             "%s order %s exists but has not ended (status=%s); no new purchase; checking again in %ss.",
             settings["exchange"], pending.get("exchangeOrderId") or pending["clientOrderId"], status or "unknown", delay,
         )
@@ -478,13 +480,14 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
     try:
         maybe_withdraw_btc(api, state, settings)
     except requests.RequestException as exc:
-        LOG.error("Automatic BTC withdrawal check failed: %s", exc)
+        LOG.warning("Automatic BTC withdrawal check failed; will retry: %s", exc)
     # Use the current available quote balance as the DCA budget. This includes
     # funds already on the exchange, even if they were deposited before this cycle.
     try:
         exchange_btc = cycle_data['btc_balance'] if cycle_data else api.balance("BTC")
-    except requests.RequestException:
-        LOG.warning("Could not refresh the dashboard BTC balance", exc_info=True)
+    except requests.RequestException as exc:
+        LOG.warning("Could not refresh the dashboard BTC balance: %s", exc)
+        LOG.debug("Dashboard balance refresh failure", exc_info=True)
         exchange_btc = None
     balance = cycle_data['balance'] if cycle_data else api.balance(quote)
     balance_after_simulated_spend = (
@@ -493,6 +496,7 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
     if balance_after_simulated_spend <= 0:
         update_dashboard_snapshot(settings,balance,Decimal(str(read_dashboard_snapshot().get('price','0'))),exchange_btc)
         update_dashboard_schedule(None,'Waiting for available quote-currency funds')
+        log_transition(LOG, api, 'purchase-wait', 'no-funds', logging.INFO, 'Waiting for available %s funds.', quote)
         return check_interval
     # Fee lookup precedes the fresh market-rule check; it is cached by the adapter.
     fee_rate = cycle_data['fee_rate'] if cycle_data else api.estimate_taker_fee(symbol, Decimal(1))
@@ -510,7 +514,7 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
         return check_interval
     if market.get("status") != "trading":
         update_dashboard_schedule(None, f"Waiting for market status: {market.get('status')}")
-        LOG.info("Market %s is %s; waiting.", symbol, market.get("status"))
+        log_transition(LOG, api, "purchase-wait", "market-" + str(market.get("status")), logging.INFO, "Market %s is %s; waiting.", symbol, market.get("status"))
         return check_interval
     min_quote = Decimal(market["minOrderInQuoteAsset"])
     min_btc = Decimal(market["minOrderInBaseAsset"])
@@ -527,7 +531,7 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
     possible_buys = int(affordable_budget // planned_cost)
     if possible_buys < 1:
         update_dashboard_schedule(None, "Waiting until the balance covers an order")
-        LOG.info("Waiting: available balance %s %s; minimum order %s %s.", affordable_budget, quote, order_quote, quote)
+        log_transition(LOG, api, "purchase-wait", "insufficient-funds", logging.INFO, "Waiting: available balance %s %s; minimum order %s %s.", affordable_budget, quote, order_quote, quote)
         return check_interval
 
     last_buy = settings.get('startup_last_buy_at')
@@ -535,6 +539,7 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
         last_buy = datetime.fromisoformat(state['last_order_at'])
     if last_buy is not None:
         last_buy = last_buy.replace(tzinfo=last_buy.tzinfo or timezone.utc).astimezone(timezone.utc)
+    clear_transition(api, "purchase-wait")
     interval_anchor = last_buy if last_buy is not None else now.astimezone(timezone.utc)
     seconds_to_deposit = max(60, (next_deposit.astimezone(timezone.utc) - interval_anchor).total_seconds())
     interval_seconds = max(60, int(seconds_to_deposit / possible_buys))
@@ -592,7 +597,7 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
     if settings["live"]:
         if available < planned_cost:
             update_dashboard_schedule(None, "Waiting until the balance covers an order")
-            LOG.info("Waiting for sufficient available balance: %s %s; minimum order %s %s.", available, quote, order_quote, quote)
+            log_transition(LOG, api, "purchase-wait", "insufficient-funds", logging.INFO, "Waiting for sufficient available balance: %s %s; minimum order %s %s.", available, quote, order_quote, quote)
             return check_interval
         pending = {
             "clientOrderId": str(uuid.uuid4()),
@@ -714,7 +719,7 @@ def manual_withdrawal_service(api, settings):
             raise ValueError("The balance or withdrawal state changed. Review a new preview.")
         maybe_withdraw_btc(api, state, settings, manual_request=preview["request"])
         if state.get("pending_withdrawal"):
-            raise ValueError("Withdrawal outcome is uncertain. Check the exchange; do not submit again.")
+            raise UncertainWithdrawalError("Withdrawal outcome is uncertain. Check the exchange; do not submit again.")
         return {"submitted": True, "message": "Withdrawal submitted and recorded in Activity. It will be included in Parqet exports after exchange confirmation."}
     return handle
 

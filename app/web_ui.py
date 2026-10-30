@@ -19,6 +19,7 @@ from threading import RLock
 import time
 from concurrent.futures import ThreadPoolExecutor
 import price_cache
+from exchange_errors import UncertainWithdrawalError
 from favicon_assets import FAVICON_ICO, FAVICON_PNG, APPLE_TOUCH_ICON_PNG, FAVICON_MASK_SVG
 from analytics import report as build_report, totals_from_records
 from activity import activity_page, activity_totals, parqet_interval_records, ledger_balance, withdrawal_records, read_report
@@ -999,7 +1000,13 @@ class Handler(BaseHTTPRequestHandler):
                 LOG.info("Manual withdrawal %s request accepted", "confirmation" if parsed.path.endswith("/confirm") else "preview")
                 self._json(202 if "jobId" in result else 200, result)
             except (ValueError, UnicodeDecodeError) as exc:
+                LOG.log(logging.ERROR if isinstance(exc, UncertainWithdrawalError) else logging.INFO,
+                        "Manual withdrawal request rejected: %s", exc)
                 self._json(400, {"error": str(exc)})
+            except requests.RequestException as exc:
+                LOG.warning("Manual withdrawal request unavailable: %s", exc)
+                LOG.debug("Manual withdrawal transport failure", exc_info=True)
+                self._json(503, {"error": "Exchange request failed. Check exchange status before retrying."})
             except Exception:
                 LOG.exception("Manual withdrawal request failed")
                 self._json(502, {"error": "Withdrawal could not be confirmed. Check exchange status and container logs before trying again."})
@@ -1072,7 +1079,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, market)
             except ValueError as exc:
                 self._json(400, {"error": str(exc)})
-            except RuntimeError as exc:
+            except (RuntimeError, requests.RequestException) as exc:
+                LOG.warning("Kraken reference price unavailable: %s", exc)
+                LOG.debug("Reference price fetch failure", exc_info=True)
                 self._json(503, {"error": str(exc)})
             except Exception:
                 LOG.exception("Kraken public price page fetch failed")
@@ -1161,14 +1170,16 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path == "/api/export.csv":
                 LOG.info("Parqet CSV export rejected: %s", exc)
             self._json(400, {"error": str(exc)})
+        except requests.RequestException as exc:
+            LOG.warning("%s unavailable due to an external service: %s", "Parqet CSV export" if parsed.path == "/api/export.csv" else "Web UI data", exc)
+            LOG.debug("External reporting service failure", exc_info=True)
+            self._json(503, {"error": "External data service unavailable. Please try again later."})
         except Exception as exc:
-            if parsed.path == "/api/export.csv":
-                LOG.info("Parqet CSV export failed: %s", type(exc).__name__)
-            LOG.exception("Web UI request failed")
+            LOG.exception("%s failed unexpectedly", "Parqet CSV export" if parsed.path == "/api/export.csv" else "Web UI request")
             self._json(502, {"error": "Stored bot activity could not be loaded. Check the container logs."})
 
     def log_message(self, fmt, *args):
-        LOG.info("Web UI %s - %s", self.address_string(), fmt % args)
+        LOG.debug("Web UI %s - %s", self.address_string(), fmt % args)
 
 
 def _row_timestamp_ms(row):

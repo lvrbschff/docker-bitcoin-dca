@@ -1,5 +1,7 @@
 """Single account worker: queued web actions, periodic checks and bounded health age."""
 import logging
+import requests
+from exchange_errors import UncertainWithdrawalError
 import os
 import queue
 import threading
@@ -87,7 +89,11 @@ class Worker:
                         due=time.monotonic()+min(self.interval,max(1,int(wait or self.interval)))
                     except Exception as exc:
                         self.last_error=str(exc)
-                        LOG.exception('Account check failed; worker will retry.')
+                        if isinstance(exc, requests.RequestException):
+                            LOG.warning('Account check failed; worker will retry: %s', exc)
+                            LOG.debug('Account check network failure', exc_info=True)
+                        else:
+                            LOG.exception('Account check failed; worker will retry.')
                         if self.on_error:
                             try:self.on_error()
                             except Exception:LOG.exception('Could not update account-error status.')
@@ -99,7 +105,15 @@ class Worker:
                     with self.lock:self.jobs[job_id].update(state='completed',result=result)
                     due=min(due,time.monotonic()+1)
                 except Exception as exc:
-                    LOG.warning('Manual account request failed: %s',exc)
+                    if isinstance(exc, UncertainWithdrawalError):
+                        LOG.error('Manual withdrawal outcome requires verification: %s', exc)
+                    elif isinstance(exc, ValueError):
+                        LOG.info('Manual account request rejected: %s', exc)
+                    elif isinstance(exc, requests.RequestException):
+                        LOG.warning('Manual account request failed: %s', exc)
+                        LOG.debug('Manual account network failure', exc_info=True)
+                    else:
+                        LOG.exception('Manual account request failed unexpectedly')
                     with self.lock:self.jobs[job_id].update(state='failed',error=str(exc))
                 finally:
                     self.queue.task_done()
