@@ -334,6 +334,12 @@ class Kraken:
         ids = result.get("txid", [])
         return {"status": "submitted", "orderId": ids[0] if ids else None, "userref": userref}
 
+    def open_orders(self):
+        result = self.private('OpenOrders', {})
+        if not isinstance(result, dict) or not isinstance(result.get('open'), dict):
+            raise ValueError('Kraken open orders could not be verified.')
+        return list(result['open'].values())
+
     def _find_order(self, userref, exchange_order_id=None):
         matches = []
         for method, bucket in (("ClosedOrders", "closed"), ("OpenOrders", "open")):

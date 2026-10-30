@@ -33,13 +33,15 @@ class StorageTests(TestCase):
         storage.prepare_storage(self.volume)
         self.assertEqual(json.loads((self.volume/'state.json').read_text()),state)
 
-    def test_missing_state_with_existing_account_or_history_is_not_reset(self):
+    def test_missing_state_starts_in_persistent_recovery_mode(self):
         for filename,value in [('config.json',{'complete':True}),('activity.json',{'records':[]})]:
             with self.subTest(filename=filename):
                 self.put(filename,value)
-                with self.assertRaisesRegex(RuntimeError,'scheduling state is missing'):
-                    storage.prepare_storage(self.volume)
-                self.assertFalse((self.volume/'state.json').exists())
+                with self.assertLogs(storage.LOG,level='ERROR'):storage.prepare_storage(self.volume)
+                self.assertTrue(json.loads((self.volume/'state.json').read_text())['recoveryRequired'])
+                storage.prepare_storage(self.volume)
+                self.assertTrue(json.loads((self.volume/'state.json').read_text())['recoveryRequired'])
+                (self.volume/'state.json').unlink()
                 (self.volume/filename).unlink()
 
     def test_corrupt_state_is_not_overwritten(self):

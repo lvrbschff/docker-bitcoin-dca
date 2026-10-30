@@ -9,12 +9,13 @@ from activity import withdrawal_records, update_activity_record
 
 LOG = logging.getLogger("bitcoin-dca.withdrawals")
 
-def reconcile_withdrawals(api, settings, force=False):
+def reconcile_withdrawals(api, settings, force=False, submitted_only=False):
     now=time.monotonic()
     previous=getattr(api,'_withdrawal_check_at',None)
     if isinstance(previous,(int,float)) and not force and now-previous<30: return
     api._withdrawal_check_at=now
     waiting=withdrawal_records(unresolved=True)
+    if submitted_only: waiting=[record for record in waiting if record.get('withdrawalStatus')=='submitted']
     waiting.sort(key=lambda r:r.get('withdrawalStatus')!='submitted')
     checked=0
     for record in waiting:

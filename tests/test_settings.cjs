@@ -4,7 +4,7 @@ const root=path.resolve(__dirname,'..');
 const page=execFileSync('python3',['-c',`import sys,json;sys.path.insert(0,'app');from settings_ui import PAGE;from configuration import DEFAULTS;print(PAGE.replace('__INITIAL__',json.dumps(dict(settings={**DEFAULTS,'kraken_api_key_configured':True,'kraken_api_secret_configured':True},username='operator',complete=True,passwordChangeRequired=False,createAccount=False))))`],{cwd:root,encoding:'utf8'});
 const script=page.match(/<script>([\s\S]*?)<\/script>/)[1];
 class Element{
- constructor(tag='div'){this.style={};this.tag=tag;this.value='';this.type='';this.dataset={};this.children=[];this.listeners={};this.hidden=false;this.disabled=false;this.checked=false;this.textContent='';this.options=[{},{}];this.classList={toggle(){}}}
+ constructor(tag='div'){this.style={};this.tag=tag;this.value='';this.type='';this.dataset={};this.children=[];this.listeners={};this.hidden=false;this.disabled=false;this.checked=false;this.textContent='';this.options=[{},{}];this.classList={toggle(){},add(){}}}
  append(...children){for(const c of children){c.parentElement=this;this.children.push(c);if(c.id)elements[c.id]=c}}
  replaceChildren(){this.children=[]}
  addEventListener(name,fn){this.listeners[name]=fn}
@@ -49,6 +49,9 @@ async function event(id,name='click'){return elements[id].listeners[name]({preve
  reject=true;await event('testConnection');assert.equal(elements.testConnection.disabled,false);assert.equal(elements.connectionStatus.textContent,'Connection failed');
  vm.runInContext('pending={settings:{buy_amount:"0.000"}};renderReview()',context);assert.equal(elements.reviewValues.children.length,0);assert.match(elements.reviewDescription.textContent,/No changes/);
  vm.runInContext('pending={settings:{},username:"renamed",password:"PRIVATE-DASHBOARD-PASSWORD"};renderReview()',context);const credentialReview=allText(elements.reviewValues);assert.match(credentialReview,/operator/);assert.match(credentialReview,/renamed/);assert.match(credentialReview,/Will be changed \(hidden\)/);assert(!credentialReview.includes('PRIVATE-DASHBOARD-PASSWORD'));
+ const recoveryCalls=requests.length;elements.recoveryConfirmed.checked=false;await event('recoveryForm','submit');assert.equal(requests.length,recoveryCalls);assert.match(elements.recoveryFeedback.textContent,/Confirm/);
+ elements.recoveryConfirmed.checked=true;elements.recoveryPassword.value='PRIVATE-RECOVERY-PASSWORD';reject=false;
+ await event('recoveryForm','submit');assert.equal(requests.at(-1).url,'/api/settings/recover');assert.equal(requests.at(-1).body.confirmed,true);assert.equal(elements.recoveryPassword.value,'');assert.equal(elements.recoverAccount.disabled,false);
  console.log('Settings UI passed: credentials, exchange fields, read-only test, review/cancel/save and validation');
 })().catch(error=>{console.error(error);process.exitCode=1});
 

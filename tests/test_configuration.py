@@ -280,6 +280,90 @@ class ConfigurationTests(unittest.TestCase):
         self.assertTrue(reloaded.snapshot()['complete'])
         self.assertEqual(reloaded.path,volume)
 
+    def recovery(self):
+        self.ready(startup_delay_seconds=0)
+        self.app.state_path.write_text(json.dumps({'recoveryRequired':True}))
+        self.app.api.open_orders.return_value=[]
+        self.app.api.btc_withdrawals.return_value=[]
+
+    def test_missing_state_recovery_keeps_ui_healthy_and_blocks_financial_actions(self):
+        self.recovery()
+        with patch.object(bot,'run_once') as run:
+            self.app.cycle()
+        run.assert_not_called()
+        self.assertTrue(self.app.recovery_required())
+        with self.assertRaisesRegex(ValueError,'recovery'):self.app.action('preview','session')
+        with self.assertRaisesRegex(ValueError,'recovery'):self.app.save({'settings':{'live':True}})
+        self.assertTrue(self.app.recovery_required())
+        self.assertIn('recoveryRequired',settings_ui.settings_page(self.store,recovery_required=True))
+        restarted=runtime.Runtime(self.store,self.app.state_path)
+        self.assertTrue(restarted.recovery_required())
+
+    def test_account_recovery_requires_password_and_explicit_confirmation(self):
+        self.recovery()
+        for payload in [{},{'confirmed':True,'current_password':'wrong'},
+                        {'confirmed':'true','current_password':PASSWORD}]:
+            with self.assertRaises(ValueError):self.app.recover_account(payload)
+        self.app.api.open_orders.assert_not_called()
+        self.assertTrue(self.app.recovery_required())
+
+    def test_account_recovery_only_reads_exchange_and_restarts_after_a_delay(self):
+        self.recovery()
+        before=self.store.snapshot()
+        result=self.app.recover_account({'confirmed':True,'current_password':PASSWORD})
+        self.assertIn('completed',result['message'])
+        self.assertFalse(self.app.recovery_required())
+        self.assertEqual(before,self.store.snapshot())
+        self.app.api.open_orders.assert_called_once_with()
+        self.app.api.btc_withdrawals.assert_called_once()
+        self.app.api.buy_btc.assert_not_called();self.app.api.withdraw_btc.assert_not_called()
+        state=json.loads(self.app.state_path.read_text())
+        self.assertIn('last_order_at',state)
+        self.assertNotIn('pending_order',state)
+        with patch.object(bot,'run_once') as run:self.app.cycle()
+        run.assert_not_called()
+        self.assertTrue(self.app.worker.reconfigure.is_set())
+
+    def test_unresolved_exchange_activity_cannot_clear_recovery(self):
+        self.recovery()
+        self.app.api.open_orders.return_value=[{'id':'still-open'}]
+        with self.assertRaisesRegex(ValueError,'Open exchange orders'):
+            self.app.recover_account({'confirmed':True,'current_password':PASSWORD})
+        self.app.api.open_orders.return_value=[]
+        self.app.api.btc_withdrawals.return_value=[{'status':'pending'}]
+        with self.assertRaisesRegex(ValueError,'withdrawal'):
+            self.app.recover_account({'confirmed':True,'current_password':PASSWORD})
+        self.assertTrue(self.app.recovery_required())
+        self.app.api.buy_btc.assert_not_called();self.app.api.withdraw_btc.assert_not_called()
+
+    def test_recovery_read_failure_preserves_the_pause(self):
+        self.recovery()
+        self.app.api.open_orders.side_effect=requests.ReadTimeout('offline')
+        with self.assertRaises(requests.ReadTimeout):
+            self.app.recover_account({'confirmed':True,'current_password':PASSWORD})
+        self.assertTrue(self.app.recovery_required())
+
+    def test_recovery_http_ui_is_available_but_requires_authenticated_confirmation(self):
+        request=self.server()
+        request('/api/setup/account',{'username':'operator','password':PASSWORD})
+        request('/api/settings',{'settings':CREDENTIALS})
+        self.app.state_path.write_text(json.dumps({'recoveryRequired':True}))
+        status,page=request('/')
+        self.assertEqual(status,200);self.assertIn('Trading is paused',page)
+        status,page=request('/settings?embedded=1')
+        self.assertEqual(status,200);self.assertIn('"recoveryRequired": true',page)
+        status,body=request('/api/schedule')
+        self.assertEqual(status,200);self.assertTrue(json.loads(body)['recoveryRequired'])
+        self.assertIsNone(json.loads(body)['nextPurchaseAt'])
+        self.assertEqual(request('/api/withdrawal/preview',{})[0],403)
+        self.assertEqual(request('/api/settings/recover',{'confirmed':True,'current_password':PASSWORD},header=False)[0],400)
+        saved_cookie=self.cookie;self.cookie=''
+        self.assertEqual(request('/api/settings/recover',{'confirmed':True,'current_password':PASSWORD})[0],401)
+        self.cookie=saved_cookie
+        self.app.api.open_orders.return_value=[];self.app.api.btc_withdrawals.return_value=[]
+        self.assertEqual(request('/api/settings/recover',{'confirmed':True,'current_password':PASSWORD})[0],200)
+        self.assertFalse(self.app.recovery_required())
+
     def test_setup_html_escapes_embedded_data(self):
         self.ready(kraken_withdraw_key='</script><script>alert(1)</script>')
         page = settings_ui.settings_page(self.store)

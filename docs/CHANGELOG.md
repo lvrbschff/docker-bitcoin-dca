@@ -2,6 +2,12 @@
 
 Release history based on the published [GitHub Releases](https://github.com/oli792dev/docker-bitcoin-dca/releases). Entries are newest first; dates use Europe/Berlin. Releases without notes are marked explicitly.
 
+## Unreleased
+
+- Fixed the restart loop when saved settings or history exist but scheduling state is missing.
+- Added authenticated account recovery in Settings, with read-only exchange checks and a trading pause until explicit confirmation.
+- Preserved saved configuration and recorded activity while rebuilding the purchase schedule after recovery.
+
 ## [v0.5.0](https://github.com/oli792dev/docker-bitcoin-dca/releases/tag/v0.5.0) — 2026-10-30
 
 - Added first-run setup for creating dashboard credentials and configuring the bot.

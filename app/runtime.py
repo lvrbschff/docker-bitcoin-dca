@@ -2,6 +2,7 @@
 import json
 import logging
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from configuration import ConfigStore, account_values, runtime_settings, validate
 from exchange import create_exchange
@@ -26,8 +27,58 @@ class Runtime:
         self.worker = Worker(self.cycle, self.action, lambda: None, self.settings['check_interval_seconds'], 0)
         if self.store.snapshot()['complete']:
             self.api = create_exchange(self.settings)
-            self._synchronize_state()
+            if not self.recovery_required(): self._synchronize_state()
+            else:
+                from bot import update_dashboard_schedule
+                update_dashboard_schedule(None, 'Account recovery required — open Settings')
+                LOG.warning('Account recovery required; purchases and withdrawals remain paused until confirmed in Settings')
         LOG.info('Application configuration loaded' if self.api else 'Waiting for first-run configuration; purchases are paused')
+
+    def recovery_required(self):
+        # State writes are atomic; HTTP status reads must not wait for account I/O.
+        return bool(self.state_path.exists() and json.loads(self.state_path.read_text()).get('recoveryRequired'))
+
+    def recover_account(self, payload):
+        """Explicit authenticated recovery; all exchange operations here are reads."""
+        from activity import latest_real_buy, withdrawal_records, write_json_atomic
+        from withdrawals import reconcile_withdrawals
+        with self.lock:
+            if not self.recovery_required():
+                return {'message': 'Account recovery is already complete.'}
+            if not isinstance(payload, dict) or payload.get('confirmed') is not True:
+                raise ValueError('Confirm that you checked the exchange for unresolved transactions.')
+            account = self.store.snapshot()['account']
+            if not account or not self.store.authenticate(account['username'], payload.get('current_password', '')):
+                raise ValueError('Your current dashboard password is incorrect.')
+            if account.get('password_change_required'):
+                raise ValueError('Change the initial dashboard password before account recovery.')
+            if not self.api:
+                raise ValueError('Configure exchange access before account recovery.')
+            LOG.info('Account recovery requested: exchange=%s; read-only exchange checks started', self.settings['exchange'])
+            orders = self.api.open_orders()
+            if not isinstance(orders, list):
+                raise ValueError('Open orders could not be verified. Trading remains paused.')
+            if orders:
+                raise ValueError('Open exchange orders exist. Wait for them to finish and check their outcome before resuming.')
+            end_ms = int(time.time() * 1000)
+            transfers = self.api.btc_withdrawals(max(0, end_ms - 7 * 86400000), end_ms)
+            if not isinstance(transfers, list) or any(not isinstance(item, dict) or str(item.get('status', '')).lower() not in ('completed','success','failed','failure','canceled','cancelled') for item in transfers):
+                raise ValueError('A recent withdrawal is unresolved or its status is unavailable. Trading remains paused.')
+            reconcile_withdrawals(self.api, self.settings, force=True, submitted_only=True)
+            if any(record.get('withdrawalStatus') == 'submitted' and record.get('exchange') in ('',None,self.settings['exchange']) for record in withdrawal_records(unresolved=True)):
+                raise ValueError('A recorded withdrawal still needs exchange confirmation. Trading remains paused.')
+            last_buy = latest_real_buy(self.settings['exchange'])
+            recovered = {'configuration_account': [self.settings['exchange'], self.settings['quote']],
+                         'configuration_live': self.settings['live'], 'spent': '0',
+                         'last_order_at': (last_buy or datetime.now(timezone.utc)).isoformat(),
+                         'recoveredAt': datetime.now(timezone.utc).isoformat()}
+            write_json_atomic(self.state_path, recovered)
+            self.service = None
+            self.startup_pending = True
+            self.ready_at = time.monotonic() + max(60, self.settings['startup_delay_seconds'])
+            self.worker.reconfigure.set()
+            LOG.info('Account recovery confirmed: exchange checks passed; schedule will be rebuilt after the startup delay; no orders or withdrawals submitted')
+            return {'message': 'Account recovery completed. Scheduling resumes after the startup delay.'}
 
     def unresolved(self):
         from activity import withdrawal_records
@@ -54,6 +105,9 @@ class Runtime:
         with self.lock:
             if not self.api:
                 return self.worker.interval
+            if self.recovery_required():
+                update_dashboard_schedule(None, 'Account recovery required — open Settings')
+                return self.worker.interval
             remaining = self.ready_at - time.monotonic()
             if remaining > 0:
                 update_dashboard_schedule(None, 'Waiting for startup delay')
@@ -70,6 +124,8 @@ class Runtime:
     def action(self, action, session, token=None):
         from bot import manual_withdrawal_service
         with self.lock:
+            if self.recovery_required():
+                raise ValueError('Trading is paused. Complete account recovery in Settings first.')
             if not self.api or not self.settings['manual_withdrawal_enabled']:
                 raise ValueError('Manual withdrawals are disabled in Settings.')
             if self.store.snapshot()['account'].get('password_change_required'):
@@ -84,6 +140,8 @@ class Runtime:
                 raise ValueError('Invalid settings request.')
             previous = self.store.snapshot()
             values = validate(payload.get('settings', {}), previous['settings'])
+            if previous['complete'] and self.recovery_required() and any(values[key] != previous['settings'][key] for key in ('exchange','quote','live')):
+                raise ValueError('Complete account recovery before changing exchange, purchase currency or trading mode.')
             account = previous['account']
             if not account: raise ValueError('Create a dashboard account first.')
             account_changed = bool(payload.get('password') or payload.get('username', account['username']) != account['username'])

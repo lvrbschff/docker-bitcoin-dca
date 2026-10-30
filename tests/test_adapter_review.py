@@ -24,6 +24,20 @@ class AdapterReviewTests(unittest.TestCase):
             configured=kraken.Kraken('EUR',api_key='saved-key',api_secret='dGVzdA==')
             self.assertEqual(configured.key,'saved-key')
 
+    def test_recovery_open_order_queries_are_read_only_and_validate_responses(self):
+        kraken_api=kraken.Kraken('EUR',api_key='fictional',api_secret='dGVzdA==')
+        kraken_api.private=Mock(return_value={'open':{'id':{'status':'open'}}})
+        self.assertEqual(kraken_api.open_orders(),[{'status':'open'}])
+        kraken_api.private.assert_called_once_with('OpenOrders',{})
+        kraken_api.private.return_value={}
+        with self.assertRaises(ValueError):kraken_api.open_orders()
+        bitvavo_api=bitvavo.Bitvavo(api_key='fictional',api_secret='fictional')
+        bitvavo_api.request=Mock(return_value=[])
+        self.assertEqual(bitvavo_api.open_orders(),[])
+        bitvavo_api.request.assert_called_once_with('GET','/ordersOpen',private=True)
+        bitvavo_api.request.return_value={}
+        with self.assertRaises(ValueError):bitvavo_api.open_orders()
+
     def pair(self,minimum,status='online'):
         return {'XXBTZEUR':{'base':'XXBT','quote':'ZEUR','altname':'XBTEUR','ordermin':minimum,'status':status}}
 

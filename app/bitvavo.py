@@ -135,6 +135,12 @@ class Bitvavo:
             params["end"] = end_ms
         return self.request("GET", "/withdrawalHistory", params=params, private=True)
 
+    def open_orders(self):
+        result = self.request('GET', '/ordersOpen', private=True)
+        if not isinstance(result, list):
+            raise ValueError('Bitvavo open orders could not be verified.')
+        return result
+
     def get_order(self, symbol, client_order_id, exchange_order_id=None):
         return self.request("GET", "/order", params={"market": symbol, "clientOrderId": client_order_id}, private=True)
 
