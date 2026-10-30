@@ -2,6 +2,11 @@
 
 Release history based on the published [GitHub Releases](https://github.com/oli792dev/docker-bitcoin-dca/releases). Entries are newest first; dates use Europe/Berlin. Releases without notes are marked explicitly.
 
+## [v0.3.2](https://github.com/oli792dev/docker-bitcoin-dca/releases/tag/v0.3.2) — 2026-10-30
+
+- Reworked the application architecture, moving Python runtime modules into `app/`.
+- Updated Docker source paths, test entry points and architecture documentation.
+
 ## [v0.3.1](https://github.com/oli792dev/docker-bitcoin-dca/releases/tag/v0.3.1) — 2026-10-30
 
 - Improved visibility in the web UI.
