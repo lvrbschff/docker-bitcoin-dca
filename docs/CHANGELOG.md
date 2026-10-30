@@ -2,6 +2,16 @@
 
 Release history based on the published [GitHub Releases](https://github.com/oli792dev/docker-bitcoin-dca/releases). Entries are newest first; dates use Europe/Berlin. Releases without notes are marked explicitly.
 
+## Unreleased
+
+- Added first-run account creation and guided configuration without a default login.
+- Added Settings next to Log out for account, exchange, API credentials, purchase settings, withdrawal destinations and thresholds.
+- Added independent switches for automatic withdrawals, manual withdrawals and Parqet CSV, with matching notes and server-side enforcement.
+- Persisted private application configuration, hashed dashboard passwords and migrated existing environment settings once.
+- Added read-only connection testing, configuration review and protection against account changes during unresolved transactions.
+- Kept scheduling and CSV withdrawal cycles separate across exchanges.
+- Updated setup documentation and added configuration regression tests.
+
 ## [v0.3.4](https://github.com/oli792dev/docker-bitcoin-dca/releases/tag/v0.3.4) — 2026-10-30
 
 - Standardized log levels and reduced routine INFO output.

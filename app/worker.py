@@ -29,6 +29,7 @@ class Worker:
         self.jobs={}
         self.lock=threading.RLock()
         self.stop=threading.Event()
+        self.reconfigure=threading.Event()
         self.thread=None
         self.beat=time.monotonic()
         self.running=False
@@ -76,6 +77,9 @@ class Worker:
         try:
             while not self.stop.is_set():
                 self.heartbeat()
+                if self.reconfigure.is_set():
+                    self.reconfigure.clear()
+                    due=time.monotonic()
                 try: job_id,action,session,token=self.queue.get(timeout=min(1,max(0,due-time.monotonic())))
                 except queue.Empty:
                     if time.monotonic()<due: continue

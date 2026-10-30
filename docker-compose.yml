@@ -3,6 +3,8 @@ services:
     build: .
     container_name: bitcoin-dca
     restart: unless-stopped
+    # Application settings are managed in the UI. These legacy defaults are
+    # imported once for existing installations; saved configuration takes precedence.
     environment:
       EXCHANGE: ${EXCHANGE:-KRAKEN}
       QUOTE_CURRENCY: EUR

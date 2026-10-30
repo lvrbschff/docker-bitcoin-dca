@@ -99,6 +99,10 @@ def parqet_aggregate_rows(records, exchange):
     if not withdrawals:
         return []
     timestamp = max(_parse_datetime(record["row"]) for record in withdrawals)
+    ending = max(withdrawals, key=lambda record: _parse_datetime(record["row"]))
+    cycle_exchange = ending.get('exchange') or exchange
+    records = [record for record in records if (record.get('exchange') or exchange) == cycle_exchange]
+    withdrawals = [record for record in withdrawals if (record.get('exchange') or exchange) == cycle_exchange]
     previous_times = [_parse_datetime(record["row"]) for record in withdrawals
                       if _parse_datetime(record["row"]) < timestamp]
     previous = max(previous_times) if previous_times else None

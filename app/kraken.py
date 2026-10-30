@@ -51,9 +51,9 @@ class Kraken:
     exchange_name = "KRAKEN"
     supports_withdrawal_idempotency = False
 
-    def __init__(self, quote_currency, withdraw_key=""):
-        self.key = os.getenv("KRAKEN_API_KEY", "")
-        self.secret = os.getenv("KRAKEN_API_SECRET", "")
+    def __init__(self, quote_currency, withdraw_key="", api_key=None, api_secret=None):
+        self.key = os.getenv("KRAKEN_API_KEY", "") if api_key is None else api_key
+        self.secret = os.getenv("KRAKEN_API_SECRET", "") if api_secret is None else api_secret
         if not self.key or not self.secret:
             raise ValueError("Set KRAKEN_API_KEY and KRAKEN_API_SECRET for EXCHANGE=KRAKEN")
         try:

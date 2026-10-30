@@ -164,14 +164,15 @@ def parqet_interval_records(start, end):
     with _db() as db:
         db.execute('BEGIN')
         completed = "asset='BTC' AND kind='TransferOut' AND simulated=0 AND status='completed'"
-        latest = db.execute('SELECT max(timestamp) FROM activity WHERE '+completed+' AND timestamp>? AND timestamp<=?', (start,end)).fetchone()[0]
-        if latest is None:
+        ending = db.execute('SELECT timestamp,exchange FROM activity WHERE '+completed+' AND timestamp>? AND timestamp<=? ORDER BY timestamp DESC,id DESC LIMIT 1', (start,end)).fetchone()
+        if ending is None:
             return []
-        previous = db.execute('SELECT max(timestamp) FROM activity WHERE '+completed+' AND timestamp<?', (latest,)).fetchone()[0]
+        latest, exchange = ending
+        previous = db.execute('SELECT max(timestamp) FROM activity WHERE '+completed+' AND exchange=? AND timestamp<?', (exchange,latest)).fetchone()[0]
         lower = previous if previous is not None else -1
         return [json.loads(r[0]) for r in db.execute(
-            "SELECT payload FROM activity WHERE asset='BTC' AND timestamp>? AND timestamp<=? ORDER BY timestamp,id",
-            (lower,latest))]
+            "SELECT payload FROM activity WHERE asset='BTC' AND exchange=? AND timestamp>? AND timestamp<=? ORDER BY timestamp,id",
+            (exchange,lower,latest))]
 
 
 def _totals(db, start, end):
@@ -277,7 +278,7 @@ def get_activity_record(activity_id):
         return json.loads(row[0]) if row else None
 
 
-def latest_real_buy():
+def latest_real_buy(exchange=None):
     with _db() as db:
-        row=db.execute("SELECT timestamp FROM activity WHERE asset='BTC' AND kind='Buy' AND simulated=0 ORDER BY timestamp DESC LIMIT 1").fetchone()
+        row=db.execute("SELECT timestamp FROM activity WHERE asset='BTC' AND kind='Buy' AND simulated=0" + (" AND exchange=?" if exchange else "") + " ORDER BY timestamp DESC LIMIT 1", (exchange,) if exchange else ()).fetchone()
         return datetime.fromtimestamp(row[0]/1000,timezone.utc) if row else None

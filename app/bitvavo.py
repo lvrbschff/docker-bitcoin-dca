@@ -17,9 +17,9 @@ BASE_URL = "https://api.bitvavo.com/v2"
 
 
 class Bitvavo:
-    def __init__(self):
-        self.key = os.getenv("BITVAVO_API_KEY", "")
-        self.secret = os.getenv("BITVAVO_API_SECRET", "")
+    def __init__(self, api_key=None, api_secret=None):
+        self.key = os.getenv("BITVAVO_API_KEY", "") if api_key is None else api_key
+        self.secret = os.getenv("BITVAVO_API_SECRET", "") if api_secret is None else api_secret
         if not self.key or not self.secret:
             raise ValueError("Set BITVAVO_API_KEY and BITVAVO_API_SECRET")
         self.session = requests.Session()

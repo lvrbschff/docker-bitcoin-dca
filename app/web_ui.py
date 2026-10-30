@@ -308,7 +308,7 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 </head>
 <body>
 <div class="compact-brand-bar"><div class="compact-brand-inner"><img src="/bitcoin-dca-icon-v3.png" width="36" height="36" alt=""><span>Bitcoin DCA Dashboard</span></div></div><main>
-<header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Dashboard</h1></div></div><div class="top-actions"><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div><form method="post" action="/logout"><button type="submit">Log out</button></form></div></header>
+<header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Dashboard</h1></div></div><div class="top-actions"><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div><form method="get" action="/settings"><button type="submit">Settings</button></form><form method="post" action="/logout"><button type="submit">Log out</button></form></div></header>
 <details open class="panel" aria-labelledby="configurationHeading">
 <summary class="panel-heading"><h2 id="configurationHeading">Configuration</h2></summary>
 <div class="horizontal-scroll configuration-scroll" role="region" aria-label="Configuration cards" tabindex="0"><div class="grid configuration-grid">
@@ -367,14 +367,14 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 </div></div>
 <h3 class="summary-subheading activity-subheading" id="activityHeading">Period Activity</h3>
 <section class="panel activity-panel" aria-labelledby="activityHeading"><div class="activity-heading"><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap horizontal-scroll" role="region" aria-label="Period activity table" tabindex="0"><table><thead><tr><th>Date</th><th>Type</th><th class="num">BTC</th><th class="num">Price</th><th class="num">Value</th><th class="num">Fee</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><span id="pageInfo" class="notice"></span><div class="pagination-navigation"><button class="secondary" id="previousPage">Previous</button><button class="secondary" id="nextPage">Next</button></div><form class="page-jump" id="pageJump" aria-label="Jump to activity page"><label for="pageNumber">Go to page</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><button class="secondary" id="goToPage" type="submit">Go</button></form></div></section></div>
-<div class="bottom-actions"><button id="download" aria-describedby="exportMessage">Download Parqet CSV</button></div>
+<div class="bottom-actions" id="parqet-actions"><button id="download" aria-describedby="exportMessage">Download Parqet CSV</button></div>
 <div class="feedback-wrap"><p id="exportMessage" class="export-feedback hidden" role="alert"></p><button class="secondary feedback-close" type="button" data-dismiss="exportMessage" aria-label="Close export message">×</button></div>
 </details>
 <footer class="dashboard-footnotes" aria-labelledby="notesHeading">
 <h2 id="notesHeading">Notes</h2>
 <ol>
-<li id="schedule-note"><strong>Schedule and automatic withdrawal</strong><p>Purchase interval = time from the last purchase to the next deposit day ÷ purchases affordable with the current fiat balance, including estimated fees and a planning buffer. Without a previous purchase, planning starts from now. Next purchase = last purchase + interval; elapsed time reduces the wait. Open orders block further purchases. Balances reflect the last account check; the display BTC price comes from Kraken’s public converter pages.</p><p>The automatic withdrawal threshold uses all available exchange BTC valued in the purchase currency, including BTC acquired outside this bot. Remaining purchases = (threshold ÷ current BTC price − available BTC) ÷ BTC per purchase, rounded up. The forecast projects these purchases using the current budget, price and order costs. Expected monthly deposit adds assumed funds on each deposit day; unused funds carry over and intervals are recalculated for actual calendar months. This browser-saved setting affects only the forecast. The estimated date is the final required purchase; withdrawal follows an eligible bot check. If the threshold is already reached, the estimate is now. Countdown = estimated date − current time, with a minimum of zero. Estimates require automatic withdrawals and live trading; future prices, fees, deposits and execution may change them.</p><div id="withdrawal-note" class="note-subsection"><h3 class="note-subheading">Manual withdrawal</h3><p id="withdrawalDestination">Loading withdrawal configuration…</p><p id="withdrawMessage" role="status" aria-live="polite"></p><p>After confirmation, sends all available BTC minus the exchange withdrawal fee. Requires LIVE_TRADING; the automatic withdrawal setting and threshold do not apply. Withdrawals appear immediately in Period activity; only confirmed ones qualify for export.</p></div></li>
-<li id="report-note"><strong>Period analysis and Parqet export</strong><p>Choose a custom range or an interval between withdrawals. Historical amounts are converted from their original currencies to the display currency. The EUR CSV exports only the complete cycle after the previous confirmed withdrawal through the last confirmed withdrawal in the selected range. It includes real purchase costs and trading fees, and the ending withdrawal’s net BTC after network fees. Later purchases, simulations and unconfirmed or failed withdrawals are excluded. A confirmed withdrawal and at least one real purchase in its cycle are required.</p></li>
+<li id="schedule-note"><strong>Schedule and automatic withdrawal</strong><p>Purchase interval = time from the last purchase to the next deposit day ÷ purchases affordable with the current fiat balance, including estimated fees and a planning buffer. Without a previous purchase, planning starts from now. Next purchase = last purchase + interval; elapsed time reduces the wait. Open orders block further purchases. Balances reflect the last account check; the display BTC price comes from Kraken’s public converter pages.</p><p id="automatic-withdrawal-note">The automatic withdrawal threshold uses all available exchange BTC valued in the purchase currency, including BTC acquired outside this bot. Remaining purchases = (threshold ÷ current BTC price − available BTC) ÷ BTC per purchase, rounded up. The forecast projects these purchases using the current budget, price and order costs. Expected monthly deposit adds assumed funds on each deposit day; unused funds carry over and intervals are recalculated for actual calendar months. This browser-saved setting affects only the forecast. The estimated date is the final required purchase; withdrawal follows an eligible bot check. If the threshold is already reached, the estimate is now. Countdown = estimated date − current time, with a minimum of zero. Estimates require automatic withdrawals and live trading; future prices, fees, deposits and execution may change them.</p><div id="withdrawal-note" class="note-subsection"><h3 class="note-subheading">Manual withdrawal</h3><p id="withdrawalDestination">Loading withdrawal configuration…</p><p id="withdrawMessage" role="status" aria-live="polite"></p><p>After confirmation, sends all available BTC minus the exchange withdrawal fee. Requires LIVE_TRADING; the automatic withdrawal setting and threshold do not apply. Withdrawals appear immediately in Period activity.<span id="manual-export-note"> Only confirmed ones qualify for export.</span></p></div></li>
+<li id="report-note"><strong>Period analysis and Parqet export</strong><p>Choose a custom range or an interval between withdrawals. Historical amounts are converted from their original currencies to the display currency.</p><p id="parqet-note">The EUR CSV exports only the complete cycle after the previous confirmed withdrawal through the last confirmed withdrawal in the selected range. It includes real purchase costs and trading fees, and the ending withdrawal’s net BTC after network fees. Later purchases, simulations and unconfirmed or failed withdrawals are excluded. A confirmed withdrawal and at least one real purchase in its cycle are required.</p></li>
 </ol>
 </footer>
 </main>
@@ -863,6 +863,7 @@ def _period(query):
 
 class Handler(BaseHTTPRequestHandler):
     settings = None
+    runtime = None
     withdrawal_service = None
     worker = None
 
@@ -902,6 +903,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def _require_authentication(self):
         if self._has_valid_session():
+            if self.runtime and urlparse(self.path).path not in ('/api/settings', '/api/settings/test', '/settings', '/logout', '/'):
+                data = self.runtime.store.snapshot()
+                if not data['complete'] or data['account'].get('password_change_required'):
+                    self._json(403, {'error': 'Complete configuration and update your password in Settings first.'})
+                    return False
             return True
         self._json(401, {"error": "Authentication required"})
         return False
@@ -922,7 +928,8 @@ class Handler(BaseHTTPRequestHandler):
         expected_password = (os.getenv("WEB_UI_PASSWORD", "admin") or "admin").encode("utf-8")
         username_matches = hmac.compare_digest(username.encode("utf-8"), expected_username)
         password_matches = hmac.compare_digest(password.encode("utf-8"), expected_password)
-        if not (username_matches and password_matches):
+        valid = self.runtime.store.authenticate(username, password) if self.runtime else username_matches and password_matches
+        if not valid:
             self._send(401, _login_page("The username or password is incorrect."), "text/html; charset=utf-8")
             return
 
@@ -959,8 +966,74 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    def _settings_body(self):
+        if self.headers.get('X-DCA-Action') != 'settings' or self.headers.get('Content-Type') != 'application/json':
+            raise ValueError('Invalid settings request.')
+        length = int(self.headers.get('Content-Length', '0'))
+        if not 0 < length <= 32768:
+            raise ValueError('Invalid settings request size.')
+        data = json.loads(self.rfile.read(length).decode('utf-8'))
+        if not isinstance(data, dict): raise ValueError('Invalid settings request.')
+        return data
+
+    def _settings_post(self, path):
+        if not self.runtime:
+            self._json(404, {'error': 'Settings unavailable.'})
+            return
+        if path != '/api/setup/account' and not self._require_authentication(): return
+        try:
+            payload = self._settings_body()
+            if path == '/api/setup/account':
+                self.runtime.store.create_account(payload.get('username'), payload.get('password'))
+                token = token_urlsafe(32)
+                with _SESSION_LOCK: _SESSIONS[token] = time.monotonic() + SESSION_TTL_SECONDS
+                self.send_response(200)
+                self.send_header('Set-Cookie', f'dca_session={token}; Path=/; Max-Age={SESSION_TTL_SECONDS}; HttpOnly; SameSite=Strict')
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', '2')
+                self.send_header('Cache-Control', 'no-store')
+                self.end_headers()
+                self.wfile.write(b'{}')
+                LOG.info('Initial dashboard account created; configuration is required')
+            elif path == '/api/settings/test':
+                self._json(200, self.runtime.test_connection(payload))
+            else:
+                changed = self.runtime.save(payload)
+                if changed:
+                    with _SESSION_LOCK: _SESSIONS.clear()
+                self._json(200, {'saved': True, 'signInRequired': changed})
+        except (ValueError, UnicodeDecodeError) as exc:
+            self._json(400, {'error': str(exc)})
+        except requests.RequestException:
+            # Exchange errors may contain request details. Never echo them to the browser.
+            self._json(502, {'error': 'Exchange connection failed. Check credentials, permissions and internet access.'})
+        except Exception:
+            LOG.error('Settings operation failed; configuration was not confirmed')
+            self._json(500, {'error': 'Settings could not be confirmed. Check persistent storage and try again.'})
+
+    def _dashboard_html(self):
+        settings = self.settings
+        hidden = []
+        if not settings.get('manual_withdrawal_enabled', True): hidden += ['#manualWithdraw', '#withdrawal-note']
+        if not settings.get('parqet_enabled', True): hidden += ['#download', '#parqet-actions', '#exportMessage', '#parqet-note', '#manual-export-note']
+        if not settings.get('withdrawals_enabled', False): hidden += ['#automatic-withdrawal-note']
+        styles = '<style>' + ','.join(hidden) + '{display:none!important}</style>' if hidden else ''
+        page = HTML.replace('</head>', styles + '</head>')
+        if not settings.get('withdrawals_enabled', False):
+            page = page.replace('Schedule and automatic withdrawal</strong>', 'Purchase schedule</strong>')
+        if not settings.get('parqet_enabled', True):
+            page = page.replace('Period analysis and Parqet export</strong>', 'Period analysis</strong>')
+            page = page.replace('to review activity and prepare a Parqet export.', 'to review activity.')
+        return page
+
     def do_POST(self):
+        if self.runtime:
+            from configuration import runtime_settings
+            self.settings = runtime_settings(self.runtime.store.snapshot()['settings'])
         parsed = urlparse(self.path)
+        if parsed.path in ('/api/setup/account', '/api/settings', '/api/settings/test'):
+            self._settings_post(parsed.path)
+            return
         if parsed.path == "/login":
             self._handle_login()
             return
@@ -994,6 +1067,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(400, {"error": "Invalid UI event"})
             return
         if parsed.path in ("/api/withdrawal/preview", "/api/withdrawal/confirm"):
+            if not (self.settings or {}).get('manual_withdrawal_enabled', True):
+                self._json(403, {'error': 'Manual withdrawals are disabled in Settings.'})
+                return
             # A custom header plus JSON prevents cross-origin form submissions.
             if self.headers.get("X-DCA-Action") != "withdrawal" or self.headers.get("Content-Type") != "application/json":
                 self._json(403, {"error": "Invalid withdrawal request"})
@@ -1027,6 +1103,9 @@ class Handler(BaseHTTPRequestHandler):
         self._json(404, {"error": "Not found"})
 
     def do_GET(self):
+        if self.runtime:
+            from configuration import runtime_settings
+            self.settings = runtime_settings(self.runtime.store.snapshot()['settings'])
         parsed = urlparse(self.path)
         if parsed.path == '/healthz':
             healthy=bool(self.worker and self.worker.healthy())
@@ -1046,13 +1125,32 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/favicon.svg":
             self._send(200, FAVICON_SVG, "image/svg+xml; charset=utf-8", cache_control="public, max-age=86400")
             return
+        if self.runtime and parsed.path in ('/', '/configure', '/settings', '/api/settings'):
+            from settings_ui import settings_page
+            data = self.runtime.store.snapshot()
+            if not data['account']:
+                if parsed.path == '/api/settings':
+                    self._json(401, {'error': 'Create an account first.'})
+                else:
+                    self._send(200, settings_page(self.runtime.store, create_account=True), 'text/html; charset=utf-8')
+                return
+            if parsed.path in ('/configure', '/settings') and not self._has_valid_session():
+                self._send(200, _login_page(), 'text/html; charset=utf-8')
+                return
+            if self._has_valid_session():
+                if parsed.path == '/api/settings':
+                    self._json(200, self.runtime.store.public())
+                    return
+                if parsed.path in ('/configure', '/settings') or not data['complete'] or data['account'].get('password_change_required'):
+                    self._send(200, settings_page(self.runtime.store), 'text/html; charset=utf-8')
+                    return
         if parsed.path == "/" and not self._has_valid_session():
             self._send(200, _login_page(), "text/html; charset=utf-8")
             return
         if not self._require_authentication():
             return
         if parsed.path == "/":
-            self._send(200, HTML, "text/html; charset=utf-8")
+            self._send(200, self._dashboard_html(), "text/html; charset=utf-8")
             return
         if parsed.path.startswith('/api/withdrawal/jobs/'):
             session=SimpleCookie(self.headers.get('Cookie',''))['dca_session'].value
@@ -1066,16 +1164,18 @@ class Handler(BaseHTTPRequestHandler):
             kraken = settings["exchange"] == "KRAKEN"
             destination = ("Kraken saved withdrawal method: " + (settings.get("kraken_withdraw_key") or "not configured")) if kraken else ("Bitvavo address: " + (settings.get("withdraw_address") or "not configured") + "; network: " + settings.get("withdraw_network", "BTC"))
             missing = []
+            if not settings.get('manual_withdrawal_enabled', True):
+                missing.append('enable manual withdrawals in Settings')
             if not settings["live"]:
                 missing.append("enable LIVE_TRADING=true")
             if kraken:
                 if not settings.get("kraken_withdraw_key"):
-                    missing.append("set KRAKEN_WITHDRAW_KEY to your saved Bitcoin withdrawal method in .env")
+                    missing.append("set KRAKEN_WITHDRAW_KEY to your saved Bitcoin withdrawal method in Settings")
             else:
                 if not settings.get("withdraw_address"):
-                    missing.append("set WITHDRAW_ADDRESS in .env")
+                    missing.append("set WITHDRAW_ADDRESS in Settings")
                 if not settings.get("withdraw_network"):
-                    missing.append("set WITHDRAW_NETWORK in .env")
+                    missing.append("set WITHDRAW_NETWORK in Settings")
             if not self.withdrawal_service:
                 missing.append("restart the bot to enable the withdrawal service")
             reason = "Manual withdrawal is unavailable: " + "; ".join(missing) + "." if missing else ""
@@ -1139,6 +1239,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if parsed.path in ("/api/analytics", "/api/export.csv"):
                 if parsed.path == "/api/export.csv":
+                    if not (self.settings or {}).get('parqet_enabled', True):
+                        self._json(403, {'error': 'Parqet CSV export is disabled in Settings.'})
+                        return
                     LOG.info("Parqet CSV export requested")
                 start_ms, end_ms = _period(query)
                 if parsed.path == "/api/export.csv":
@@ -1205,8 +1308,8 @@ def _analytics_from_rows(settings, records, snapshot):
     return build_report(settings,totals_from_records(records),snapshot,records)
 
 
-def serve(settings, port, withdrawal_service=None, worker=None):
-    handler = type("ConfiguredHandler", (Handler,), {"settings": settings, "withdrawal_service": staticmethod(withdrawal_service), "worker":worker})
+def serve(settings, port, withdrawal_service=None, worker=None, runtime=None):
+    handler = type("ConfiguredHandler", (Handler,), {"settings": settings, "withdrawal_service": staticmethod(withdrawal_service), "worker":worker, "runtime":runtime})
     server = ThreadingHTTPServer(("0.0.0.0", port), handler)
     LOG.info("Local portfolio web UI listening on container port %s.", port)
     server.serve_forever()

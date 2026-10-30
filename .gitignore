@@ -1,0 +1,7 @@
+.env
+.env.*
+!.env.example
+/state/
+__pycache__/
+*.py[cod]
+/docs/web-ui-browser-preview.html

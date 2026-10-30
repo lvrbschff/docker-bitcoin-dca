@@ -67,9 +67,9 @@ def local_now(timezone_name):
     return datetime.now(ZoneInfo(timezone_name))
 
 
-def latest_recorded_buy_time():
+def latest_recorded_buy_time(exchange=None):
     """Return the newest real Bitcoin buy from persistent UI activity."""
-    return latest_real_buy()
+    return latest_real_buy(exchange) if exchange else latest_real_buy()
 
 
 def read_state(path, cycle_key):
@@ -79,6 +79,10 @@ def read_state(path, cycle_key):
     if state.get("cycle") != cycle_key:
         # Reset dry-run simulated spending at the configured monthly boundary.
         fresh = {"cycle": cycle_key, "spent": "0"}
+        if state.get("configuration_account"):
+            fresh["configuration_account"] = state["configuration_account"]
+        if "configuration_live" in state:
+            fresh["configuration_live"] = state["configuration_live"]
         if state.get("pending_order"):
             fresh["pending_order"] = state["pending_order"]
         if state.get("pending_withdrawal"):
@@ -732,6 +736,18 @@ def withdrawal_destination(settings):
 
 def main():
     logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(), format="%(asctime)s %(levelname)s %(message)s")
+    if os.getenv("WEB_UI_ENABLED", "true").lower() == "true":
+        from runtime import Runtime
+        from worker import supervise
+        from web_ui import serve
+        runtime = Runtime()
+        port = int(os.getenv("WEB_UI_PORT", "6890"))
+        if not 1 <= port <= 65535:
+            raise ValueError("WEB_UI_PORT must be between 1 and 65535")
+        runtime.worker.start()
+        threading.Thread(target=supervise, args=(runtime.worker,), daemon=True).start()
+        serve(runtime.settings, port, runtime.worker.submit, worker=runtime.worker, runtime=runtime)
+        return
     deposit_day = int(os.getenv("DEPOSIT_DAY", "1"))
     if not 1 <= deposit_day <= 31:
         raise ValueError("DEPOSIT_DAY must be between 1 and 31")
@@ -764,18 +780,7 @@ def main():
     buy_amount_mode = "exchange minimum will be used" if settings["buy_amount"] == 0 else "fixed requested amount"
     LOG.info("Starting on %s: %s; live trading=%s; quote currency=%s; BUY_AMOUNT=%s %s (%s); deposit day=%s; startup delay=%ss; timezone=%s; check interval=%ss; order status check delay=%ss", settings["exchange"], f"BTC-{settings['quote']}", settings["live"], settings["quote"], settings["buy_amount"], "BTC", buy_amount_mode, deposit_day, settings["startup_delay_seconds"], settings["timezone"], interval, settings["order_status_check_seconds"])
 
-    if os.getenv("WEB_UI_ENABLED", "true").lower() == "true":
-        port = int(os.getenv("WEB_UI_PORT", "6890"))
-        if not 1 <= port <= 65535:
-            raise ValueError("WEB_UI_PORT must be between 1 and 65535")
-        from worker import supervise
-        worker=make_worker(api,settings,interval)
-        worker.start()
-        threading.Thread(target=supervise,args=(worker,),daemon=True).start()
-        from web_ui import serve
-        serve(settings,port,worker.submit,worker=worker)
-    else:
-        bot_loop(api, settings, interval)
+    bot_loop(api, settings, interval)
 
 
 if __name__ == "__main__":

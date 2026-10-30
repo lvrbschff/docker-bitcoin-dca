@@ -10,64 +10,26 @@ A Docker bot that buys Bitcoin on Bitvavo or Kraken, with optional automatic and
 
 Requires Docker Engine with Compose, internet access and a Bitvavo or Kraken account.
 
-### 1. Configure exchange access
-
-Clone the repository and create your local configuration:
-
 ~~~sh
 git clone https://github.com/oli792dev/docker-bitcoin-dca.git
 cd docker-bitcoin-dca
-cp .env.example .env
-~~~
-
-Create an API key for your selected exchange. Grant withdrawal permissions only if you will use withdrawals.
-
-| Exchange | Required API permissions | Credentials in `.env` |
-| --- | --- | --- |
-| [Bitvavo](https://docs.bitvavo.com/docs/get-started/) | View access; Trade digital assets for live buys; Withdraw digital assets for withdrawals | `BITVAVO_API_KEY`, `BITVAVO_API_SECRET` |
-| [Kraken](https://support.kraken.com/in/articles/360000919966-how-to-create-an-api-key?mode=consumerapp) | Query Funds, Query Open Orders & Trades, Query Closed Orders & Trades; Modify Orders for live buys; Withdraw Funds for withdrawals | `KRAKEN_API_KEY`, `KRAKEN_API_SECRET` |
-
-Fill in only the selected exchange’s credentials. Never commit `.env` or API credentials.
-
-For withdrawals, first save and verify the destination on the exchange, then configure:
-
-| Exchange | Destination in `.env` |
-| --- | --- |
-| Bitvavo | `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK` |
-| Kraken | `KRAKEN_WITHDRAW_KEY`: the exact label of the saved Bitcoin withdrawal address, not the address itself |
-
-Set `WEB_UI_USERNAME` and change `WEB_UI_PASSWORD` in `.env` (defaults: `admin` / `admin`). `WEB_UI_PORT` defaults to `6890`. The port is published on all host interfaces; HTTP is unencrypted, so use an HTTPS reverse proxy on untrusted networks.
-
-### 2. Configure the bot
-
-Edit `docker-compose.yml`. Start with `LIVE_TRADING=false`.
-
-| Setting | Default | Purpose |
-| --- | --- | --- |
-| `EXCHANGE` | `KRAKEN` | `KRAKEN` or `BITVAVO`. |
-| `QUOTE_CURRENCY` | `EUR` | Currency used to buy BTC. Reporting supports EUR and USD; the exchange must support the market. |
-| `BUY_AMOUNT` | `0` | BTC per purchase; `0` uses the exchange minimum. Amounts below the minimum are raised to it. |
-| `DEPOSIT_DAY` | `1` | Monthly scheduling boundary; shortened months use their last day. Does not initiate deposits. |
-| `startup_delay_seconds` | `60` | Wait after each startup before account checks and scheduling. |
-| `TIMEZONE` | `Europe/Berlin` | Deposit-cycle timezone. |
-| `LIVE_TRADING` | `false` | `false`: simulated buys; `true`: real orders. |
-| `CHECK_INTERVAL_SECONDS` | `300` | Account-check interval while waiting; minimum 60 seconds. |
-| `ORDER_STATUS_CHECK_SECONDS` | `30` | Delay before and between live-order status checks. |
-| `WITHDRAWALS_ENABLED` | `false` | Automatic withdrawals; also requires live trading. |
-| `WITHDRAW_THRESHOLD_QUOTE` | `1000` | Automatic withdrawal trigger, valued in the purchase currency. |
-| `WEB_UI_ENABLED` | `true` | Enable the dashboard. |
-| `LOG_LEVEL` | `INFO` | Optional logging verbosity. |
-
-### 3. Start and review
-
-~~~sh
 docker compose up -d --build
-docker compose logs -f
 ~~~
 
-Open `http://<docker-host-ip>:6890` and sign in. Dry-run mode still requires API credentials and internet access. Simulated buys are marked in activity and excluded from CSV exports.
+Open `http://<docker-host-ip>:6890`. On a fresh installation, create your username and password first (at least 12 characters), then configure your exchange and API credentials. Review and save to open the dashboard. There is no default account. New installations start in dry-run mode; API access and internet are required even for simulations.
 
-To start real purchases, set `LIVE_TRADING=true` and recreate the container with the same command.
+**Settings**, next to **Log out**, lets you change the account, exchange, API credentials, purchase amount, deposit day, timezone, startup/check intervals and trading mode. It also controls automatic withdrawals and their threshold, the destination, manual withdrawals and Parqet export. Disabled features hide their controls and notes and are blocked by the server. Empty API fields retain saved credentials; secrets are never displayed again.
+
+| Exchange | API permissions | Bitcoin withdrawal destination |
+| --- | --- | --- |
+| [Bitvavo](https://docs.bitvavo.com/docs/get-started/) | View access; Trade digital assets for live buys; Withdraw digital assets for withdrawals | Address and network saved and verified on Bitvavo |
+| [Kraken](https://support.kraken.com/articles/360000919966-how-to-create-an-api-key) | Query Funds; Query Open/Closed Orders & Trades; Modify Orders for live buys; Withdraw Funds for withdrawals | Exact label of a saved Bitcoin withdrawal method, not the address itself |
+
+**Test connection** checks account balance access without placing an order or withdrawal. Enable live trading only after reviewing the dry-run schedule. Exchange, currency, credential and trading-mode changes are blocked while orders, withdrawals or queued actions remain unresolved.
+
+Application settings persist in `./state/config.json`; passwords are hashed, API credentials are stored in this private file. Protect it and its backups. Never commit `.env`, `state/` or API credentials. Existing installations import their environment settings once; saved settings then take precedence. A weak initial dashboard password must be changed in Settings.
+
+Docker still controls ports, volumes and restart policy. To change the default port, copy `.env.example` to `.env` and set `WEB_UI_PORT`. The port is published on all host interfaces; HTTP is unencrypted, so use an HTTPS reverse proxy on untrusted networks. Environment-only/headless operation remains available; see [Architecture and operation](docs/architecture.md).
 
 ## Purchases and withdrawals
 
@@ -83,7 +45,7 @@ Live orders are submitted once and verified before another purchase. Open orders
 
 ### Withdrawals
 
-Automatic withdrawals require `WITHDRAWALS_ENABLED=true`, `LIVE_TRADING=true`, withdrawal permissions and a configured destination. Account checks compare all available exchange BTC × current exchange price against `WITHDRAW_THRESHOLD_QUOTE`. This includes BTC acquired outside the bot. When reached, the bot withdraws the available balance, less withdrawal fees.
+Enable automatic withdrawals and live trading in Settings, with withdrawal permissions and a configured destination. Account checks compare all available exchange BTC × current exchange price against the configured withdrawal threshold. This includes BTC acquired outside the bot. When reached, the bot withdraws the available balance, less withdrawal fees.
 
 For a manual withdrawal, click **Withdraw BTC manually** in Current BTC balance, review the destination and amount, then confirm. Live trading and destination permissions are required; the automatic toggle and threshold do not apply.
 

@@ -74,6 +74,19 @@ class ExportIntervals(unittest.TestCase):
         row=reporting.parqet_aggregate_rows(self.records,'KRAKEN')[0]
         self.assertEqual(Decimal(row['amount']),Decimal('240.40'))
 
+    def test_exchange_switch_does_not_mix_withdrawal_cycles(self):
+        buy=record('bitvavo-buy',7,amount='9999');buy['exchange']='BITVAVO'
+        withdrawal=record('bitvavo-withdraw',9,'TransferOut');withdrawal['exchange']='BITVAVO'
+        activity.append_activity_records([buy,withdrawal])
+        rows=activity.parqet_interval_records(stamp(1),stamp(12))
+        self.assertEqual({r['exchange'] for r in rows},{'KRAKEN'})
+        self.assertEqual(Decimal(reporting.parqet_aggregate_rows(rows,'BITVAVO')[0]['amount']),Decimal('240.40'))
+        all_records=activity.read_activity_records()
+        self.assertEqual(Decimal(reporting.parqet_aggregate_rows(all_records,'KRAKEN')[0]['amount']),Decimal('240.40'))
+        self.assertEqual(activity.latest_real_buy('KRAKEN').day,11)
+        self.assertEqual(activity.latest_real_buy('BITVAVO').day,7)
+
+
     def test_http_export_uses_complete_cycle_instead_of_selected_activity_range(self):
         handler=object.__new__(web_ui.Handler)
         handler.path=f'/api/export.csv?start={stamp(9)}&end={stamp(12)}'
