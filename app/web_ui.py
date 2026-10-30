@@ -333,7 +333,7 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 <div class="card btc-balance-card"><label>Current BTC balance</label><div class="value" id="exchangeBtcBalance">—</div><div class="small" id="exchangeBtcValue">—</div><div class="small" id="exchangeBtcUpdated">Waiting for account check</div><div class="withdraw-action"><button id="manualWithdraw" type="button" aria-describedby="withdrawal-note withdrawalFeedback">Withdraw BTC manually</button><p id="withdrawalFeedback" class="export-feedback withdraw-feedback hidden" role="alert"></p></div></div>
 <div class="card"><div class="field"><label for="monthlyDeposit">Expected monthly deposit (<span id="monthlyDepositCurrency">EUR</span>)</label><input id="monthlyDeposit" type="number" min="0" step="0.01" inputmode="decimal" value="0"></div><div class="small">Forecast only · assumes deposits on the configured deposit day · saved in this browser</div></div>
 <div class="card time-card"><label>Estimated automatic withdrawal date</label><div class="value time-value" id="estimatedWithdrawalAt">—</div><div class="small" id="estimatedWithdrawalStatus">Waiting for account check</div></div>
-<div class="card time-card"><label>Time until automatic withdrawal</label><div class="value countdown-value" id="withdrawalCountdown">—</div><div class="small" id="withdrawalCountdownStatus">Estimate at the current BTC price and purchase interval</div></div>
+<div class="card time-card"><label>Time until automatic withdrawal</label><div class="value countdown-value" id="withdrawalCountdown">—</div><div class="small" id="withdrawalCountdownStatus">Estimate at the current BTC price, deposit and purchase interval</div></div>
 </div></div>
 </section>
 </details>
@@ -485,8 +485,8 @@ async function refreshPurchaseSchedule(){
   const withdrawalTarget=Date.parse(schedule.estimatedWithdrawalAt);
   estimatedWithdrawalTimestamp=Number.isFinite(withdrawalTarget)?withdrawalTarget:null;
   $("estimatedWithdrawalAt").textContent=estimatedWithdrawalTimestamp===null?"Not estimated":new Date(estimatedWithdrawalTimestamp).toLocaleString("en-GB",{timeZone:schedule.timezone||"UTC",timeZoneName:"short"});
-  $("estimatedWithdrawalStatus").textContent=schedule.estimatedWithdrawalStatus||"Waiting for account check";
-  $("withdrawalCountdownStatus").textContent=estimatedWithdrawalTimestamp===null?$("estimatedWithdrawalStatus").textContent:"Estimate at the current BTC price and purchase interval";
+  $("estimatedWithdrawalStatus").textContent=estimatedWithdrawalTimestamp===null?(schedule.estimatedWithdrawalStatus||"Waiting for account check"):"Estimate at the current BTC price, deposit and purchase interval";
+  $("withdrawalCountdownStatus").textContent=estimatedWithdrawalTimestamp===null?$("estimatedWithdrawalStatus").textContent:"Estimate at the current BTC price, deposit and purchase interval";
   renderPurchaseCountdown();
   sectionFeedback("scheduleFeedback","");
  }catch(e){if(request===scheduleRequest)sectionFeedback("scheduleFeedback","Could not refresh the schedule. Previous values are still shown.",true)}
