@@ -32,3 +32,19 @@ async function event(id,name='click'){return elements[id].listeners[name]({preve
  reject=true;await event('testConnection');assert.equal(elements.testConnection.disabled,false);assert.equal(elements.status.textContent,'Connection failed');
  console.log('Settings UI passed: credentials, exchange fields, read-only test, review/cancel/save and validation');
 })().catch(error=>{console.error(error);process.exitCode=1});
+
+// The dashboard owns a native modal and accepts messages only from its settings frame.
+const dashboard=execFileSync('python3',['-c',`import ast;from pathlib import Path;m=ast.parse(Path('app/web_ui.py').read_text());print(next(ast.literal_eval(n.value) for n in m.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='HTML' for t in n.targets)))`],{cwd:root,encoding:'utf8'});
+const modalScript=dashboard.match(/<script data-ui-settings>([\s\S]*?)<\/script>/)[1];
+const modalElements=Object.fromEntries(['settingsDialog','settingsFrame','openSettings','closeSettings'].map(id=>[id,new Element()]));
+const frameWindow={},events={};modalElements.settingsFrame.contentWindow=frameWindow;let reloads=0;
+const modalWindow={location:{origin:'http://dashboard.test',href:'',reload(){reloads++}},addEventListener(name,fn){events[name]=fn}};
+vm.runInNewContext(modalScript,{document:{getElementById:id=>modalElements[id]},window:modalWindow});
+modalElements.openSettings.listeners.click();assert.equal(modalElements.settingsDialog.open,true);assert.equal(modalElements.settingsFrame.src,'/settings?embedded=1');
+modalElements.closeSettings.listeners.click();assert.equal(modalElements.settingsDialog.open,false);
+modalElements.settingsDialog.listeners.close();assert.equal(modalElements.settingsFrame.src,'about:blank','Closing must clear sensitive form fields');
+events.message({origin:'http://untrusted.test',source:frameWindow,data:{type:'dca-settings-saved'}});assert.equal(reloads,0);
+events.message({origin:'http://dashboard.test',source:{},data:{type:'dca-settings-saved'}});assert.equal(reloads,0);
+events.message({origin:'http://dashboard.test',source:frameWindow,data:{type:'dca-settings-saved'}});assert.equal(reloads,1);
+events.message({origin:'http://dashboard.test',source:frameWindow,data:{type:'dca-settings-auth-required'}});assert.equal(modalWindow.location.href,'/');
+console.log('Settings modal passed: open/close, secret cleanup, origin/source checks and save/auth handling');

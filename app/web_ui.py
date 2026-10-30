@@ -281,6 +281,7 @@ body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
 .section-feedback.is-error{color:var(--red)}
 th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
 .confirmation-dialog{width:min(520px,calc(100vw - 28px));max-height:calc(100dvh - 32px);overflow:auto;padding:24px;color:var(--text);background:#121a2d;border:1px solid var(--line);border-radius:12px;box-shadow:0 20px 70px #0008}
+.settings-dialog{width:min(1000px,calc(100vw - 28px));padding:0;overflow:hidden}.settings-dialog-header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}.settings-dialog-header h2{margin:0}.settings-dialog iframe{display:block;width:100%;height:min(76dvh,850px);border:0;background:#121a2d}.settings-dialog-header button{padding:5px 10px;min-height:32px}
 .confirmation-dialog::backdrop{background:#060b17aa;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
 .confirmation-dialog h2{font-size:20px;margin-bottom:12px}
 .confirmation-values{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:12px;margin:22px 0}
@@ -308,7 +309,7 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 </head>
 <body>
 <div class="compact-brand-bar"><div class="compact-brand-inner"><img src="/bitcoin-dca-icon-v3.png" width="36" height="36" alt=""><span>Bitcoin DCA Dashboard</span></div></div><main>
-<header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Dashboard</h1></div></div><div class="top-actions"><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div><form method="get" action="/settings"><button type="submit">Settings</button></form><form method="post" action="/logout"><button type="submit">Log out</button></form></div></header>
+<header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Dashboard</h1></div></div><div class="top-actions"><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div><button id="openSettings" type="button" aria-haspopup="dialog" aria-controls="settingsDialog">Settings</button><form method="post" action="/logout"><button type="submit">Log out</button></form></div></header>
 <details open class="panel" aria-labelledby="configurationHeading">
 <summary class="panel-heading"><h2 id="configurationHeading">Configuration</h2></summary>
 <div class="horizontal-scroll configuration-scroll" role="region" aria-label="Configuration cards" tabindex="0"><div class="grid configuration-grid">
@@ -385,6 +386,26 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 <p id="confirmationHint" class="small"></p>
 <form method="dialog" class="confirmation-actions"><button type="submit" value="cancel" class="secondary" id="cancelConfirmation" autofocus>Cancel</button><button type="submit" value="confirm" id="acceptConfirmation">Confirm withdrawal</button></form>
 </dialog>
+<dialog id="settingsDialog" class="confirmation-dialog settings-dialog" aria-labelledby="settingsTitle">
+<div class="settings-dialog-header"><h2 id="settingsTitle">Settings</h2><button id="closeSettings" class="secondary" type="button" aria-label="Close settings">×</button></div>
+<iframe id="settingsFrame" title="Application settings" src="about:blank"></iframe>
+</dialog>
+<script data-ui-settings>
+(()=>{
+ const dialog=document.getElementById('settingsDialog'),frame=document.getElementById('settingsFrame');
+ document.getElementById('openSettings').addEventListener('click',()=>{
+  frame.src='/settings?embedded=1';dialog.showModal();
+ });
+ document.getElementById('closeSettings').addEventListener('click',()=>dialog.close());
+ dialog.addEventListener('close',()=>{frame.src='about:blank';});
+ window.addEventListener('message',event=>{
+  if(event.origin!==window.location.origin||event.source!==frame.contentWindow)return;
+  if(event.data?.type==='dca-settings-close')dialog.close();
+  if(event.data?.type==='dca-settings-saved')window.location.reload();
+  if(event.data?.type==='dca-settings-auth-required')window.location.href='/';
+ });
+})();
+</script>
 <script data-ui-dismiss>
 document.querySelectorAll("[data-dismiss]").forEach(button=>button.addEventListener("click",()=>{
  const message=document.getElementById(button.dataset.dismiss);
@@ -1135,6 +1156,9 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, settings_page(self.runtime.store, create_account=True), 'text/html; charset=utf-8')
                 return
             if parsed.path in ('/configure', '/settings') and not self._has_valid_session():
+                if parse_qs(parsed.query).get('embedded') == ['1']:
+                    self._send(401, '<script>parent.postMessage({type:"dca-settings-auth-required"},location.origin)</script>', 'text/html; charset=utf-8')
+                    return
                 self._send(200, _login_page(), 'text/html; charset=utf-8')
                 return
             if self._has_valid_session():
@@ -1142,7 +1166,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._json(200, self.runtime.store.public())
                     return
                 if parsed.path in ('/configure', '/settings') or not data['complete'] or data['account'].get('password_change_required'):
-                    self._send(200, settings_page(self.runtime.store), 'text/html; charset=utf-8')
+                    self._send(200, settings_page(self.runtime.store, embedded=parse_qs(parsed.query).get("embedded") == ["1"]), 'text/html; charset=utf-8')
                     return
         if parsed.path == "/" and not self._has_valid_session():
             self._send(200, _login_page(), "text/html; charset=utf-8")
