@@ -1,6 +1,6 @@
 # Bitcoin DCA Bot for Bitvavo and Kraken
 
-A Docker bot that buys Bitcoin on Bitvavo or Kraken, with optional automatic and manual withdrawals. It distributes purchases until the next deposit day using the available fiat balance, current price and exchange order minimums. **Bitcoin DCA Dashboard** provides scheduling, activity and Parqet CSV exports.
+A Docker bot that buys Bitcoin on Bitvavo or Kraken, with optional automatic and manual withdrawals. It distributes purchases until the next deposit day using the available fiat balance, current price and exchange order minimums. Bitcoin DCA Dashboard provides scheduling, activity and Parqet CSV exports.
 
 ![Bitcoin DCA Dashboard: full-page screenshot with fictional data](docs/web-ui-dashboard-screenshot.png)
 
