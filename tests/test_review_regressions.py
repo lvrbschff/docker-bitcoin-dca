@@ -125,6 +125,28 @@ class ReviewTests(unittest.TestCase):
         api.estimate_taker_fee.return_value=D('.0025')
         return api
 
+    def test_adaptive_quantity_recalculates_interval_and_respects_exchange_minimum_and_budget(self):
+        now=datetime(2026,10,28,12,tzinfo=timezone.utc)
+        plans={}
+        for factor in ('1','2','.5'):
+            api=self.cycle_api();api.balance.return_value=D(1000)
+            state={'last_order_at':(now-timedelta(minutes=1)).isoformat()}
+            settings={**self.settings,'buy_amount':D('.001'),'adaptive_dca_enabled':True}
+            metrics={'enabled':True,'strength':'1','factor':factor,'status':'active'}
+            with patch.object(bot,'local_now',return_value=now),patch.object(bot,'read_state',return_value=state),patch.object(bot,'save_state'),patch.object(bot,'update_dashboard_snapshot'),patch.object(bot,'update_dashboard_schedule') as schedule,patch.object(bot,'evaluate_adaptive_dca',return_value=metrics):
+                bot.run_once(api,settings,300)
+            plans[factor]=schedule.call_args.args[2]
+            self.assertEqual(D(plans[factor]['orderAmount']),D('.001')*D(factor))
+            api.buy_btc.assert_not_called()
+            self.assertEqual(datetime.fromisoformat(state['schedule']['dueAt']),datetime.fromisoformat(state['last_order_at'])+timedelta(seconds=plans[factor]['intervalSeconds']))
+        self.assertGreater(plans['2']['intervalSeconds'],plans['1']['intervalSeconds'])
+        self.assertLess(plans['.5']['intervalSeconds'],plans['1']['intervalSeconds'])
+        api=self.cycle_api();api.balance.return_value=D('1')
+        with patch.object(bot,'read_state',return_value={}),patch.object(bot,'save_state'),patch.object(bot,'update_dashboard_snapshot'),patch.object(bot,'update_dashboard_schedule') as schedule,patch.object(bot,'evaluate_adaptive_dca',return_value={'enabled':True,'strength':'2','factor':'.25','status':'active'}):
+            bot.run_once(api,{**self.settings,'adaptive_dca_enabled':True},300)
+        self.assertEqual(D(schedule.call_args.args[2]['orderAmount']),D('.0001'))
+        api.buy_btc.assert_not_called()
+
     def test_definitive_rejection_clears_pending_but_timeout_keeps_it(self):
         for exception, retained in [(DefinitiveRejection('Rejected: insufficient funds'),False),(__import__('requests').ReadTimeout('unknown'),True)]:
             state={};api=self.cycle_api();api.buy_btc.side_effect=exception

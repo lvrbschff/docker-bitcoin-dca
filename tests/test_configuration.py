@@ -41,6 +41,16 @@ class ConfigurationTests(unittest.TestCase):
         self.app.save({'current_password':PASSWORD,'settings': {**CREDENTIALS, **settings}})
         self.app.worker.reconfigure.clear()
 
+    def test_adaptive_settings_persist_and_refresh_the_schedule(self):
+        self.ready()
+        self.app.save({'settings':{'adaptive_dca_enabled':True,'adaptive_dca_strength':'1.5'}})
+        self.assertTrue(self.app.worker.reconfigure.is_set())
+        saved=config.ConfigStore(self.store.path)
+        self.assertTrue(saved.snapshot()['settings']['adaptive_dca_enabled'])
+        restarted=runtime.Runtime(saved,self.app.state_path)
+        self.assertEqual(restarted.settings['adaptive_dca_strength'],'1.5')
+        self.assertTrue(restarted.settings['adaptive_dca_enabled'])
+
     def test_cosmetic_save_reuses_adapter_and_validation_failure_closes_replacement(self):
         self.ready()
         old=self.app.api

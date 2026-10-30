@@ -43,6 +43,8 @@ The next purchase is the last purchase time plus that interval. At startup, the 
 
 Live orders are submitted once and verified before another purchase. Open orders and uncertain submissions remain pending across restarts; completed partial fills are recorded at their actual executed amount. Network requests and queued actions can delay execution.
 
+Optional Adaptive DCA adjusts BTC per purchase against the mean and price standard deviation of 200 completed UTC days. Enable it and set strength (0–2; default 1) at the end of Bot Configuration. The adjusted quantity also determines the purchase interval; unavailable reference data falls back to ordinary DCA.
+
 ### Withdrawals
 
 Enable automatic withdrawals and live trading in Settings, with withdrawal permissions and a configured destination. Account checks compare all available exchange BTC × current exchange price against the configured withdrawal threshold. This includes BTC acquired outside the bot. When reached, the bot withdraws the available balance, less withdrawal fees.

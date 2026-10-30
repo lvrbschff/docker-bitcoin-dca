@@ -12,6 +12,7 @@ import threading
 from functools import wraps
 from exchange_errors import DefinitiveRejection, UncertainWithdrawalError
 from logging_utils import log_transition, clear_transition
+from adaptive_dca import evaluate as evaluate_adaptive_dca
 from withdrawals import reconcile_withdrawals
 
 BOT_LOCK = threading.RLock()
@@ -467,7 +468,7 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
     fee_rate = cycle_data['fee_rate'] if cycle_data else api.estimate_taker_fee(symbol, Decimal(1))
     price = cycle_data['price'] if cycle_data else api.price(symbol)
     market = cycle_data['market'] if cycle_data else api.market(symbol, refresh=True)
-    cycle_data = {'balance':balance,'price':price,'market':market,'fee_rate':fee_rate,'btc_balance':exchange_btc}
+    cycle_data = {'balance':balance,'price':price,'market':market,'fee_rate':fee_rate,'btc_balance':exchange_btc,'adaptive':cycle_data.get('adaptive') if cycle_data else None}
     update_dashboard_snapshot(settings, balance, price, exchange_btc)
     if market.get("status") != "trading":
         update_dashboard_schedule(None, f"Waiting for market status: {market.get('status')}")
@@ -477,7 +478,22 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
     min_btc = Decimal(market["minOrderInBaseAsset"])
     quantity_decimals = int(market["quantityDecimals"])
     notional_decimals = int(market["notionalDecimals"])
-    order_amount = ceil_to_places(max(settings["buy_amount"], min_btc, min_quote / price), quantity_decimals)
+    base_amount = ceil_to_places(max(settings["buy_amount"], min_btc, min_quote / price), quantity_decimals)
+    adaptive = cycle_data.get('adaptive')
+    if adaptive is None:
+        # Kraken's execution ticker is already a consistent reference. Bitvavo
+        # uses Kraken's public ticker alongside its Kraken daily closes.
+        adaptive = evaluate_adaptive_dca(settings, price if settings['exchange'] == 'KRAKEN' else None)
+        cycle_data['adaptive'] = adaptive
+    order_amount = ceil_to_places(max(base_amount * Decimal(adaptive['factor']), min_btc, min_quote / price), quantity_decimals)
+    adaptive = {**adaptive, 'baseAmount': str(base_amount), 'orderAmount': str(order_amount),
+                'effectiveFactor': str(order_amount / base_amount)}
+    if adaptive['enabled']:
+        log_transition(LOG, api, 'adaptive-dca', (adaptive['status'], adaptive['factor']),
+                       logging.WARNING if adaptive['status'] == 'unavailable' else logging.INFO,
+                       'Adaptive DCA: status=%s; mean=%s; standard deviation=%s; z=%s; strength=%s; factor=%s; base=%s BTC; order=%s BTC.',
+                       adaptive['status'], adaptive.get('mean', 'unavailable'), adaptive.get('standardDeviation', 'unavailable'),
+                       adaptive.get('zScore', 'unavailable'), adaptive['strength'], adaptive['factor'], base_amount, order_amount)
     order_quote = ceil_to_places(order_amount * price, notional_decimals)
     spendable = balance_after_simulated_spend
     available = balance if settings["live"] else balance_after_simulated_spend
@@ -487,7 +503,7 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
     planned_cost = ceil_to_places((order_quote + estimated_fee) * Decimal('1.005'), notional_decimals)
     possible_buys = int(affordable_budget // planned_cost)
     if possible_buys < 1:
-        update_dashboard_schedule(None, "Waiting until the balance covers an order")
+        update_dashboard_schedule(None, "Waiting until the balance covers an order", {"orderAmount":str(order_amount), "baseAmount":str(base_amount), "adaptiveDca":adaptive})
         log_transition(LOG, api, "purchase-wait", "insufficient-funds", logging.INFO, "Waiting: available balance %s %s; minimum order %s %s.", affordable_budget, quote, order_quote, quote)
         return check_interval
 
@@ -520,7 +536,7 @@ def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=Non
     save_state(state_path,state)
     remaining=max(0,int((due.astimezone(timezone.utc)-now.astimezone(timezone.utc)).total_seconds()))
     update_dashboard_schedule(due, 'Scheduled' if remaining else 'Due now', {
-        "orderAmount": str(order_amount), "plannedCost": str(planned_cost),
+        "orderAmount": str(order_amount), "baseAmount": str(base_amount), "adaptiveDca": adaptive, "plannedCost": str(planned_cost),
         "budget": str(affordable_budget), "intervalSeconds": interval_seconds,
         "nextDepositAt": next_deposit.isoformat(),
     })

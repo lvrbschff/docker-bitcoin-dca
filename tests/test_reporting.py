@@ -119,3 +119,68 @@ class ScheduleBalanceTests(unittest.TestCase):
     def test_zero_is_a_valid_balance(self):
         data=self.response({'quote':'EUR','exchange':'KRAKEN','quoteBalance':'0'})
         self.assertEqual(data['quoteBalance'],'0')
+
+
+class AdaptiveIndicatorTests(TestCase):
+    def test_tier_boundaries_and_strength_follow_the_agreed_formula(self):
+        from adaptive_dca import tier_factor
+        for z,expected in [('-3','2'),('-2','2'),('-1.99','1.5'),('-1','1.5'),('-.99','1.25'),('-.5','1.25'),('-.49','1'),('.49','1'),('.5','.8'),('.99','.8'),('1','.67'),('1.99','.67'),('2','.5')]:
+            with self.subTest(z=z):self.assertEqual(tier_factor(D(z)),D(expected))
+        for tier in ('2','.5'):
+            self.assertEqual(D(tier)**D(0),D(1))
+            self.assertEqual(D(tier)**D(2),D(4) if tier=='2' else D('.25'))
+
+    def fixture(self):
+        import adaptive_dca
+        now=datetime(2026,10,30,12,tzinfo=timezone.utc)
+        day=int(now.timestamp())//86400*86400
+        rows=[[day-i*86400,0,0,0,str(100+i)] for i in range(200,0,-1)]
+        return adaptive_dca,now,day,rows
+
+    def test_uses_200_completed_utc_days_and_reuses_volume_cache(self):
+        adaptive,now,day,rows=self.fixture();saved={}
+        def read(keys):return {k:(saved[k],0) for k in keys if k in saved}
+        with patch.object(adaptive,'cache_get_many',side_effect=read),patch.object(adaptive,'cache_put_many',side_effect=saved.update),patch.object(adaptive,'_public',return_value=rows+[[day,0,0,0,'999999']]) as fetch:
+            result=adaptive.evaluate({'quote':'EUR','adaptive_dca_enabled':True,'adaptive_dca_strength':'2'},100,now)
+            self.assertEqual(result['mean'],'200.5');self.assertEqual(result['throughDate'],'2026-10-29')
+            self.assertEqual(D(result['factor']),D('2.25'))
+            second=adaptive.evaluate({'quote':'EUR','adaptive_dca_enabled':True},300,now)
+            self.assertEqual(D(second['factor']),D('.67'));self.assertEqual(fetch.call_count,1)
+            self.assertLess(abs(D(result['standardDeviation'])**2-D('3333.25')),D('1e-20'))
+            zero=adaptive.evaluate({'quote':'EUR','adaptive_dca_enabled':True,'adaptive_dca_strength':'0'},100,now)
+            self.assertEqual(zero['factor'],'1');self.assertEqual(zero['status'],'neutral');self.assertEqual(zero['mean'],'200.5')
+            from datetime import timedelta
+            adaptive.evaluate({'quote':'EUR','adaptive_dca_enabled':True},300,now+timedelta(days=1))
+            self.assertEqual(fetch.call_count,2,'UTC day changes refresh the stored reference window')
+
+    def test_data_failures_fall_back_without_changing_the_base_and_disabled_does_no_io(self):
+        adaptive,now,day,rows=self.fixture()
+        import requests
+        with patch.object(adaptive,'cache_get_many',return_value={}),patch.object(adaptive,'cache_put_many'),patch.object(adaptive,'_public') as fetch:
+            self.assertEqual(adaptive.evaluate({'quote':'EUR'})['factor'],'1');fetch.assert_not_called()
+            for response in (rows[:-1],rows[:-1]+[rows[0]],[[day-i*86400,0,0,0,'100'] for i in range(200,0,-1)]):
+                fetch.return_value=response
+                self.assertEqual(adaptive.evaluate({'quote':'EUR','adaptive_dca_enabled':True},100,now)['status'],'unavailable')
+            fetch.side_effect=requests.ReadTimeout('offline')
+            result=adaptive.evaluate({'quote':'EUR','adaptive_dca_enabled':True},100,now)
+            self.assertEqual(result['factor'],'1');self.assertEqual(result['status'],'unavailable')
+
+    def test_configuration_limits_and_older_saved_defaults(self):
+        from configuration import validate
+        for value in ('-1','2.1','.15','NaN','Infinity','invalid'):
+            with self.subTest(value=value),self.assertRaises(ValueError):validate({'adaptive_dca_strength':value},require_credentials=False)
+        self.assertFalse(validate({},require_credentials=False)['adaptive_dca_enabled'])
+        for value in ('0','0.5','1','2'):
+            self.assertEqual(D(validate({'adaptive_dca_strength':value},require_credentials=False)['adaptive_dca_strength']),D(value))
+
+
+    def test_public_data_requests_need_no_credentials_and_bitvavo_uses_reference_ticker(self):
+        adaptive,now,day,rows=self.fixture()
+        response=Mock();response.json.return_value={'error':[],'result':{'XXBTZEUR':rows,'last':day}}
+        with patch.object(adaptive.requests,'get',return_value=response) as get:
+            self.assertEqual(adaptive._public('OHLC','EUR',interval=1440),rows)
+            self.assertEqual(get.call_args.kwargs,{'params':{'pair':'XBTEUR','interval':1440},'timeout':15})
+        with patch.object(adaptive,'cache_get_many',return_value={}),patch.object(adaptive,'cache_put_many'),patch.object(adaptive,'_public',side_effect=[rows,{'c':['100']}]) as fetch:
+            result=adaptive.evaluate({'quote':'EUR','adaptive_dca_enabled':True},now=now)
+            self.assertEqual(result['referencePrice'],'100')
+            self.assertEqual([call.args[0] for call in fetch.call_args_list],['OHLC','Ticker'])
