@@ -297,6 +297,13 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 
 :root{--subsection-space:20px;--section-space:24px;--tile-gap:14px}
 @media(max-width:600px){:root{--tile-gap:10px}}
+
+.feedback-wrap{display:flex;justify-content:flex-end;align-items:flex-start;gap:6px;max-width:100%;min-width:0}
+.feedback-wrap>.export-feedback{min-width:0;flex:1}
+.feedback-wrap>.hidden+.feedback-close{display:none}
+.feedback-close{flex:0 0 24px;width:24px;min-height:24px;padding:0;margin-top:10px;font-size:16px;line-height:22px;border-radius:6px}
+.withdraw-action>.feedback-wrap{width:100%}
+.withdraw-action .feedback-close{margin-top:4px}
 </style>
 </head>
 <body>
@@ -331,7 +338,7 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 <section class="schedule-group" aria-labelledby="withdrawalHeading">
 <h3 id="withdrawalHeading" class="summary-subheading">Withdrawal</h3>
 <div class="schedule-row-scroll horizontal-scroll" role="region" aria-label="Withdrawal schedule cards" tabindex="0"><div class="grid schedule-grid">
-<div class="card btc-balance-card"><label>Current BTC balance</label><div class="value" id="exchangeBtcBalance">—</div><div class="small" id="exchangeBtcValue">—</div><div class="small" id="exchangeBtcUpdated">Waiting for account check</div><div class="withdraw-action"><button id="manualWithdraw" type="button" aria-describedby="withdrawal-note withdrawalFeedback">Withdraw BTC manually</button><p id="withdrawalFeedback" class="export-feedback withdraw-feedback hidden" role="alert"></p></div></div>
+<div class="card btc-balance-card"><label>Current BTC balance</label><div class="value" id="exchangeBtcBalance">—</div><div class="small" id="exchangeBtcValue">—</div><div class="small" id="exchangeBtcUpdated">Waiting for account check</div><div class="withdraw-action"><button id="manualWithdraw" type="button" aria-describedby="withdrawal-note withdrawalFeedback">Withdraw BTC manually</button><div class="feedback-wrap"><p id="withdrawalFeedback" class="export-feedback withdraw-feedback hidden" role="alert"></p><button class="secondary feedback-close" type="button" data-dismiss="withdrawalFeedback" aria-label="Close withdrawal message">×</button></div></div></div>
 <div class="card"><div class="field"><label for="monthlyDeposit">Expected monthly deposit (<span id="monthlyDepositCurrency">EUR</span>)</label><input id="monthlyDeposit" type="number" min="0" step="0.01" inputmode="decimal" value="0"></div><div class="small">Forecast only · assumes deposits on the configured deposit day · saved in this browser</div></div>
 <div class="card time-card"><label>Estimated automatic withdrawal date</label><div class="value time-value" id="estimatedWithdrawalAt">—</div><div class="small" id="estimatedWithdrawalStatus">Waiting for account check</div></div>
 <div class="card time-card"><label>Time until automatic withdrawal</label><div class="value countdown-value" id="withdrawalCountdown">—</div><div class="small" id="withdrawalCountdownStatus">Estimate at the current BTC price, deposit and purchase interval</div></div>
@@ -361,7 +368,7 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 <h3 class="summary-subheading activity-subheading" id="activityHeading">Period Activity</h3>
 <section class="panel activity-panel" aria-labelledby="activityHeading"><div class="activity-heading"><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap horizontal-scroll" role="region" aria-label="Period activity table" tabindex="0"><table><thead><tr><th>Date</th><th>Type</th><th class="num">BTC</th><th class="num">Price</th><th class="num">Value</th><th class="num">Fee</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><span id="pageInfo" class="notice"></span><div class="pagination-navigation"><button class="secondary" id="previousPage">Previous</button><button class="secondary" id="nextPage">Next</button></div><form class="page-jump" id="pageJump" aria-label="Jump to activity page"><label for="pageNumber">Go to page</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><button class="secondary" id="goToPage" type="submit">Go</button></form></div></section></div>
 <div class="bottom-actions"><button id="download" aria-describedby="exportMessage">Download Parqet CSV</button></div>
-<p id="exportMessage" class="export-feedback hidden" role="alert"></p>
+<div class="feedback-wrap"><p id="exportMessage" class="export-feedback hidden" role="alert"></p><button class="secondary feedback-close" type="button" data-dismiss="exportMessage" aria-label="Close export message">×</button></div>
 </details>
 <footer class="dashboard-footnotes" aria-labelledby="notesHeading">
 <h2 id="notesHeading">Notes</h2>
@@ -378,6 +385,12 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 <p id="confirmationHint" class="small"></p>
 <form method="dialog" class="confirmation-actions"><button type="submit" value="cancel" class="secondary" id="cancelConfirmation" autofocus>Cancel</button><button type="submit" value="confirm" id="acceptConfirmation">Confirm withdrawal</button></form>
 </dialog>
+<script data-ui-dismiss>
+document.querySelectorAll("[data-dismiss]").forEach(button=>button.addEventListener("click",()=>{
+ const message=document.getElementById(button.dataset.dismiss);
+ if(message){message.classList.add("hidden");message.textContent=""}
+}));
+</script>
 <script data-ui-view>
 (()=>{
  let saved={};try{const value=JSON.parse(localStorage.getItem("bitcoinDcaPanels")||"{}");if(value&&typeof value==="object")saved=value}catch(e){}
