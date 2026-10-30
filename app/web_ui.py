@@ -122,7 +122,7 @@ main{max-width:1180px;margin:0 auto;padding:36px 22px 64px}.top{display:flex;jus
 .controls input[type="datetime-local"]::-webkit-datetime-edit{min-width:0;padding:0}
 .controls input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper{min-width:0;padding:0}
 .controls input[type="datetime-local"]::-webkit-date-and-time-value{min-width:0;text-align:left}
-.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.period-summary-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.summary-secondary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.card{padding:17px;border:1px solid var(--line);border-radius:14px;background:#0c1425a8}.card label{display:block;color:var(--muted);font-size:12px;margin-bottom:9px}.value{font-size:22px;font-weight:700;line-height:1.4;letter-spacing:-.02em}.small{font-size:12px;color:var(--muted);margin-top:4px}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--tile-gap)}.period-summary-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.summary-secondary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.card{padding:17px;border:1px solid var(--line);border-radius:14px;background:#0c1425a8}.card label{display:block;color:var(--muted);font-size:12px;margin-bottom:9px}.value{font-size:22px;font-weight:700;line-height:1.4;letter-spacing:-.02em}.small{font-size:12px;color:var(--muted);margin-top:4px}
 h2{font-size:17px;margin:0 0 16px}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:740px}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}td.num{text-align:right;font-variant-numeric:tabular-nums}.positive{color:var(--green)}.negative{color:var(--red)}.notice{color:var(--muted);font-size:13px;margin-top:12px}.error{color:var(--red);margin:12px 0}.hidden{display:none}.activity-panel .activity-heading{justify-content:flex-end}
 .activity-heading,.pagination,.settings-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.settings-heading h2{margin:0}.settings-heading .field{min-width:160px}.activity-heading h4{font-size:14px;font-weight:700;margin:0}.page-size{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}.page-size select{width:auto;padding:7px 10px}.pagination{margin-top:12px}.pagination button{padding:8px 12px}.pagination .notice{margin:0;text-align:center}
 main,.panel,.grid,.card,.field,.top>div{min-width:0}
@@ -143,7 +143,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
  .top-actions form,.top-actions .withdraw-action{grid-column:1/-1;justify-self:end}.top-actions .field{grid-column:1/-1;min-width:0}
  .controls{grid-template-columns:minmax(0,1fr)}.controls .field:first-child{grid-column:auto}
  input,select{font-size:16px}input,select,button{min-height:44px}
- .grid{gap:10px}.card{padding:13px}.card label{line-height:1.5;margin-bottom:7px}
+ .grid{gap:var(--tile-gap)}.card{padding:13px}.card label{line-height:1.5;margin-bottom:7px}
  .value{font-size:19px;line-height:1.4}.time-card{grid-column:1/-1}
  .activity-heading,.settings-heading{align-items:flex-start;flex-wrap:wrap}
  .activity-heading h2{flex-basis:100%}.page-size{width:100%;justify-content:space-between}
@@ -162,9 +162,9 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 
 .report-section{min-width:0}
 .report-heading,.panel-heading{margin-bottom:18px}.report-heading h2,.panel-heading h2{font-size:21px;margin:0 0 5px}
-.report-heading .sub{font-size:14px}.summary-subheading{font-size:17px;font-weight:700;line-height:1.4;margin:0 0 16px}
+.report-heading .sub{font-size:14px}.summary-subheading{font-size:17px;font-weight:700;line-height:1.4;margin:0 0 var(--subsection-space)}
 .period-summary-content,.schedule-group+.schedule-group,.summary-subheading.activity-subheading{
- margin-top:24px;padding-top:20px;border-top:1px solid var(--line)
+ margin-top:var(--section-space);padding-top:var(--subsection-space);border-top:1px solid var(--line)
 }
 .report-controls>.sub{margin-bottom:16px;font-size:14px}
 
@@ -273,7 +273,7 @@ body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
 .horizontal-scroll.is-scrolling::-webkit-scrollbar-thumb{background:#8bafff}
 .horizontal-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 .configuration-scroll .configuration-grid{grid-template-columns:repeat(4,minmax(220px,1fr))}
-.report-cards{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:14px;min-width:0}
+.report-cards{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:var(--tile-gap);min-width:0}
 .report-scroll .period-summary-grid,.report-scroll .summary-secondary-grid{display:contents}
 
 .section-feedback{font-size:12px;color:var(--muted);margin:0 0 14px}
@@ -293,6 +293,9 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
  mask-image:linear-gradient(to right,#000 calc(100% - 32px),rgba(0,0,0,.18));
 }
 #activities tr{height:34px}#activities .activity-placeholder{user-select:none;pointer-events:none}
+
+:root{--subsection-space:20px;--section-space:24px;--tile-gap:14px}
+@media(max-width:600px){:root{--tile-gap:10px}}
 </style>
 </head>
 <body>
@@ -349,7 +352,7 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 <div class="card"><label>Trading fees</label><div class="value" id="tradeFees">—</div></div>
 <div class="card"><label>Withdrawals</label><div class="value" id="withdrawBtc">—</div><div class="small" id="withdrawCount"></div></div>
 <div class="card"><label>Withdrawal fees</label><div class="value" id="withdrawFees">—</div></div>
-</div><div class="grid summary-secondary-grid" style="margin-top:14px">
+</div><div class="grid summary-secondary-grid" style="margin-top:var(--tile-gap)">
 <div class="card"><label>Profit / loss on period purchases</label><div class="value" id="profitLoss">—</div><div class="small" id="profitLossBasis">Current value of BTC bought in this period minus trading fees</div></div>
 <div class="card"><label>Net BTC in period</label><div class="value" id="netBtc">—</div><div class="small">Purchases minus gross BTC withdrawals</div></div>
 </div>
