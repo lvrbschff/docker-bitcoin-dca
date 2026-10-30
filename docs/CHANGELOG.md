@@ -5,8 +5,10 @@ Release history based on the published [GitHub Releases](https://github.com/oli7
 ## Unreleased
 
 - Fixed the restart loop when saved settings or history exist but scheduling state is missing.
-- Added authenticated account recovery in Settings, with read-only exchange checks and a trading pause until explicit confirmation.
-- Preserved saved configuration and recorded activity while rebuilding the purchase schedule after recovery.
+- Replaced manual account recovery with automatic startup exchange checks; new purchases and withdrawals wait for open transactions to close.
+- Preserved saved configuration and recorded activity while rebuilding the purchase schedule after startup checks.
+- Added separate, independently saved pages for dashboard credentials and exchange API access.
+- Aligned display currency with the timezone field and shortened its timezone help text.
 
 ## [v0.5.0](https://github.com/oli792dev/docker-bitcoin-dca/releases/tag/v0.5.0) — 2026-10-30
 

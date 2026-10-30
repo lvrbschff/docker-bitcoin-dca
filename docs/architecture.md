@@ -77,10 +77,8 @@ First-run account creation is separate from bot configuration; the second step d
 
 Only executed live fills are stored as buys; these display Confirmed. Simulations remain Simulated. Withdrawals display Confirmed only after exchange-history reconciliation, with pending, failed, cancelled and legacy-unverified outcomes kept distinct. This is exchange confirmation, not independent blockchain verification.
 
-## Missing scheduling state
+## Startup exchange checks
 
-If settings or activity exist but `state.json` is missing, startup creates a persistent recovery flag instead of exiting. The dashboard, Settings and healthcheck remain available; purchase cycles and manual withdrawals are paused across restarts. Settings shows Account recovery required.
+After setup, restart, or exchange/credential/trading-mode changes, the worker reads open account orders and BTC withdrawal status before allowing new transactions. Open or unverifiable outcomes keep purchases and withdrawals paused; checks retry at the account-check interval. HTTP polling and manual withdrawal clicks do not trigger these checks. The configured startup delay still applies.
 
-Restore a consistent volume backup if available. Otherwise review the exchange’s open orders, recent fills and BTC withdrawals, then confirm recovery in Settings using the current dashboard password. The bot checks open orders and recent withdrawal statuses without submitting transactions, and rechecks submitted ledger withdrawals. Pending or unverifiable outcomes keep the pause active.
-
-Successful recovery retains the account, settings and activity ledger, rebuilds scheduling from recorded purchase history, and waits at least 60 seconds before the next account cycle. Without a recorded buy, the recovery time is the execution anchor. Lost in-flight request identifiers and unrecorded executions are not silently recreated; review historical reports and CSV exports against the exchange. No host directory or migration is used.
+Missing scheduling state is initialized without resetting saved configuration or activity. Recorded purchases anchor the rebuilt schedule; existing pending requests retain their normal reconciliation. Lost request identifiers and unrecorded executions cannot be reconstructed from this check; restore a consistent volume backup when historical data is missing. No host migration or manual recovery menu is used. A full withdrawal-history response reaching the exchange response limit is treated as unverifiable rather than assumed complete.

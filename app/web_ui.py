@@ -1005,7 +1005,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.runtime:
             self._json(404, {'error': 'Settings unavailable.'})
             return
-        operation = {'/api/setup/account': 'Initial account creation', '/api/settings/test': 'Exchange connection test', '/api/settings': 'Settings update', '/api/settings/recover': 'Account recovery'}[path]
+        operation = {'/api/setup/account': 'Initial account creation', '/api/settings/test': 'Exchange connection test', '/api/settings': 'Settings update'}[path]
         if path != '/api/setup/account' and not self._require_authentication():
             LOG.info('%s rejected: authentication required', operation)
             return
@@ -1022,8 +1022,6 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header('Cache-Control', 'no-store')
                 self.end_headers()
                 self.wfile.write(b'{}')
-            elif path == '/api/settings/recover':
-                self._json(200, self.runtime.recover_account(payload))
             elif path == '/api/settings/test':
                 self._json(200, self.runtime.test_connection(payload))
             else:
@@ -1053,8 +1051,8 @@ class Handler(BaseHTTPRequestHandler):
         if not settings.get('withdrawals_enabled', False): hidden += ['#automatic-withdrawal-note']
         styles = '<style>' + ','.join(hidden) + '{display:none!important}</style>' if hidden else ''
         page = HTML.replace('</head>', styles + '</head>')
-        if self.runtime and self.runtime.recovery_required():
-            page = page.replace('</header>', '</header><p class="export-feedback" role="alert">Trading is paused because scheduling state is missing. Open Settings to review account recovery. Your saved settings and recorded activity are retained.</p>', 1)
+        if self.runtime and self.runtime.exchange_check_pending:
+            page = page.replace('</header>', '</header><p class="export-feedback" role="alert">New transactions are paused until the automatic exchange check passes and open orders or withdrawals are closed.</p>', 1)
         if not settings.get('withdrawals_enabled', False):
             page = page.replace('Schedule and automatic withdrawal</strong>', 'Purchase schedule</strong>')
         if not settings.get('parqet_enabled', True):
@@ -1067,7 +1065,7 @@ class Handler(BaseHTTPRequestHandler):
             from configuration import runtime_settings
             self.settings = runtime_settings(self.runtime.store.snapshot()['settings'])
         parsed = urlparse(self.path)
-        if parsed.path in ('/api/setup/account', '/api/settings', '/api/settings/test', '/api/settings/recover'):
+        if parsed.path in ('/api/setup/account', '/api/settings', '/api/settings/test'):
             self._settings_post(parsed.path)
             return
         if parsed.path == "/login":
@@ -1185,7 +1183,7 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 if parsed.path in ('/configure', '/settings') or not data['complete'] or data['account'].get('password_change_required'):
                     LOG.info('Settings opened' if data['complete'] else 'First-run bot configuration opened')
-                    self._send(200, settings_page(self.runtime.store, embedded=parse_qs(parsed.query).get("embedded") == ["1"], recovery_required=self.runtime.recovery_required()), 'text/html; charset=utf-8')
+                    self._send(200, settings_page(self.runtime.store, embedded=parse_qs(parsed.query).get("embedded") == ["1"], editor=parse_qs(parsed.query).get("editor", [None])[0], editor_exchange=parse_qs(parsed.query).get("exchange", [None])[0]), 'text/html; charset=utf-8')
                     return
         if parsed.path == "/" and not self._has_valid_session():
             self._send(200, _login_page(), "text/html; charset=utf-8")
@@ -1207,8 +1205,8 @@ class Handler(BaseHTTPRequestHandler):
             kraken = settings["exchange"] == "KRAKEN"
             destination = ("Kraken saved withdrawal method: " + (settings.get("kraken_withdraw_key") or "not configured")) if kraken else ("Bitvavo address: " + (settings.get("withdraw_address") or "not configured") + "; network: " + settings.get("withdraw_network", "BTC"))
             missing = []
-            if self.runtime and self.runtime.recovery_required():
-                missing.append('complete account recovery in Settings')
+            if self.runtime and self.runtime.exchange_check_pending:
+                missing.append('wait for the automatic exchange check and open transactions to close')
             if not settings.get('manual_withdrawal_enabled', True):
                 missing.append('enable manual withdrawals in Settings')
             if not settings["live"]:
@@ -1248,19 +1246,19 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if parsed.path == "/api/schedule":
                 snapshot = read_dashboard_snapshot()
-                recovery_required = bool(self.runtime and self.runtime.recovery_required())
-                if recovery_required:
-                    snapshot = {**snapshot, 'nextPurchaseAt':None, 'nextPurchaseStatus':'Account recovery required — open Settings'}
+                exchange_check_pending = bool(self.runtime and self.runtime.exchange_check_pending)
+                if exchange_check_pending:
+                    snapshot = {**snapshot, 'nextPurchaseAt':None, 'nextPurchaseStatus':'Waiting for automatic exchange check'}
                 balance_matches = (snapshot.get("quote") == self.settings["quote"]
                                    and snapshot.get("exchange") == self.settings["exchange"])
-                if recovery_required:
-                    forecast_at, forecast_status = None, 'Account recovery required — open Settings'
+                if exchange_check_pending:
+                    forecast_at, forecast_status = None, 'Waiting for automatic exchange check'
                 else:
                     forecast_at, forecast_status = withdrawal_forecast(
                         self.settings, snapshot if balance_matches else {},
                         query.get("monthlyDeposit", ["0"])[0], datetime.now(timezone.utc))
                 self._json(200, {
-                    "recoveryRequired": recovery_required,
+                    "exchangeCheckPending": exchange_check_pending,
                     "quote": self.settings["quote"],
                     "exchange": self.settings["exchange"],
                     "quoteBalance": snapshot.get("quoteBalance") if balance_matches else None,

@@ -46,8 +46,8 @@ def prepare_storage(data_dir=None):
     saved = _read(configuration) if configuration.exists() else {}
     has_history = (destination / 'activity.sqlite3').exists() or (destination / 'activity.json').exists()
     if saved.get('complete') or has_history:
-        _write(state, {'recoveryRequired': True})
-        LOG.error('Persistent scheduling state is missing; trading is paused. Open Settings for account recovery or restore the volume backup.')
+        _write(state, {})
+        LOG.warning('Scheduling state is missing; initialized empty state. Automatic exchange checks must pass before new transactions.')
         return
     _write(state, {})
     LOG.info('Persistent storage initialized in the named web UI volume')

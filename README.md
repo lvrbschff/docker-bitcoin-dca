@@ -27,7 +27,7 @@ Open `http://<docker-host-ip>:6890`. The setup wizard first creates your usernam
 
 **Test connection** reads balances without trading; progress and results appear beside the button. API access and internet are required even for dry runs. Exchange, credential, currency and trading-mode changes are blocked while transactions remain unresolved.
 
-Settings persist as `config.json` in the named volume `bitcoin-dca-webui-data`; passwords are hashed and API credentials stay private. Empty API fields keep saved credentials. Protect this file and backups; never commit credentials or `.env`. All runtime state and activity also live in this volume; no host state directory is required. Reuse the same volume on redeployment. If scheduling state is missing, the dashboard opens in a paused recovery mode; review the exchange and use Account recovery in Settings, or restore a volume backup.
+Settings persist as `config.json` in the named volume `bitcoin-dca-webui-data`; passwords are hashed and API credentials stay private. Empty API fields keep saved credentials. Protect this file and backups; never commit credentials or `.env`. All runtime state and activity also live in this volume; no host state directory is required. Reuse the same volume on redeployment. After setup and each restart, automatic API checks block new transactions until open exchange orders and Bitcoin withdrawals are closed. Unavailable status keeps the bot paused and is retried.
 
 Compose manages only port, log level, volumes and restart policy. Optional `.env` overrides are `WEB_UI_PORT` (6890) and `LOG_LEVEL` (INFO). HTTP is unencrypted; use HTTPS on untrusted networks. See [Architecture and operation](docs/architecture.md) for storage and operation.
 
