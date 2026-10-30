@@ -544,15 +544,13 @@ function sectionFeedback(id,message,error=false){const el=$(id);el.textContent=m
 function readReportView(){try{return JSON.parse(localStorage.getItem("bitcoinDcaReportView")||"null")}catch(e){return null}}
 function saveReportView(){try{localStorage.setItem("bitcoinDcaReportView",JSON.stringify({interval:$("interval").value,start:$("start").value,end:$("end").value,pageSize:$("pageSize").value}))}catch(e){}}
 function restoreReportView(){
+ const now=Date.now();$("end").value=localInput(now);$("interval").value="";
  const saved=readReportView();if(!saved||typeof saved!=="object")return;
  if(["5","10","20","50","100","500","1000"].includes(String(saved.pageSize)))$("pageSize").value=String(saved.pageSize);
- const start=Date.parse(saved.start),end=Date.parse(saved.end);
- if(Number.isFinite(start)&&Number.isFinite(end)&&start<end){
-  $("start").value=saved.start;$("end").value=saved.end;
-  $("interval").value=saved.interval||"";
-  if(!$("interval").value)$("interval").value="";
- }
+ const start=Date.parse(saved.start);
+ if(Number.isFinite(start)&&start<now)$("start").value=saved.start;
 }
+
 let reportRequest=0,scheduleRequest=0;
 function knownNumber(value){return value!==null&&value!==undefined&&String(value).trim()!==""&&Number.isFinite(Number(value))}
 function activityBtc(value){return knownNumber(value)?btc(value):"—"}

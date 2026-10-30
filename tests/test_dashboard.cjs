@@ -36,6 +36,8 @@ const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate)};
 (async()=>{
  vm.createContext(context);vm.runInContext(script,context);await settle();
  assert(get('start').value&&get('end').value,'Both dates must initialize for the selected interval');
+ assert.equal(get('end').value,vm.runInContext('localInput(Date.now())',context),'Each page load uses the current end time');
+ assert.equal(get('interval').value,'','A range ending now must not claim to be a closed withdrawal interval');
  assert.equal(get('quoteBalance').textContent,'€72.77');
  assert.equal(get('quoteBalanceLabel').textContent,'Available EUR balance on exchange');
  assert(html.indexOf('id="quoteBalance"')<html.indexOf('id="nextPurchaseAt"'),'Fiat balance precedes next purchase');
@@ -105,6 +107,11 @@ const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate)};
  vm.runInContext('saveReportView()',context);
  get('pageSize').value='10';get('start').value='';get('end').value='';vm.runInContext('restoreReportView()',context);
  assert.equal(get('pageSize').value,'20');assert.equal(get('start').value,'2026-10-01T00:00');
+ assert.equal(get('end').value,vm.runInContext('localInput(Date.now())',context),'Saved end dates must not override the current time');
+ stored.set('bitcoinDcaReportView',JSON.stringify({interval:'1,2',start:'2026-10-01T00:00',end:'2026-10-02T00:00',pageSize:'20'}));
+ vm.runInContext('restoreReportView()',context);
+ assert.equal(get('interval').value,'');assert.equal(get('end').value,vm.runInContext('localInput(Date.now())',context));
+
  let decision=vm.runInContext('confirmWithdrawal({destination:"Example wallet",availableBtc:".01",feeBtc:".0001",netBtc:".0099"})',context);
  assert(get('confirmationDialog').open);assert.equal(get('confirmGross').textContent,'0.01 BTC');assert.equal(get('confirmFee').textContent,'0.0001 BTC');assert.equal(get('confirmNet').textContent,'0.0099 BTC');
  get('confirmationDialog').close('cancel');assert.equal(await decision,false);
