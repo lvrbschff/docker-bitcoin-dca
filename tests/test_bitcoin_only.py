@@ -44,7 +44,7 @@ class BitcoinOnlyTests(unittest.TestCase):
     def test_legacy_asset_environment_does_not_choose_purchase_asset(self):
         with patch.dict(os.environ, {'BASE_ASSET': 'ETH', 'WEB_UI_ENABLED': 'false'}, clear=True), \
                 patch.object(bot, 'create_exchange') as create_exchange, \
-                patch.object(bot, 'bot_loop') as loop:
+                patch.object(bot, 'bot_loop') as loop, patch.object(bot, 'prepare_storage'):
             bot.main()
         settings = loop.call_args.args[1]
         self.assertNotIn('base', settings)

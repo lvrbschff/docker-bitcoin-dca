@@ -11,7 +11,7 @@ from pathlib import Path
 from activity import write_json_atomic
 
 LOG=logging.getLogger('bitcoin-dca.worker')
-HEALTH_PATH=Path('/data/worker-health.json')
+from storage import HEALTH_PATH
 HEARTBEAT_WRITE_INTERVAL_SECONDS=300
 
 

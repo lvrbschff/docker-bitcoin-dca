@@ -27,6 +27,7 @@ def serialized(function):
 import requests
 from activity import append_activity_records, read_dashboard_snapshot, write_dashboard_snapshot, ledger_balance, withdrawal_records, write_json_atomic, get_activity_record, latest_real_buy
 from exchange import create_exchange
+from storage import STATE_PATH, prepare_storage
 
 LOG = logging.getLogger("bitcoin-dca")
 
@@ -264,7 +265,7 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
         last_record = get_activity_record(state.get('last_withdrawal',{}).get('activityId',''))
         if last_record and last_record.get('withdrawalStatus')=='failed' and not state.get('withdrawal_armed',True):
             state['withdrawal_armed']=True
-            save_state(Path('/data/state.json'),state)
+            save_state(STATE_PATH,state)
             return
         if not state.get('pending_withdrawal') and any(r.get('exchange')==settings['exchange'] and r.get('withdrawalStatus')=='submitted'
                for r in withdrawal_records(unresolved=True)):
@@ -294,7 +295,7 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
             except DefinitiveRejection:
                 state.pop("pending_withdrawal", None)
                 state.pop("pending_withdrawal_context", None)
-                save_state(Path("/data/state.json"), state)
+                save_state(STATE_PATH, state)
                 raise
             except requests.RequestException:
                 LOG.warning("Withdrawal outcome is uncertain; the same idempotent request will be retried next check.")
@@ -302,7 +303,7 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
                 return
             context["result"] = result
             state["pending_withdrawal_context"] = context
-            save_state(Path("/data/state.json"), state)
+            save_state(STATE_PATH, state)
         persist_bot_withdrawal(api, pending, result, settings, context)
         state["last_withdrawal"] = {
             "id": result.get("id"),
@@ -314,7 +315,7 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
         state["withdrawal_armed"] = False
         state.pop("pending_withdrawal", None)
         state.pop("pending_withdrawal_context", None)
-        save_state(Path("/data/state.json"), state)
+        save_state(STATE_PATH, state)
         LOG.info("BTC withdrawal submitted: amount=%s BTC, withdrawalId=%s", pending["amount"], result.get("id"))
         return
 
@@ -322,7 +323,7 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
     if available <= 0:
         if not state.get("withdrawal_armed", True):
             state["withdrawal_armed"] = True
-            save_state(Path("/data/state.json"), state)
+            save_state(STATE_PATH, state)
             LOG.info("BTC balance is below the withdrawal threshold again; automatic withdrawal is re-armed.")
         return
     price = api.price(f"BTC-{settings['quote']}")
@@ -330,7 +331,7 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
     if manual_request is None and not state.get("withdrawal_armed", True):
         if value < settings["withdraw_threshold"]:
             state["withdrawal_armed"] = True
-            save_state(Path("/data/state.json"), state)
+            save_state(STATE_PATH, state)
             LOG.info("BTC balance is below the withdrawal threshold again; automatic withdrawal is re-armed.")
         else:
             log_transition(LOG, api, "withdrawal-wait", "balance-not-updated", logging.INFO, "Waiting for %s to reflect the previous withdrawal before another automatic withdrawal.", settings["exchange"])
@@ -354,13 +355,13 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
         "manual": manual_request is not None,
         "balanceBefore": format(available, "f"),
     }
-    save_state(Path("/data/state.json"), state)
+    save_state(STATE_PATH, state)
     try:
         result = api.withdraw_btc(withdrawal)
     except DefinitiveRejection:
         state.pop('pending_withdrawal',None)
         state.pop('pending_withdrawal_context',None)
-        save_state(Path('/data/state.json'),state)
+        save_state(STATE_PATH,state)
         raise
     except requests.RequestException:
         LOG.exception("Withdrawal outcome is uncertain; check the exchange before taking further action.")
@@ -368,7 +369,7 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
             LOG.error("This exchange does not support idempotent withdrawal retries; the saved request will not be resent automatically.")
         return
     state["pending_withdrawal_context"]["result"] = result
-    save_state(Path("/data/state.json"), state)
+    save_state(STATE_PATH, state)
     persist_bot_withdrawal(
         api, withdrawal, result, settings, state.get("pending_withdrawal_context", {})
     )
@@ -382,7 +383,7 @@ def maybe_withdraw_btc(api, state, settings, manual_request=None):
     state.pop("pending_withdrawal", None)
     state.pop("pending_withdrawal_context", None)
     state["withdrawal_armed"] = False
-    save_state(Path("/data/state.json"), state)
+    save_state(STATE_PATH, state)
     LOG.info("BTC withdrawal submitted: amount=%s BTC (fee deducted from amount), value at submission=%s %s, withdrawalId=%s", withdrawal["amount"], value, settings["quote"], result.get("id"))
 
 
@@ -471,7 +472,7 @@ def run_once(api, settings, check_interval, schedule_only=False):
 def _run_once(api, settings, check_interval, schedule_only=False, cycle_data=None):
     quote = settings["quote"]
     symbol = f"BTC-{quote}"
-    state_path = Path("/data/state.json")
+    state_path = STATE_PATH
     now = local_now(settings["timezone"])
     cycle_key, _cycle_start, next_deposit = cycle_dates(now, settings["deposit_day"])
     state = read_state(state_path, cycle_key)
@@ -691,7 +692,7 @@ def manual_withdrawal_service(api, settings):
             raise ValueError("Manual Bitcoin withdrawals require LIVE_TRADING=true.")
         api.validate_withdrawal_settings(settings)
         cycle, _, _ = cycle_dates(local_now(settings["timezone"]), settings["deposit_day"])
-        state = read_state(Path("/data/state.json"), cycle)
+        state = read_state(STATE_PATH, cycle)
         if (state.get("pending_order") or state.get("pending_withdrawal") or
             any(r.get('exchange')==settings['exchange'] and r.get('withdrawalStatus')=='submitted'
                 for r in withdrawal_records(unresolved=True))):
@@ -738,6 +739,7 @@ def withdrawal_destination(settings):
 
 def main():
     logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(), format="%(asctime)s %(levelname)s %(message)s")
+    prepare_storage()
     if os.getenv("WEB_UI_ENABLED", "true").lower() == "true":
         from runtime import Runtime
         from worker import supervise

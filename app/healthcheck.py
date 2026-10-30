@@ -2,9 +2,9 @@
 import json
 import sys
 import time
-from pathlib import Path
+from storage import HEALTH_PATH
 
-def healthy(path=Path('/data/worker-health.json')):
+def healthy(path=HEALTH_PATH):
     try:
         state=json.loads(path.read_text())
         age=time.time()-float(state['heartbeat'])

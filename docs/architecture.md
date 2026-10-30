@@ -10,8 +10,7 @@ flowchart LR
     Web <-->|Action queue| Worker["Account worker"]
     Worker <--> Adapter["Kraken or Bitvavo adapter"]
     Adapter <--> Exchange["Exchange API"]
-    Worker <--> State["./state → /data"]
-    Worker <--> Data["Named volume → /webui-data"]
+    Worker <--> Data["bitcoin-dca-webui-data → /webui-data"]
     Web <--> Data
     Web --> Sources["Kraken prices / Frankfurter FX"]
 ~~~
@@ -21,13 +20,14 @@ flowchart LR
 - `app/web_ui.py`, `app/analytics.py`, `app/reporting.py`: dashboard and exports.
 - `app/configuration.py`, `app/runtime.py`, `app/settings_ui.py`: private persistent configuration, runtime application and setup/settings pages.
 - `app/activity.py`: SQLite activity, reporting data and persistence.
+- `app/storage.py`: volume paths and one-time migration before account actions start.
 The application source lives in `app/`; tests live in `tests/`. Docker copies `app/` into its `/app` working directory, so container startup and healthcheck commands are unchanged.
 
 - `Dockerfile` builds the image; `docker-compose.yml` configures runtime, port and storage.
 
-**Keep and back up both mounts:** `./state` holds pending requests and scheduling state; `bitcoin-dca-webui-data` holds private `config.json`, `activity.sqlite3`, FX cache and `dashboard.json`. Stop the bot for a consistent backup, or use a SQLite-aware backup. Legacy JSON activity is imported once; downgrading to a JSON-only release loses access to newer SQLite activity.
+**One persistent volume:** `bitcoin-dca-webui-data`, mounted at `/webui-data`, holds private `config.json`, `state.json` (pending transactions and schedule), `activity.sqlite3`, FX cache, `dashboard.json`, the worker heartbeat and storage-layout marker. No host state directory is used during normal operation. Stop the bot for a consistent backup, or use a SQLite-aware backup. Legacy JSON activity is imported once; downgrading to a JSON-only release loses access to newer SQLite activity.
 
-Back up both `./state` and `bitcoin-dca-webui-data`. After updating the source, run `docker compose up -d --build`. **Do not run `docker compose down -v`: it deletes the activity volume.**
+Back up the named volume. After updating the source, run `docker compose up -d --build`. **Do not run `docker compose down -v`: it deletes the volume.**
 
 View recent logs with `docker compose logs --tail=200`. INFO logs show schedule inputs, next purchase times, orders, withdrawals and errors. Review logs before sharing: they can contain balances and transaction identifiers.
 
@@ -70,7 +70,7 @@ Automatic withdrawals, manual withdrawals and Parqet export have separate settin
 
 ### Environment-only operation
 
-With `WEB_UI_ENABLED=false`, the bot continues to use environment variables directly. Legacy names are `EXCHANGE`, `QUOTE_CURRENCY`, `BUY_AMOUNT`, `DEPOSIT_DAY`, `startup_delay_seconds`, `TIMEZONE`, `LIVE_TRADING`, `CHECK_INTERVAL_SECONDS`, `ORDER_STATUS_CHECK_SECONDS`, `WITHDRAWALS_ENABLED`, `WITHDRAW_THRESHOLD_QUOTE`, `KRAKEN_WITHDRAW_KEY`, `WITHDRAW_ADDRESS`, `WITHDRAW_NETWORK`, and each exchange’s `*_API_KEY` / `*_API_SECRET`. Dashboard deployments import these only when no saved configuration exists and legacy variables are explicitly passed (for example with the previous Compose file). The simplified Compose file no longer forwards credentials or bot settings. An existing `/data/config.json` is copied atomically into `/webui-data/config.json` when the destination does not exist; the old file is retained. An existing volume configuration always takes precedence, and an unreadable configuration stops startup instead of silently restarting setup. Reuse the same named volume on redeployment. For environment-only legacy installations, migrate with the previous Compose configuration before removing legacy environment values.
+With `WEB_UI_ENABLED=false`, the bot continues to use environment variables directly. Legacy names are `EXCHANGE`, `QUOTE_CURRENCY`, `BUY_AMOUNT`, `DEPOSIT_DAY`, `startup_delay_seconds`, `TIMEZONE`, `LIVE_TRADING`, `CHECK_INTERVAL_SECONDS`, `ORDER_STATUS_CHECK_SECONDS`, `WITHDRAWALS_ENABLED`, `WITHDRAW_THRESHOLD_QUOTE`, `KRAKEN_WITHDRAW_KEY`, `WITHDRAW_ADDRESS`, `WITHDRAW_NETWORK`, and each exchange’s `*_API_KEY` / `*_API_SECRET`. Dashboard deployments import these only when no saved configuration exists and legacy variables are explicitly passed (for example with the previous Compose file). The simplified Compose file no longer forwards credentials or bot settings. During a one-time migration, accessible legacy files are copied atomically into the named volume; source files are retained. An existing volume configuration always takes precedence, and an unreadable configuration stops startup instead of silently restarting setup. Reuse the same named volume on redeployment. For environment-only legacy installations, migrate with the previous Compose configuration before removing legacy environment values.
 
 Setup and Settings log account creation, one-time environment import, configuration completion, changed field names, session invalidation, read-only connection tests and explicit dialog cancellations at INFO. Expected validation or pending-transaction rejections are INFO; exchange/network failures are WARNING and unexpected failures are ERROR. Stored configuration reads and sanitized failure locations are DEBUG. Passwords, API credential values, session/confirmation tokens and raw settings exception messages are never included in these logs.
 
@@ -79,3 +79,20 @@ Setup and Settings log account creation, one-time environment import, configurat
 First-run account creation is separate from bot configuration; the second step does not repeat Dashboard Credentials. Later, Settings opens in a dashboard dialog. Trading and dashboard groups the large live/withdrawal/export switches and display currency; connection-test results appear beside its button. Reporting currency changes do not reschedule purchases.
 
 Only executed live fills are stored as buys; these display Confirmed. Simulations remain Simulated. Withdrawals display Confirmed only after exchange-history reconciliation, with pending, failed, cancelled and legacy-unverified outcomes kept distinct. This is exchange confirmation, not independent blockchain verification.
+
+## Move existing state to the named volume
+
+Do this once before removing the old `./state:/data` mount. The old directory cannot be accessed after that mount is removed.
+
+In Portainer, first deploy the updated image with the **old mount still present**, alongside the named volume. Startup migrates scheduling state, pending requests, configuration and legacy JSON data before starting the worker. Wait for `Persistent storage ready: all runtime data uses the named web UI volume`, then remove the old bind mount and redeploy. The normal Compose file contains only the named volume.
+
+Alternatively, with the bot stopped, run the migration from the repository on the Docker host (adjust the source path if needed):
+
+~~~sh
+docker compose stop
+docker compose build
+docker compose run --rm --no-deps --volume /data/compose/28/state:/legacy-state:ro bitcoin-dca python storage.py --from /legacy-state
+docker compose up -d
+~~~
+
+The temporary migration container reads the old directory only once; the running bot uses only the named volume. Existing volume settings take precedence. Conflicting scheduling states, malformed files or an existing configured account without its scheduling state stop startup rather than risk repeating orders or withdrawals. The migration is retryable after a failed write. Once migration is complete, legacy files are not read again; retain the old folder as a backup until verified.

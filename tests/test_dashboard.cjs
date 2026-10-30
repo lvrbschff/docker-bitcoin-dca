@@ -13,14 +13,14 @@ class Element{
 const elements={},get=id=>{assert(!["balance","balanceValue"].includes(id),"Removed portfolio element must not be accessed");return elements[id]??=new Element()};get('pageSize').value=html.match(/<option selected>(\d+)<\/option>/)[1];
 const records=Array.from({length:45},(_,i)=>({activityId:String(i),datetime:'2026-10-22T12:00:00Z',type:'Buy',identifier:'BTC',shares:'.001',currency:i<22?'EUR':'USD',price:i<22?'80000':'100000',amount:i<22?'80':'100',fee:i<22?'.2':'.25'}));
 const stored=new Map();let expiryCallback;
-const requests=[];let reportFails=false,scheduleFails=false,checks=0,eurOnly=false,priceUnavailable=false,invalidUsdRate=false,withdrawalUnavailable=false,configuredDisplayCurrency="EUR";
+const requests=[];let reportFails=false,scheduleFails=false,checks=0,eurOnly=false,priceUnavailable=false,invalidUsdRate=false,withdrawalUnavailable=false,configuredDisplayCurrency="EUR",withdrawalExchange="KRAKEN",withdrawalTarget="Example wallet",withdrawalNetwork="BTC";
 const response=data=>({ok:true,json:async()=>data});
 const context={document:{getElementById:get,createElement:()=>new Element()},localStorage:{getItem:key=>stored.get(key)??null,setItem:(key,value)=>stored.set(key,value)},Intl,Date,URL,console,alert(){throw Error('Withdrawal must not use a browser alert')},confirm:()=>false,setInterval(){},setTimeout(fn,ms){if(ms===120000){expiryCallback=fn;return 1}queueMicrotask(fn)},clearTimeout(){},window:{location:{reload(){throw Error('Unexpected reload')}}},fetch:async(url,options)=>{
  requests.push(url);const parsed=new URL(url,'http://example.test');
  if(parsed.pathname==='/api/schedule'&&scheduleFails)throw Error('Schedule offline');
  if(parsed.pathname==='/api/schedule')return response({quote:'EUR',exchange:'KRAKEN',quoteBalance:'72.7719',balanceUpdatedAt:'2026-10-29T12:00:00Z',nextPurchaseAt:new Date(Date.now()+3600000).toISOString(),serverTime:new Date().toISOString(),timezone:'Europe/Berlin'});
  if(parsed.pathname==='/api/withdrawals')return response([{timestamp:Date.parse('2026-10-20T12:00:00Z')},{timestamp:Date.parse('2026-10-23T12:00:00Z')}]);
- if(parsed.pathname==='/api/withdrawal/config')return response({enabled:!withdrawalUnavailable,destination:'fictional wallet',reason:withdrawalUnavailable?'Manual withdrawal is unavailable: set KRAKEN_WITHDRAW_KEY to your saved Bitcoin withdrawal method in .env.':''});
+ if(parsed.pathname==='/api/withdrawal/config')return response({enabled:!withdrawalUnavailable,exchange:withdrawalExchange,target:withdrawalTarget,network:withdrawalNetwork,destination:'fictional wallet',reason:withdrawalUnavailable?'Manual withdrawal is unavailable: set KRAKEN_WITHDRAW_KEY to your saved Bitcoin withdrawal method in .env.':''});
  if(parsed.pathname==='/api/market-price'&&parsed.searchParams.get('currency')==='USD')return response({price:'88000',conversionRate:'1.1',conversionRates:{EUR:'1.1',USD:'1'},updatedAt:Date.now()/1000});
  if(parsed.pathname==='/api/market-price')return priceUnavailable?{ok:false,json:async()=>({error:'offline'})}:response({price:'80000',conversionRate:'1',conversionRates:{EUR:'1',USD:invalidUsdRate?'invalid':'0.9'},updatedAt:Date.now()/1000});
  if(parsed.pathname==='/api/analytics'){
@@ -183,5 +183,13 @@ const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate)};
  assert.equal(vm.runInContext('activityStatus({type:"TransferOut"}).label',context),'Unverified');
  assert.equal(get('activities').children[0].children.length,7);
  assert.equal(get('activities').children[0].children[6].textContent,'Confirmed ✓');
+
+ await vm.runInContext('loadWithdrawalConfiguration()',context);
+ assert.equal(get('automaticWithdrawalDestination').textContent,get('withdrawalDestination').textContent);
+ assert.match(get('automaticWithdrawalDestination').textContent,/Kraken under “Example wallet”/);
+ withdrawalExchange='BITVAVO';withdrawalTarget='bc1-fictional-target';withdrawalNetwork='BTC';await vm.runInContext('loadWithdrawalConfiguration()',context);
+ assert.match(get('automaticWithdrawalDestination').textContent,/bc1-fictional-target via BTC on Bitvavo/);
+ withdrawalTarget='';await vm.runInContext('loadWithdrawalConfiguration()',context);
+ assert.match(get('automaticWithdrawalDestination').textContent,/No withdrawal target is configured/);
  console.log('Dashboard regressions passed: interval dates, server pages, mixed-currency rows/totals and queued preview polling');
 })().catch(e=>{console.error(e);process.exit(1)});

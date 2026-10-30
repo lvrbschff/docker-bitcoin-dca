@@ -5,18 +5,19 @@ import time
 from pathlib import Path
 from configuration import ConfigStore, account_values, runtime_settings, validate
 from exchange import create_exchange
+from storage import STATE_PATH
 
 LOG = logging.getLogger('bitcoin-dca.settings')
 IDENTITY_FIELDS = ('exchange', 'quote', 'kraken_api_key', 'kraken_api_secret', 'bitvavo_api_key', 'bitvavo_api_secret')
 
 
 class Runtime:
-    def __init__(self, store=None, state_path='/data/state.json'):
+    def __init__(self, store=None, state_path=None):
         from bot import BOT_LOCK
         from worker import Worker
         self.lock = BOT_LOCK
         self.store = store or ConfigStore()
-        self.state_path = Path(state_path)
+        self.state_path = Path(state_path) if state_path is not None else STATE_PATH
         self.settings = runtime_settings(self.store.snapshot()['settings'])
         self.api = None
         self.service = None
