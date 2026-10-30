@@ -286,6 +286,12 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 .confirmation-values dt{color:var(--muted);font-size:13px}.confirmation-values dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .confirmation-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
 @media(max-width:480px){.confirmation-dialog{padding:18px}.confirmation-values{grid-template-columns:minmax(0,1fr)}.confirmation-values dd{text-align:left;margin-top:-8px}.confirmation-actions button{flex:1}}
+
+/* Fade only overflowing card rows with more content to their right. */
+.horizontal-scroll:not(.tablewrap).has-more-right{
+ -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 32px),rgba(0,0,0,.18));
+ mask-image:linear-gradient(to right,#000 calc(100% - 32px),rgba(0,0,0,.18));
+}
 </style>
 </head>
 <body>
@@ -381,12 +387,17 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 (()=>{
  const areas=[...document.querySelectorAll(".horizontal-scroll")];
  const timers=new WeakMap();
- function update(area){area.classList.toggle("has-overflow",area.scrollWidth>area.clientWidth+1)}
+ function update(area){
+  const overflow=area.clientWidth>0&&area.scrollWidth>area.clientWidth+1;
+  area.classList.toggle("has-overflow",overflow);
+  area.classList.toggle("has-more-right",overflow&&area.scrollLeft+area.clientWidth<area.scrollWidth-2);
+ }
  const observer=new ResizeObserver(()=>areas.forEach(update));
  areas.forEach(area=>{
   observer.observe(area);
   if(area.firstElementChild)observer.observe(area.firstElementChild);
   area.addEventListener("scroll",()=>{
+   update(area);
    area.classList.add("is-scrolling");
    clearTimeout(timers.get(area));
    timers.set(area,setTimeout(()=>area.classList.remove("is-scrolling"),180));

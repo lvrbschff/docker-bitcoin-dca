@@ -139,5 +139,21 @@ const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate)};
  assert.equal(panel.open,false);panel.open=true;panel.toggle();
  assert.equal(JSON.parse(stored.get('bitcoinDcaPanels')).configurationHeading,true);
  context.document=savedDocument;
+
+ const scrollClasses=new Set(),scrollEvents={};let resizeScroll;
+ const scrollArea={clientWidth:300,scrollWidth:900,scrollLeft:0,firstElementChild:{},
+  classList:{toggle(name,on){on?scrollClasses.add(name):scrollClasses.delete(name)},add(name){scrollClasses.add(name)},remove(name){scrollClasses.delete(name)}},
+  addEventListener(name,fn){scrollEvents[name]=fn}};
+ const previousDocument=context.document;
+ context.document={querySelectorAll:selector=>selector==='.horizontal-scroll'?[scrollArea]:[]};
+ context.ResizeObserver=class{constructor(fn){resizeScroll=fn}observe(){}};
+ vm.runInContext(html.split('<script data-ui-scroll-areas>')[1].split('</script>')[0],context);
+ assert(scrollClasses.has('has-more-right'),'Overflow shows the right edge hint');
+ scrollArea.scrollLeft=600;scrollEvents.scroll();
+ assert(!scrollClasses.has('has-more-right'),'Reaching the end removes the hint');
+ scrollArea.scrollLeft=100;scrollEvents.scroll();assert(scrollClasses.has('has-more-right'));
+ scrollArea.clientWidth=1000;resizeScroll();
+ assert(!scrollClasses.has('has-more-right'));assert(!scrollClasses.has('has-overflow'));
+ context.document=previousDocument;
  console.log('Dashboard regressions passed: interval dates, server pages, mixed-currency rows/totals and queued preview polling');
 })().catch(e=>{console.error(e);process.exit(1)});
