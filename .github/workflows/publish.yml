@@ -1,3 +1,4 @@
+# Build and publish the Docker image to GitHub Container Registry.
 name: Publish container
 
 on:
