@@ -2,15 +2,40 @@
 
 Release history based on the published [GitHub Releases](https://github.com/oli792dev/docker-bitcoin-dca/releases). Entries are newest first; dates use Europe/Berlin. Releases without notes are marked explicitly.
 
-## Unreleased
+## [v0.5.0](https://github.com/oli792dev/docker-bitcoin-dca/releases/tag/v0.5.0) — 2026-10-30
 
-- Added first-run account creation and guided configuration without a default login.
-- Added Settings next to Log out for account, exchange, API credentials, purchase settings, withdrawal destinations and thresholds.
-- Added independent switches for automatic withdrawals, manual withdrawals and Parqet CSV, with matching notes and server-side enforcement.
-- Persisted private application configuration, hashed dashboard passwords and migrated existing environment settings once.
-- Added read-only connection testing, configuration review and protection against account changes during unresolved transactions.
-- Kept scheduling and CSV withdrawal cycles separate across exchanges.
-- Updated setup documentation and added configuration regression tests.
+- Added first-run setup for creating dashboard credentials and configuring the bot.
+- Added a Settings dialog for exchange access, purchase parameters, withdrawal targets and dashboard options.
+- Added separate credential editors and a review showing highlighted before-and-after changes.
+- Added read-only API connection tests with inline feedback.
+- Added controls for live trading, automatic/manual withdrawals, Parqet exports, display currency and timezone.
+- Added worldwide timezone presets and contextual setting descriptions.
+- Moved all persistent data into `bitcoin-dca-webui-data`, preserving settings and transaction state across deployments.
+- Removed the host state bind mount and migration code.
+- Made the web UI mandatory; bot settings and credentials now come exclusively from the saved web configuration.
+- Added confirmation statuses to Period Activity and automatic withdrawal targets to Notes.
+- Reset the Period Analysis end time to the current time on each page load.
+- Expanded setup and Settings logs without exposing credentials.
+- Improved mobile layouts and simplified the deployment configuration and documentation.
+
+## [v0.4.2](https://github.com/oli792dev/docker-bitcoin-dca/releases/tag/v0.4.2) — 2026-10-30
+
+- improvements in configuration and settings page
+
+## [v0.4.1](https://github.com/oli792dev/docker-bitcoin-dca/releases/tag/v0.4.1) — 2026-10-30
+
+- improving configuration page
+
+## [v0.4.0](https://github.com/oli792dev/docker-bitcoin-dca/releases/tag/v0.4.0) — 2026-10-30
+
+- Adding settings menu and configuration assistant
+
+## [v0.3.5](https://github.com/oli792dev/docker-bitcoin-dca/releases/tag/v0.3.5) — 2026-10-30
+
+- Kept scheduled account checks unchanged after manual withdrawal previews and confirmations, avoiding unnecessary purchase schedule recalculations.
+- Added compact dismiss buttons to manual withdrawal and Parqet CSV export messages.
+- Unified automatic withdrawal forecast subtitles and subsection spacing.
+- Kept activity table height stable by filling unused page rows.
 
 ## [v0.3.4](https://github.com/oli792dev/docker-bitcoin-dca/releases/tag/v0.3.4) — 2026-10-30
 
