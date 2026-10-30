@@ -4,13 +4,15 @@ import json
 import logging
 import re
 import requests
+import ssl
+from tls import TLSHandshakeError
 from datetime import datetime, timezone, timedelta
 import calendar
 from zoneinfo import ZoneInfo
 from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
 from http.cookies import CookieError, SimpleCookie
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 from secrets import token_urlsafe
 from threading import RLock
@@ -869,7 +871,11 @@ class Handler(BaseHTTPRequestHandler):
     def setup(self):
         if self.tls_context is not None:
             self.request.settimeout(10)
-            self.request = self.tls_context.wrap_socket(self.request, server_side=True)
+            try:
+                self.request = self.tls_context.wrap_socket(self.request, server_side=True)
+            except (ssl.SSLError, ConnectionError, TimeoutError) as error:
+                self.request.close()
+                raise TLSHandshakeError(error) from None
         super().setup()
 
 
@@ -1359,12 +1365,12 @@ def _row_timestamp_ms(row):
 
 def serve(settings, port, withdrawal_service=None, worker=None, runtime=None):
     import os
-    from tls import certificate_hosts, https_context, renew_certificates
+    from tls import certificate_hosts, https_context, renew_certificates, HTTPSWebServer
     from threading import Thread, Event
     hosts = certificate_hosts(os.getenv("WEB_UI_TLS_HOSTS", ""))
     context = https_context(hosts)
     handler = type("ConfiguredHandler", (Handler,), {"settings": settings, "withdrawal_service": staticmethod(withdrawal_service), "worker":worker, "runtime":runtime, "tls_context":context})
-    server = ThreadingHTTPServer(("0.0.0.0", port), handler)
+    server = HTTPSWebServer(("0.0.0.0", port), handler)
     LOG.info("HTTPS dashboard listening on container port %s.", port)
     stop = Event()
     Thread(target=renew_certificates, args=(handler, hosts, stop), name="https-certificate-renewal", daemon=True).start()

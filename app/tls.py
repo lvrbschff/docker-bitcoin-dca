@@ -2,6 +2,9 @@
 import ipaddress
 import json
 import logging
+import sys
+from http.server import ThreadingHTTPServer
+from logging_utils import log_transition
 import os
 from pathlib import Path
 import re
@@ -84,3 +87,29 @@ def renew_certificates(handler, hosts, stop):
         try: handler.tls_context = https_context(hosts)
         except Exception:
             LOG.error('HTTPS certificate renewal failed; keeping the current certificate and retrying in 24 hours')
+
+
+class TLSHandshakeError(Exception):
+    """An expected peer/transport failure before an HTTP request exists."""
+    def __init__(self, error):
+        reason = getattr(error, 'reason', None) or type(error).__name__
+        self.reason = reason if re.fullmatch(r'[A-Za-z0-9_]{1,80}', str(reason)) else 'HANDSHAKE_ABORTED'
+        super().__init__(self.reason)
+
+
+class HTTPSWebServer(ThreadingHTTPServer):
+    def handle_error(self, request, client_address):
+        error = sys.exception()
+        if not isinstance(error, TLSHandshakeError):
+            return super().handle_error(request, client_address)
+        reason = error.reason
+        if reason in {'SSLV3_ALERT_CERTIFICATE_UNKNOWN', 'TLSV1_ALERT_UNKNOWN_CA',
+                      'SSLV3_ALERT_BAD_CERTIFICATE', 'SSLV3_ALERT_CERTIFICATE_EXPIRED'}:
+            log_transition(LOG, self, 'tls:' + client_address[0], reason, logging.WARNING,
+                           'HTTPS client %s rejected the certificate (%s). Trust tls/ca.pem on this device and check WEB_UI_TLS_HOSTS against the address used.',
+                           client_address[0], reason)
+        elif reason == 'HTTP_REQUEST':
+            log_transition(LOG, self, 'tls:' + client_address[0], reason, logging.INFO,
+                           'Plain HTTP request on the HTTPS port from %s; use an https:// URL.', client_address[0])
+        else:
+            LOG.debug('HTTPS handshake aborted by %s (%s).', client_address[0], reason)

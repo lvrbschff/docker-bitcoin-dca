@@ -95,3 +95,18 @@ area.clientWidth=900;resizeScroll();assert(!scrollClasses.has('has-overflow'));
 assert(page.includes('grid-template-rows:repeat(2,auto);grid-auto-flow:column'));
 assert.equal((page.match(/class="horizontal-scroll"/g)||[]).length,7);
 console.log('Settings scrolling passed: two-row layout, overflow, edge fade, resize and scroll feedback');
+
+// All native dialogs lock their own page and restore its exact scroll position.
+const lockScript=page.match(/<script data-ui-dialog-lock>([\s\S]*?)<\/script>/)[1];
+class InlineStyle{
+ constructor(text){this.cssText=text}
+ get cssText(){return this._text}
+ set cssText(text){for(const key of Object.keys(this))delete this[key];this._text=text;for(const item of text.split(';')){const [key,value]=item.split(':');if(key&&value)this[key.trim().replace(/-([a-z])/g,(_,letter)=>letter.toUpperCase())]=value.trim()}}
+}
+const background={style:new InlineStyle('color:red')},rootElement={clientWidth:980,style:new InlineStyle('scroll-behavior:smooth')};
+const modalA={open:false},modalB={open:false},restored=[];let updateModal;
+vm.runInNewContext(lockScript,{document:{body:background,documentElement:rootElement,querySelectorAll:()=>[modalA,modalB]},window:{innerWidth:1000,scrollX:30,scrollY:420,getComputedStyle:()=>({paddingRight:'5px'}),scrollTo:(x,y)=>restored.push([x,y])},MutationObserver:class{constructor(fn){updateModal=fn}observe(){}}});
+modalA.open=true;updateModal();assert.equal(background.style.position,'fixed');assert.equal(background.style.top,'-420px');assert.equal(background.style.paddingRight,'25px');assert.equal(rootElement.style.overflow,'hidden');
+modalB.open=true;updateModal();modalA.open=false;updateModal();assert.equal(restored.length,0,'Another open dialog keeps the page locked');
+modalB.open=false;updateModal();assert.deepEqual(restored,[[30,420]]);assert.equal(background.style.cssText,'color:red');assert.equal(background.style.position,undefined);assert.equal(rootElement.style.scrollBehavior,'smooth');
+console.log('Dialog scroll lock passed: nested dialogs, scrollbar compensation and position/style restoration');

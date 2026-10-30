@@ -4,6 +4,11 @@ Release history based on the published [GitHub Releases](https://github.com/oli7
 
 ## Unreleased
 
+- Locked background scrolling while settings, withdrawal and review dialogs are open, restoring the previous position on close.
+- Placed exchange and purchase currency cards in one horizontal row on mobile.
+
+- Replaced expected TLS-handshake tracebacks with concise certificate-trust guidance; repeated failures and disconnects remain DEBUG.
+
 - Added native HTTPS with a persistent local CA, configurable certificate addresses and automatic renewal.
 - Secured session cookies, reduced sessions to 30 minutes and limited sign-in/password-confirmation attempts.
 - Required current-password confirmation for sensitive exchange, withdrawal and live-trading changes.

@@ -147,3 +147,42 @@ class LocalHttpsTests(unittest.TestCase):
         for value in ['bad/name','host\nDNS:evil','-bad.local','https://host:6890']:
             with self.assertRaises(ValueError):tls.certificate_hosts(value)
         self.assertIn('bot.local',tls.certificate_hosts('bot.local,192.0.2.62'))
+
+
+class HandshakeFailureTests(unittest.TestCase):
+    def test_certificate_rejection_closes_request_before_http_processing(self):
+        handler=object.__new__(web_ui.Handler)
+        handler.request=Mock();handler.tls_context=Mock()
+        error=ssl.SSLError('rejected');error.reason='SSLV3_ALERT_CERTIFICATE_UNKNOWN'
+        handler.tls_context.wrap_socket.side_effect=error
+        with patch.object(web_ui.BaseHTTPRequestHandler,'setup') as setup:
+            with self.assertRaises(tls.TLSHandshakeError):handler.setup()
+        handler.request.close.assert_called_once();setup.assert_not_called()
+
+    def test_untrusted_certificate_logs_once_without_a_traceback(self):
+        server=object.__new__(tls.HTTPSWebServer)
+        error=ssl.SSLError('rejected');error.reason='SSLV3_ALERT_CERTIFICATE_UNKNOWN'
+        with patch.object(tls.ThreadingHTTPServer,'handle_error') as fallback:
+            with self.assertLogs(tls.LOG,level='DEBUG') as logs:
+                for port in (1234,1235):
+                    try:raise tls.TLSHandshakeError(error)
+                    except tls.TLSHandshakeError:server.handle_error(Mock(),('192.0.2.83',port))
+        fallback.assert_not_called()
+        self.assertEqual([entry.levelname for entry in logs.records],['WARNING','DEBUG'])
+        self.assertTrue(all(entry.exc_info is None for entry in logs.records))
+        self.assertIn('Trust tls/ca.pem',logs.output[0])
+
+    def test_disconnections_and_timeouts_are_debug_only(self):
+        server=object.__new__(tls.HTTPSWebServer)
+        with self.assertLogs(tls.LOG,level='DEBUG') as logs:
+            for error in (TimeoutError(),ConnectionResetError(),ssl.SSLEOFError()):
+                try:raise tls.TLSHandshakeError(error)
+                except tls.TLSHandshakeError:server.handle_error(Mock(),('192.0.2.83',1234))
+        self.assertTrue(all(entry.levelname=='DEBUG' and entry.exc_info is None for entry in logs.records))
+
+    def test_unexpected_internal_errors_keep_the_standard_error_handler(self):
+        server=object.__new__(tls.HTTPSWebServer);request=Mock();peer=('192.0.2.83',1234)
+        with patch.object(tls.ThreadingHTTPServer,'handle_error') as fallback:
+            try:raise RuntimeError('internal failure')
+            except RuntimeError:server.handle_error(request,peer)
+        fallback.assert_called_once_with(request,peer)

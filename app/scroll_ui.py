@@ -44,3 +44,33 @@ SCROLL_SCRIPT = '''
 })();
 </script>
 '''
+
+SCROLL_CSS += '\ndialog[open]{overscroll-behavior:contain}\n'
+SCROLL_SCRIPT += '''
+<script data-ui-dialog-lock>
+(()=>{
+ const dialogs=[...document.querySelectorAll('dialog')];
+ const body=document.body,root=document.documentElement;
+ let saved=null;
+ function update(){
+  const open=dialogs.some(dialog=>dialog.open);
+  if(open&&!saved){
+   const gutter=Math.max(0,window.innerWidth-root.clientWidth);
+   const padding=parseFloat(window.getComputedStyle(body).paddingRight)||0;
+   saved={x:window.scrollX,y:window.scrollY,body:body.style.cssText,root:root.style.cssText};
+   root.style.overflow='hidden';root.style.overscrollBehavior='none';
+   body.style.position='fixed';body.style.top=-saved.y+'px';body.style.left=-saved.x+'px';
+   body.style.width='100%';body.style.overflow='hidden';body.style.paddingRight=padding+gutter+'px';
+  }else if(!open&&saved){
+   const previous=saved;saved=null;
+   body.style.cssText=previous.body;root.style.cssText=previous.root;
+   const behavior=root.style.scrollBehavior;root.style.scrollBehavior='auto';
+   window.scrollTo(previous.x,previous.y);root.style.scrollBehavior=behavior;
+  }
+ }
+ const observer=new MutationObserver(update);
+ dialogs.forEach(dialog=>observer.observe(dialog,{attributes:true,attributeFilter:['open']}));
+ update();
+})();
+</script>
+'''
