@@ -260,12 +260,12 @@ class ConfigurationTests(unittest.TestCase):
     def test_setup_step_two_omits_credentials_but_settings_keeps_them(self):
         self.account()
         page=settings_ui.settings_page(self.store)
-        self.assertNotIn('<h2>Dashboard Credentials</h2>',page)
+        self.assertNotIn('<h2>Login Credentials</h2>',page)
         self.assertNotIn('id="username"',page)
         self.assertIn('id="connectionStatus"',page)
         self.app.save({'settings':CREDENTIALS})
         page=settings_ui.settings_page(self.store)
-        self.assertIn('<h2>Dashboard Credentials</h2>',page)
+        self.assertIn('<h2>Login Credentials</h2>',page)
         self.assertIn('id="dashboardOptions"',page)
         self.assertIn('role="switch"',page)
 

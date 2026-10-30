@@ -45,7 +45,7 @@ async function event(id,name='click'){return elements[id].listeners[name]({preve
  vm.runInContext('setExchangeEditor(false)',context);assert.equal(elements.exchangeEditor.hidden,true);assert.equal(elements.bitvavo_api_key.value,'');
  const afterClosing=requests.length;await event('settingsForm','submit');assert.equal(requests.length,afterClosing,'A closed editor cannot silently reuse saved keys after switching');elements.exchange.value='KRAKEN';await event('exchange','change');assert.equal(elements.exchangeSwitchHint.hidden,true);assert.equal(elements.kraken_api_key.required,false);
  await event('settingsForm','submit');await event('confirm');const closedPayload=requests.at(-1).body;assert(!('username'in closedPayload));assert(!('password'in closedPayload));assert(!('bitvavo_api_key'in closedPayload.settings));assert(!('withdraw_address'in closedPayload.settings));
- vm.runInContext('initial.passwordChangeRequired=true',context);const beforeUpgrade=requests.length;await event('settingsForm','submit');assert.equal(requests.length,beforeUpgrade);assert.match(elements.status.textContent,/Open Change dashboard credentials/);vm.runInContext('initial.passwordChangeRequired=false',context);
+ vm.runInContext('initial.passwordChangeRequired=true',context);const beforeUpgrade=requests.length;await event('settingsForm','submit');assert.equal(requests.length,beforeUpgrade);assert.match(elements.status.textContent,/Open Change login credentials/);vm.runInContext('initial.passwordChangeRequired=false',context);
  reject=true;await event('testConnection');assert.equal(elements.testConnection.disabled,false);assert.equal(elements.connectionStatus.textContent,'Connection failed');
  vm.runInContext('pending={settings:{buy_amount:"0.000"}};renderReview()',context);assert.equal(elements.reviewValues.children.length,0);assert.match(elements.reviewDescription.textContent,/No changes/);
  vm.runInContext('pending={settings:{},username:"renamed",password:"PRIVATE-DASHBOARD-PASSWORD"};renderReview()',context);const credentialReview=allText(elements.reviewValues);assert.match(credentialReview,/operator/);assert.match(credentialReview,/renamed/);assert.match(credentialReview,/Will be changed \(hidden\)/);assert(!credentialReview.includes('PRIVATE-DASHBOARD-PASSWORD'));
@@ -55,7 +55,7 @@ async function event(id,name='click'){return elements[id].listeners[name]({preve
  console.log('Settings UI passed: credentials, exchange fields, read-only test, review/cancel/save and validation');
 })().catch(error=>{console.error(error);process.exitCode=1});
 
-// Step two uses the actual server-rendered page without Dashboard Credentials.
+// Step two uses the actual server-rendered page without Login Credentials.
 const setupPage=execFileSync('python3',['-c',`import sys;from types import SimpleNamespace;sys.path.insert(0,'app');from configuration import DEFAULTS;from settings_ui import settings_page;print(settings_page(SimpleNamespace(public=lambda:dict(settings={**DEFAULTS,'timezone':'Pacific/Chatham'},username='operator',complete=False,passwordChangeRequired=False))))`],{cwd:root,encoding:'utf8'});
 const setupElements={};
 class SetupElement extends Element{append(...children){for(const child of children){child.parentElement=this;this.children.push(child);if(child.id)setupElements[child.id]=child}}}
