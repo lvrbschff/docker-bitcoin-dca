@@ -16,10 +16,12 @@ flowchart LR
     Web --> Sources["Kraken prices / Frankfurter FX"]
 ~~~
 
-- `bot.py`, `worker.py`, `withdrawals.py`: scheduling and account actions.
-- `exchange.py`, `kraken.py`, `bitvavo.py`: exchange access.
-- `web_ui.py`, `analytics.py`, `reporting.py`: dashboard and exports.
-- `activity.py`: SQLite activity, reporting data and persistence.
+- `app/bot.py`, `app/worker.py`, `app/withdrawals.py`: scheduling and account actions.
+- `app/exchange.py`, `app/kraken.py`, `app/bitvavo.py`: exchange access.
+- `app/web_ui.py`, `app/analytics.py`, `app/reporting.py`: dashboard and exports.
+- `app/activity.py`: SQLite activity, reporting data and persistence.
+The application source lives in `app/`; tests live in `tests/`. Docker copies `app/` into its `/app` working directory, so container startup and healthcheck commands are unchanged.
+
 - `Dockerfile` builds the image; `docker-compose.yml` configures runtime, port and storage.
 
 **Keep and back up both mounts:** `./state` holds pending requests and scheduling state; `bitcoin-dca-webui-data` holds `activity.sqlite3`, FX cache and `dashboard.json`. Stop the bot for a consistent backup, or use a SQLite-aware backup. Legacy JSON activity is imported once; downgrading to a JSON-only release loses access to newer SQLite activity.
@@ -32,3 +34,12 @@ Docker checks health every five minutes; the saved heartbeat must be running and
 
 The [publish workflow](../.github/workflows/publish.yml) builds GHCR images on main pushes, version tags and manual runs; it does not run the test suite. Credentials belong on the Docker host and are not included in the image.
 
+
+## Development checks
+
+From the repository root, with Python and the `requests` dependency installed:
+
+~~~sh
+python tests/run_tests.py
+node tests/test_dashboard.cjs
+~~~

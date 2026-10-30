@@ -2,7 +2,7 @@
 const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
 const html=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',`import ast,json
 from pathlib import Path
-m=ast.parse(Path('web_ui.py').read_text());print(json.dumps(next(ast.literal_eval(n.value) for n in m.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='HTML' for t in n.targets))))`],{encoding:'utf8'}));
+m=ast.parse(Path('app/web_ui.py').read_text());print(json.dumps(next(ast.literal_eval(n.value) for n in m.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='HTML' for t in n.targets))))`],{encoding:'utf8'}));
 const script=html.split('<script>')[1].split('</script>')[0];
 class Element{
  constructor(){this.value='';this.children=[];this.handlers={};this.textContent='';this.disabled=false;this.classList={toggle(){},add(){},remove(){}}}
