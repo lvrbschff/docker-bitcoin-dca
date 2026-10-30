@@ -1,12 +1,12 @@
-"""Read-only withdrawal previews must not advance periodic account checks."""
+"""Manual withdrawal actions must not advance periodic account checks."""
 import queue
 from unittest import TestCase
 from unittest.mock import Mock, patch
 import worker
 
 class PreviewCheckTimingTests(TestCase):
-    def test_only_confirmed_withdrawals_advance_the_next_check(self):
-        for action,expected_checks in [("preview",0),("confirm",1)]:
+    def test_manual_withdrawals_preserve_the_next_check(self):
+        for action,expected_checks in [("preview",0),("confirm",0)]:
             with self.subTest(action=action):
                 clock=[100.0]
                 with patch.object(worker.time,"monotonic",side_effect=lambda:clock[0]),patch.object(worker,"write_json_atomic"):

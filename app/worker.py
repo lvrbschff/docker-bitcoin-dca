@@ -103,9 +103,7 @@ class Worker:
                 try:
                     result=self.action(action,session,token)
                     with self.lock:self.jobs[job_id].update(state='completed',result=result)
-                    # A preview reads the account but does not change funds or the schedule.
-                    if action == "confirm":
-                        due=min(due,time.monotonic()+1)
+                    # Manual withdrawals leave the existing account-check deadline unchanged.
                 except Exception as exc:
                     if isinstance(exc, UncertainWithdrawalError):
                         LOG.error('Manual withdrawal outcome requires verification: %s', exc)
