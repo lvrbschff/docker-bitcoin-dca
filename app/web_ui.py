@@ -292,6 +292,7 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
  -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 32px),rgba(0,0,0,.18));
  mask-image:linear-gradient(to right,#000 calc(100% - 32px),rgba(0,0,0,.18));
 }
+#activities tr{height:34px}#activities .activity-placeholder{user-select:none;pointer-events:none}
 </style>
 </head>
 <body>
@@ -553,6 +554,14 @@ function renderActivities(){
   body.appendChild(tr)
  }
  if(!total){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=6;td.textContent="No BTC activity in this period.";td.className="notice";tr.appendChild(td);body.appendChild(tr)}
+ const occupiedRows=activityRows.length||(!total?1:0);
+ for(let i=occupiedRows;i<pageSize;i++){
+  const tr=document.createElement("tr");tr.className="activity-placeholder";tr.ariaHidden="true";
+  for(let column=0;column<6;column++){
+   const td=document.createElement("td");td.textContent="\u00a0";if(column>=2)td.className="num";tr.appendChild(td);
+  }
+  body.appendChild(tr);
+ }
  $("pageInfo").textContent=total?("Showing "+(start+1)+"–"+end+" of "+total+" · Page "+currentPage+" of "+totalPages):"No entries";
  $("previousPage").disabled=currentPage<=1;$("nextPage").disabled=currentPage>=totalPages;
  $("pageNumber").value=currentPage;$("pageNumber").max=totalPages;
