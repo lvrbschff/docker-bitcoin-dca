@@ -73,7 +73,7 @@ To start real purchases, set `LIVE_TRADING=true` and recreate the container with
 
 ### Purchase schedule
 
-The bot refreshes the available fiat balance, BTC price and exchange order rules. Estimated order cost includes the trading fee and a **0.5% planning buffer**.
+The bot refreshes the available fiat balance, BTC price and exchange order rules. Estimated order cost includes the trading fee and a 0.5% planning buffer.
 
 **Purchase interval = time from the last purchase to the next deposit day ÷ affordable purchases.**
 
