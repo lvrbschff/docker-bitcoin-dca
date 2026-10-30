@@ -6,6 +6,7 @@ from pathlib import Path
 from configuration import ConfigStore, account_values, runtime_settings, validate
 from exchange import create_exchange
 from storage import STATE_PATH
+from security import AttemptLimiter, PasswordConfirmationError
 
 LOG = logging.getLogger('bitcoin-dca.settings')
 IDENTITY_FIELDS = ('exchange', 'quote', 'kraken_api_key', 'kraken_api_secret', 'bitvavo_api_key', 'bitvavo_api_secret')
@@ -21,6 +22,7 @@ class Runtime:
         self.settings = runtime_settings(self.store.snapshot()['settings'])
         self.api = None
         self.service = None
+        self.password_attempts = AttemptLimiter(capacity=1)
         self.startup_pending = True
         self.exchange_check_pending = True
         self.ready_at = time.monotonic() + self.settings['startup_delay_seconds']
@@ -125,10 +127,20 @@ class Runtime:
             account = previous['account']
             if not account: raise ValueError('Create a dashboard account first.')
             account_changed = bool(payload.get('password') or payload.get('username', account['username']) != account['username'])
-            if account.get('password_change_required') or account_changed:
+            protected_fields = IDENTITY_FIELDS + ('withdraw_address', 'withdraw_network', 'kraken_withdraw_key', 'withdraw_threshold')
+            sensitive = previous['complete'] and (any(values[k] != previous['settings'][k] for k in protected_fields)
+                         or values['live'] and not previous['settings']['live']
+                         or values['withdrawals_enabled'] and not previous['settings']['withdrawals_enabled'])
+            if account.get('password_change_required') or account_changed or sensitive:
+                retry = self.password_attempts.consume(account['username'])
+                if retry:
+                    raise PasswordConfirmationError('Too many password confirmation attempts. Try again later.', retry)
                 if not self.store.authenticate(account['username'], payload.get('current_password', '')):
-                    LOG.info('Settings account update rejected: current password verification failed')
-                    raise ValueError('Your current password is incorrect.')
+                    LOG.info('Sensitive settings update rejected: current password verification failed')
+                    raise PasswordConfirmationError('Your current password is incorrect.')
+                self.password_attempts.clear(account['username'])
+                LOG.info('Current password verified for sensitive settings update')
+            if account.get('password_change_required') or account_changed:
                 username = payload.get('username') or account['username']
                 password = payload.get('password', '')
                 if password or account.get('password_change_required'):

@@ -16,6 +16,7 @@ from secrets import token_urlsafe
 from threading import RLock
 import time
 import traceback
+from security import AttemptLimiter, PasswordConfirmationError
 from concurrent.futures import ThreadPoolExecutor
 import price_cache
 from exchange_errors import UncertainWithdrawalError
@@ -773,8 +774,9 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 </main></body></html>
 """
 
-SESSION_TTL_SECONDS = 12 * 60 * 60
+SESSION_TTL_SECONDS = 30 * 60
 _SESSION_LOCK = RLock()
+_LOGIN_ATTEMPTS = AttemptLimiter()
 _SESSIONS = {}
 
 
@@ -862,6 +864,20 @@ class Handler(BaseHTTPRequestHandler):
     runtime = None
     withdrawal_service = None
     worker = None
+    tls_context = None
+
+    def setup(self):
+        if self.tls_context is not None:
+            self.request.settimeout(10)
+            self.request = self.tls_context.wrap_socket(self.request, server_side=True)
+        super().setup()
+
+
+    def end_headers(self):
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('Referrer-Policy', 'same-origin')
+        self.send_header('Content-Security-Policy', "frame-ancestors 'self'")
+        super().end_headers()
 
     def _send(self, status, body, content_type="application/json; charset=utf-8", filename=None, *, cache_control="no-store"):
         if isinstance(body, str):
@@ -909,6 +925,18 @@ class Handler(BaseHTTPRequestHandler):
         return False
 
     def _handle_login(self):
+        client = self.client_address[0]
+        retry = _LOGIN_ATTEMPTS.consume(client)
+        if retry:
+            LOG.info('Dashboard sign-in rate limited')
+            self.send_response(429)
+            self.send_header('Retry-After', str(retry))
+            body = _login_page('Too many sign-in attempts. Please try again later.').encode('utf-8')
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers();self.wfile.write(body)
+            return
         try:
             length = int(self.headers.get("Content-Length", "0"))
             if length <= 0 or length > 4096:
@@ -925,6 +953,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(401, _login_page("The username or password is incorrect."), "text/html; charset=utf-8")
             return
 
+        _LOGIN_ATTEMPTS.clear(client)
         token = token_urlsafe(32)
         now = time.monotonic()
         with _SESSION_LOCK:
@@ -935,7 +964,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(303)
         self.send_header(
             "Set-Cookie",
-            f"dca_session={token}; Path=/; Max-Age={SESSION_TTL_SECONDS}; HttpOnly; SameSite=Strict",
+            f"dca_session={token}; Path=/; Max-Age={SESSION_TTL_SECONDS}; Secure; HttpOnly; SameSite=Strict",
         )
         self.send_header("Location", "/")
         self.send_header("Cache-Control", "no-store")
@@ -952,7 +981,7 @@ class Handler(BaseHTTPRequestHandler):
             with _SESSION_LOCK:
                 _SESSIONS.pop(morsel.value, None)
         self.send_response(303)
-        self.send_header("Set-Cookie", "dca_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict")
+        self.send_header("Set-Cookie", "dca_session=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Strict")
         self.send_header("Location", "/")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", "0")
@@ -983,7 +1012,7 @@ class Handler(BaseHTTPRequestHandler):
                 token = token_urlsafe(32)
                 with _SESSION_LOCK: _SESSIONS[token] = time.monotonic() + SESSION_TTL_SECONDS
                 self.send_response(200)
-                self.send_header('Set-Cookie', f'dca_session={token}; Path=/; Max-Age={SESSION_TTL_SECONDS}; HttpOnly; SameSite=Strict')
+                self.send_header('Set-Cookie', f'dca_session={token}; Path=/; Max-Age={SESSION_TTL_SECONDS}; Secure; HttpOnly; SameSite=Strict')
                 self.send_header('Content-Type', 'application/json')
                 self.send_header('Content-Length', '2')
                 self.send_header('Cache-Control', 'no-store')
@@ -997,6 +1026,16 @@ class Handler(BaseHTTPRequestHandler):
                     with _SESSION_LOCK: _SESSIONS.clear()
                     LOG.info('Dashboard account credentials updated; all dashboard sessions invalidated')
                 self._json(200, {'saved': True, 'signInRequired': changed})
+        except PasswordConfirmationError as exc:
+            if exc.retry_after:
+                self.send_response(429)
+                self.send_header('Retry-After', str(exc.retry_after))
+                body = json.dumps({'error': str(exc)}).encode()
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(body)))
+                self.send_header('Cache-Control', 'no-store')
+                self.end_headers();self.wfile.write(body)
+            else: self._json(400, {'error': str(exc)})
         except (ValueError, UnicodeDecodeError) as exc:
             LOG.info('%s rejected: invalid request, configuration or account verification', operation)
             self._json(400, {'error': str(exc)})
@@ -1319,9 +1358,19 @@ def _row_timestamp_ms(row):
 
 
 def serve(settings, port, withdrawal_service=None, worker=None, runtime=None):
-    handler = type("ConfiguredHandler", (Handler,), {"settings": settings, "withdrawal_service": staticmethod(withdrawal_service), "worker":worker, "runtime":runtime})
+    import os
+    from tls import certificate_hosts, https_context, renew_certificates
+    from threading import Thread, Event
+    hosts = certificate_hosts(os.getenv("WEB_UI_TLS_HOSTS", ""))
+    context = https_context(hosts)
+    handler = type("ConfiguredHandler", (Handler,), {"settings": settings, "withdrawal_service": staticmethod(withdrawal_service), "worker":worker, "runtime":runtime, "tls_context":context})
     server = ThreadingHTTPServer(("0.0.0.0", port), handler)
-    LOG.info("Local portfolio web UI listening on container port %s.", port)
-    server.serve_forever()
+    LOG.info("HTTPS dashboard listening on container port %s.", port)
+    stop = Event()
+    Thread(target=renew_certificates, args=(handler, hosts, stop), name="https-certificate-renewal", daemon=True).start()
+    try: server.serve_forever()
+    finally:
+        stop.set()
+        server.server_close()
 
 

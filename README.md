@@ -16,7 +16,7 @@ cd docker-bitcoin-dca
 docker compose up -d --build
 ~~~
 
-Open `http://<docker-host-ip>:6890`. The setup wizard first creates your username and password (12+ characters), then configures the exchange, API access and purchases. The web UI is always enabled. Bot settings and credentials come only from the saved web configuration; new installations start in dry run.
+Set `WEB_UI_TLS_HOSTS` in Compose or `.env` to the IP address/hostname you use, then open `https://<docker-host-ip>:6890`. Trust the generated local CA on your devices; see [HTTPS setup](docs/architecture.md#https-and-session-security). The setup wizard first creates your username and password (12+ characters), then configures the exchange, API access and purchases. The web UI is always enabled. Bot settings and credentials come only from the saved web configuration; new installations start in dry run.
 
 Settings, beside Log out, opens a dialog with separate buttons for editing Login Credentials and API access/withdrawal targets. Bot Configuration groups purchase settings and the withdrawal threshold, each with a short explanation. Trading and dashboard groups the live-trading, automatic/manual withdrawal and Parqet switches with display currency. Disabled features also hide their controls and notes.
 
@@ -29,7 +29,7 @@ Settings, beside Log out, opens a dialog with separate buttons for editing Login
 
 Settings persist as `config.json` in the named volume `bitcoin-dca-webui-data`; passwords are hashed and API credentials stay private. Empty API fields keep saved credentials. Protect this file and backups; never commit credentials or `.env`. All runtime state and activity also live in this volume; no host state directory is required. Reuse the same volume on redeployment. After setup and each restart, automatic API checks block new transactions until open exchange orders and Bitcoin withdrawals are closed. Unavailable status keeps the bot paused and is retried.
 
-Compose manages only port, log level, volumes and restart policy. Optional `.env` overrides are `WEB_UI_PORT` (6890) and `LOG_LEVEL` (INFO). HTTP is unencrypted; use HTTPS on untrusted networks. See [Architecture and operation](docs/architecture.md) for storage and operation.
+Compose manages the web server, volumes and restart policy. Docker settings are `WEB_UI_PORT` (6890), `LOG_LEVEL` (INFO) and `WEB_UI_TLS_HOSTS` (comma-separated IP addresses/hostnames). HTTPS is always enabled. Sessions expire after 30 minutes; sensitive changes require your current login password. See [Architecture and operation](docs/architecture.md) for storage and operation.
 
 ## Purchases and withdrawals
 

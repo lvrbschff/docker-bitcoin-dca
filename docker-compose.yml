@@ -6,6 +6,7 @@ services:
     # Configure the account, exchange and bot settings in the web UI.
     environment:
       WEB_UI_PORT: "${WEB_UI_PORT:-6890}"
+      WEB_UI_TLS_HOSTS: "${WEB_UI_TLS_HOSTS:-}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     ports:
       - "${WEB_UI_PORT:-6890}:${WEB_UI_PORT:-6890}"

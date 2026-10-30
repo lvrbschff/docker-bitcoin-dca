@@ -82,3 +82,19 @@ Only executed live fills are stored as buys; these display Confirmed. Simulation
 After setup, restart, or exchange/credential/trading-mode changes, the worker reads open account orders and BTC withdrawal status before allowing new transactions. Open or unverifiable outcomes keep purchases and withdrawals paused; checks retry at the account-check interval. HTTP polling and manual withdrawal clicks do not trigger these checks. The configured startup delay still applies.
 
 Missing scheduling state is initialized without resetting saved configuration or activity. Recorded purchases anchor the rebuilt schedule; existing pending requests retain their normal reconciliation. Lost request identifiers and unrecorded executions cannot be reconstructed from this check; restore a consistent volume backup when historical data is missing. No host migration or manual recovery menu is used. A full withdrawal-history response reaching the exchange response limit is treated as unverifiable rather than assumed complete.
+
+## HTTPS and session security
+
+The bot serves HTTPS directly on the configured port, using TLS 1.2 or newer. Set `WEB_UI_TLS_HOSTS` in Compose or `.env` to the address you use (comma-separated hostnames/IPs). The template leaves this variable empty. `localhost` and loopback IPs are always included; fill in the variable before accessing the bot through another IP or hostname. There is no plain-HTTP listener; update saved URLs to `https://`.
+
+On first start, OpenSSL creates a private local CA and a 365-day server certificate in `/webui-data/tls`. Keys have owner-only permissions; protect this directory and volume backups. The server checks renewal daily and on startup. Host changes renew only the server certificate; keeping the volume preserves the trusted CA when relocating.
+
+Copy the public CA certificate from your Docker host:
+
+~~~sh
+docker cp bitcoin-dca:/webui-data/tls/ca.pem ./bitcoin-dca-ca.pem
+~~~
+
+Import it as a trusted certificate authority on each device. On macOS use [Keychain Access certificate trust settings](https://support.apple.com/guide/keychain-access/change-the-trust-settings-of-a-certificate-kyca11871/mac). Import only `ca.pem`; never distribute either private key. A new volume creates a new CA that must be trusted again.
+
+Session cookies use `Secure`, `HttpOnly` and `SameSite=Strict`, with a fixed 30-minute lifetime. Five failed sign-in attempts from one IP cause a pause until the 15-minute window expires; forwarded IP headers are not trusted. Sensitive settings require the current password: login credentials, exchange/API access, withdrawal destination/threshold, and enabling live trading or automatic withdrawals. Password confirmation attempts are also limited to five per 15 minutes. Cosmetic settings need no password confirmation. Limits are in memory and reset on process restart. These protections follow [OWASP session guidance](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html).

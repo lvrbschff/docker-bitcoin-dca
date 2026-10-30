@@ -41,7 +41,7 @@ class ConfigurationTests(unittest.TestCase):
     def account(self): self.store.create_account('operator', PASSWORD)
     def ready(self, **settings):
         self.account()
-        self.app.save({'settings': {**CREDENTIALS, **settings}})
+        self.app.save({'current_password':PASSWORD,'settings': {**CREDENTIALS, **settings}})
         self.app.worker.reconfigure.clear()
 
     def test_no_default_account_or_exchange_calls_before_configuration(self):
@@ -72,7 +72,7 @@ class ConfigurationTests(unittest.TestCase):
 
     def test_saved_credentials_are_masked_and_blank_preserves_them(self):
         self.ready()
-        self.app.save({'settings': {'kraken_api_key': '', 'kraken_api_secret': '', 'parqet_enabled': False}})
+        self.app.save({'current_password':PASSWORD,'settings': {'kraken_api_key': '', 'kraken_api_secret': '', 'parqet_enabled': False}})
         self.assertEqual(self.store.snapshot()['settings']['kraken_api_key'], CREDENTIALS['kraken_api_key'])
         public = self.store.public()
         self.assertTrue(public['settings']['kraken_api_key_configured'])
@@ -86,7 +86,7 @@ class ConfigurationTests(unittest.TestCase):
         self.ready()
         old = self.store.snapshot(); raw = self.store.path.read_bytes()
         with patch.object(config.os, 'replace', side_effect=OSError('disk unavailable')):
-            with self.assertRaises(OSError): self.app.save({'settings': {'buy_amount': '.001'}})
+            with self.assertRaises(OSError): self.app.save({'current_password':PASSWORD,'settings': {'buy_amount': '.001'}})
         self.assertEqual(self.store.snapshot(), old)
         self.assertEqual(self.store.path.read_bytes(), raw)
         self.assertEqual(self.app.settings['buy_amount'], 0)
@@ -99,7 +99,7 @@ class ConfigurationTests(unittest.TestCase):
                        {'kraken_api_secret': 'invalid'}, {'withdrawals_enabled': True}, {'unknown': 1},
                        {'exchange': 'BITVAVO', 'quote': 'USD'}]:
             with self.subTest(values=values), self.assertRaises(ValueError):
-                self.app.save({'settings': values})
+                self.app.save({'current_password':PASSWORD,'settings': values})
 
     def test_environment_cannot_create_account_or_enable_trading(self):
         env={'WEB_UI_ENABLED':'false','EXCHANGE':'BITVAVO','KRAKEN_API_KEY':'old-key',
@@ -129,6 +129,7 @@ class ConfigurationTests(unittest.TestCase):
         body=b'username=admin&password=admin';h.headers={'Content-Length':str(len(body))}
         h.rfile=io.BytesIO(body);h._send=Mock()
         with patch.dict(os.environ,{'WEB_UI_USERNAME':'admin','WEB_UI_PASSWORD':'admin'}):
+            h.client_address=('127.0.0.1',1234)
             h._handle_login()
         self.assertEqual(h._send.call_args.args[0],401)
 
@@ -138,12 +139,12 @@ class ConfigurationTests(unittest.TestCase):
             self.app.state_path.write_text(json.dumps(state))
             for values in [{'live': True}, {'quote': 'USD'}, {'kraken_api_key': 'new-key'}]:
                 with self.subTest(state=state, values=values), self.assertRaisesRegex(ValueError, 'Resolve pending'):
-                    self.app.save({'settings': values})
+                    self.app.save({'current_password':PASSWORD,'settings': values})
         self.app.state_path.unlink()
         with patch.object(activity, 'withdrawal_records', return_value=[{'withdrawalStatus': 'submitted'}]):
-            with self.assertRaises(ValueError): self.app.save({'settings': {'live': True}})
+            with self.assertRaises(ValueError): self.app.save({'current_password':PASSWORD,'settings': {'live': True}})
         self.app.worker.queue.put('queued-action')
-        with self.assertRaises(ValueError): self.app.save({'settings': {'live': True}})
+        with self.assertRaises(ValueError): self.app.save({'current_password':PASSWORD,'settings': {'live': True}})
 
     def test_exchange_switch_requires_explicit_keys_even_if_old_keys_are_saved(self):
         self.ready(bitvavo_api_key='old-bitvavo-key',bitvavo_api_secret='old-bitvavo-secret')
@@ -154,19 +155,19 @@ class ConfigurationTests(unittest.TestCase):
                        {'exchange':'BITVAVO','bitvavo_api_key':' ','bitvavo_api_secret':''}]:
             with self.subTest(update=update):
                 with self.assertRaisesRegex(ValueError,'entering the API key and API secret'):
-                    self.app.save({'settings':update})
+                    self.app.save({'current_password':PASSWORD,'settings':update})
                 with self.assertRaisesRegex(ValueError,'entering the API key and API secret'):
                     self.app.test_connection(update)
                 self.assertEqual(self.store.snapshot(),previous)
         self.api_factory.assert_not_called()
-        self.app.save({'settings':{'exchange':'BITVAVO','bitvavo_api_key':'new-key','bitvavo_api_secret':'new-secret'}})
+        self.app.save({'current_password':PASSWORD,'settings':{'exchange':'BITVAVO','bitvavo_api_key':'new-key','bitvavo_api_secret':'new-secret'}})
         self.assertEqual(self.store.snapshot()['settings']['bitvavo_api_key'],'new-key')
         self.assertEqual(self.store.snapshot()['settings']['bitvavo_api_secret'],'new-secret')
 
     def test_feature_toggles_do_not_recalculate_purchase_schedule(self):
         self.ready()
         self.app.state_path.write_text(json.dumps({'pending_withdrawal': {'id': 'x'}}))
-        self.app.save({'settings': {'withdrawals_enabled': False, 'manual_withdrawal_enabled': False, 'parqet_enabled': False}})
+        self.app.save({'current_password':PASSWORD,'settings': {'withdrawals_enabled': False, 'manual_withdrawal_enabled': False, 'parqet_enabled': False}})
         self.assertFalse(self.app.worker.reconfigure.is_set())
         with self.assertRaisesRegex(ValueError, 'disabled'): self.app.action('preview', 'session')
         self.assertIn('pending_withdrawal', json.loads(self.app.state_path.read_text()))
@@ -185,7 +186,7 @@ class ConfigurationTests(unittest.TestCase):
         self.ready(startup_delay_seconds=0)
         self.app._synchronize_state()
         self.app.state_path.write_text(json.dumps({'configuration_account': ['KRAKEN', 'EUR'], 'last_order_at': '2026-10-01', 'spent': '20'}))
-        self.app.save({'settings': {'exchange': 'BITVAVO', 'bitvavo_api_key': 'b-key', 'bitvavo_api_secret': 'b-secret'}})
+        self.app.save({'current_password':PASSWORD,'settings': {'exchange': 'BITVAVO', 'bitvavo_api_key': 'b-key', 'bitvavo_api_secret': 'b-secret'}})
         with patch.object(bot, 'run_once'), patch.object(bot, 'latest_recorded_buy_time', return_value=None) as latest:
             self.app.cycle()
         self.assertNotIn('last_order_at', json.loads(self.app.state_path.read_text()))
@@ -199,7 +200,7 @@ class ConfigurationTests(unittest.TestCase):
         state=json.loads(self.app.state_path.read_text())
         state.update(spent='100',last_order_at='2026-10-30T10:00:00Z')
         self.app.state_path.write_text(json.dumps(state))
-        self.app.save({'settings': {'live':True}})
+        self.app.save({'current_password':PASSWORD,'settings': {'live':True}})
         with patch.object(bot,'run_once'),patch.object(bot,'latest_recorded_buy_time',return_value=None):
             self.app.cycle()
         state=json.loads(self.app.state_path.read_text())
@@ -236,19 +237,19 @@ class ConfigurationTests(unittest.TestCase):
         self.ready()
         with self.store.lock:
             self.store.data['account']['password_change_required']=True
-        with self.assertRaises(ValueError): self.app.save({'settings': {'parqet_enabled': False}})
+        with self.assertRaises(ValueError): self.app.save({'current_password':PASSWORD,'settings': {'parqet_enabled': False}})
         self.app.save({'current_password': PASSWORD,'password':'another-private-password'})
         self.assertFalse(self.store.public()['passwordChangeRequired'])
 
 
     def test_display_currency_is_saved_without_rescheduling(self):
         self.ready()
-        self.app.save({'settings': {'display_currency':'USD'}})
+        self.app.save({'current_password':PASSWORD,'settings': {'display_currency':'USD'}})
         self.assertEqual(self.store.public()['settings']['display_currency'],'USD')
         self.assertEqual(self.app.settings['display_currency'],'USD')
         self.assertFalse(self.app.worker.reconfigure.is_set())
         self.assertEqual(config.ConfigStore(self.store.path).public()['settings']['display_currency'],'USD')
-        with self.assertRaises(ValueError): self.app.save({'settings':{'display_currency':'GBP'}})
+        with self.assertRaises(ValueError): self.app.save({'current_password':PASSWORD,'settings':{'display_currency':'GBP'}})
 
     def test_old_configuration_gains_display_currency_default(self):
         self.ready()
@@ -264,7 +265,7 @@ class ConfigurationTests(unittest.TestCase):
         self.assertNotIn('<h2>Login Credentials</h2>',page)
         self.assertNotIn('id="username"',page)
         self.assertIn('id="connectionStatus"',page)
-        self.app.save({'settings':CREDENTIALS})
+        self.app.save({'current_password':PASSWORD,'settings':CREDENTIALS})
         page=settings_ui.settings_page(self.store)
         self.assertIn('<h2>Login Credentials</h2>',page)
         self.assertIn('id="dashboardOptions"',page)
@@ -352,9 +353,9 @@ class ConfigurationTests(unittest.TestCase):
         self.assertIn('"editor": "dashboard"',page)
         self.assertNotIn('Account recovery',page)
         before=self.store.snapshot()['settings']
-        self.app.save({'settings':{},'username':'renamed','current_password':PASSWORD})
+        self.app.save({'current_password':PASSWORD,'settings':{},'username':'renamed','current_password':PASSWORD})
         self.assertEqual(self.store.snapshot()['settings'],before)
-        self.app.save({'settings':{'kraken_api_key':'replacement-key'}})
+        self.app.save({'current_password':PASSWORD,'settings':{'kraken_api_key':'replacement-key'}})
         self.assertEqual(self.store.snapshot()['settings']['buy_amount'],before['buy_amount'])
         self.assertTrue(self.app.exchange_check_pending)
 
@@ -390,7 +391,7 @@ class ConfigurationTests(unittest.TestCase):
     def test_setup_and_settings_logs_describe_changes_without_secret_values(self):
         with self.assertLogs('bitcoin-dca.settings',level='INFO') as captured:
             self.ready()
-            self.app.save({'settings':{'parqet_enabled':False,'kraken_api_key':'PRIVATE-NEW-KEY'}})
+            self.app.save({'current_password':PASSWORD,'settings':{'parqet_enabled':False,'kraken_api_key':'PRIVATE-NEW-KEY'}})
             self.app.test_connection({})
         output='\n'.join(captured.output)
         self.assertIn('Initial dashboard account created',output)
@@ -421,8 +422,8 @@ class ConfigurationTests(unittest.TestCase):
         self.ready()
         self.app.state_path.write_text(json.dumps({'pending_order':{'id':'pending'}}))
         with self.assertLogs('bitcoin-dca.settings',level='INFO') as captured:
-            with self.assertRaises(ValueError): self.app.save({'settings':{'live':True}})
-        self.assertIn('Settings update blocked',captured.output[0])
+            with self.assertRaises(ValueError): self.app.save({'current_password':PASSWORD,'settings':{'live':True}})
+        self.assertTrue(any('Settings update blocked' in line for line in captured.output))
         self.assertEqual(captured.records[0].levelno,logging.INFO)
 
     def test_settings_dialog_uses_authenticated_embedded_page(self):

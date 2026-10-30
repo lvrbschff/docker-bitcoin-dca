@@ -18,7 +18,7 @@ const context={document:{getElementById:id=>elements[id],createElement:tag=>new 
  fetch:async(url,options)=>{requests.push({url,body:JSON.parse(options.body)});return {ok:!reject,json:async()=>reject?{error:'Connection failed'}:{message:'Connected',saved:true}}}};
 vm.runInNewContext(script,context);
 function allText(el){return el.textContent+' '+el.children.map(allText).join(' ')}
-async function event(id,name='click'){return elements[id].listeners[name]({preventDefault(){},submitter:elements[id]})}
+async function event(id,name='click'){if(id==='confirm'&&!elements.passwordConfirmation.hidden&&!elements.sensitivePassword.value)elements.sensitivePassword.value='current-long-password';return elements[id].listeners[name]({preventDefault(){},submitter:elements[id]})}
 (async()=>{
  assert.equal(elements.withdraw_thresholdLabel.textContent,'Automatic withdrawal threshold (EUR)');elements.quote.value='USD';await event('quote','change');assert.equal(elements.withdraw_thresholdLabel.textContent,'Automatic withdrawal threshold (USD)');
  assert(page.includes('<small id="displayCurrencyHint" class="hint">Display currency affects reporting only; purchases use the purchase currency.</small>'));assert(page.includes('aria-describedby="displayCurrencyHint"'));
@@ -52,6 +52,7 @@ async function event(id,name='click'){return elements[id].listeners[name]({preve
  vm.runInContext("initial.editor='dashboard';setDashboardEditor(true)",context);elements.password.value='new-long-password';elements.passwordConfirm.value='new-long-password';elements.current_password.value='current-long-password';reject=false;await event('settingsForm','submit');await event('confirm');assert.deepEqual(requests.at(-1).body.settings,{});assert.equal(requests.at(-1).body.password,'new-long-password');
  vm.runInContext("initial.editor='exchange';setDashboardEditor(false);setExchangeEditor(true)",context);elements.kraken_api_key.value='updated-private-key';await event('settingsForm','submit');await event('confirm');const scoped=requests.at(-1).body;assert.equal(scoped.settings.kraken_api_key,'updated-private-key');assert(!('buy_amount' in scoped.settings));assert(!('display_currency' in scoped.settings));assert(!('username' in scoped));
  assert(!page.includes('daylight saving changes are automatic'));
+ vm.runInContext("pending={settings:{live:true}};initial.settings.live=false;renderReview()",context);elements.sensitivePassword.value='';const beforePassword=requests.length;await elements.confirm.listeners.click();assert.equal(requests.length,beforePassword,'Sensitive settings cannot be submitted without a password');assert.match(elements.passwordConfirmationError.textContent,/current login password/);elements.sensitivePassword.value='private-confirmation-password';await elements.confirm.listeners.click();assert.equal(requests.at(-1).body.current_password,'private-confirmation-password');assert.equal(elements.sensitivePassword.value,'');
  console.log('Settings UI passed: credentials, exchange fields, read-only test, review/cancel/save and validation');
 })().catch(error=>{console.error(error);process.exitCode=1});
 

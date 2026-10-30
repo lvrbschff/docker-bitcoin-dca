@@ -4,6 +4,10 @@ Release history based on the published [GitHub Releases](https://github.com/oli7
 
 ## Unreleased
 
+- Added native HTTPS with a persistent local CA, configurable certificate addresses and automatic renewal.
+- Secured session cookies, reduced sessions to 30 minutes and limited sign-in/password-confirmation attempts.
+- Required current-password confirmation for sensitive exchange, withdrawal and live-trading changes.
+
 - Added responsive horizontal scrolling with two card rows to mobile settings, sharing dashboard scrollbar and edge-fade behavior.
 
 - Removed unused activity deletion/query helpers, the obsolete worker bootstrap and superseded withdrawal estimator.
