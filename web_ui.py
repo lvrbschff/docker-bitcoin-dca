@@ -260,6 +260,22 @@ details.panel:not([open])>summary{border-radius:11px}
 
 .compact-brand-bar{pointer-events:none}
 body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
+
+/* Scroll only when content cannot fit; preserve a usable card width. */
+.horizontal-scroll{max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:0;scrollbar-width:thin;scrollbar-color:#536987 #111a2d}
+.horizontal-scroll.has-overflow{padding-bottom:16px}
+.horizontal-scroll::-webkit-scrollbar{height:10px}
+.horizontal-scroll::-webkit-scrollbar-track{background:#111a2d;border-radius:6px}
+.horizontal-scroll::-webkit-scrollbar-thumb{background:#536987;border:2px solid #111a2d;border-radius:6px}
+.horizontal-scroll::-webkit-scrollbar-thumb:hover{background:#8bafff}
+.horizontal-scroll::-webkit-scrollbar-thumb:active{background:#b0c6ff}
+.horizontal-scroll.has-overflow:hover,.horizontal-scroll.is-scrolling{scrollbar-color:#8bafff #111a2d}
+.horizontal-scroll.is-scrolling::-webkit-scrollbar-thumb{background:#8bafff}
+.horizontal-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+.configuration-scroll .configuration-grid{grid-template-columns:repeat(4,minmax(220px,1fr))}
+.report-cards{min-width:956px}
+.report-scroll .period-summary-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+.report-scroll .summary-secondary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 </style>
 </head>
 <body>
@@ -267,7 +283,7 @@ body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
 <header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Dashboard</h1></div></div><div class="top-actions"><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div><form method="post" action="/logout"><button type="submit">Log out</button></form></div></header>
 <details open class="panel" aria-labelledby="configurationHeading">
 <summary class="panel-heading"><h2 id="configurationHeading">Configuration</h2></summary>
-<div class="grid">
+<div class="horizontal-scroll configuration-scroll" role="region" aria-label="Configuration cards" tabindex="0"><div class="grid configuration-grid">
 <div class="card"><label>Exchange</label><div class="value" id="settingExchange">—</div></div>
 <div class="card"><label>Quote currency</label><div class="value" id="settingQuoteCurrency">—</div></div>
 <div class="card"><label>Trading mode</label><div class="value" id="tradingMode">—</div></div>
@@ -277,12 +293,13 @@ body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
 <div class="card"><label>Withdrawal threshold</label><div class="value" id="threshold">—</div><div class="small" id="thresholdNote">Configured threshold</div></div>
 <div class="card"><label>Withdrawal target</label><div class="value" id="withdrawalTarget">—</div></div>
 </div>
+</div>
 </details>
 <details open class="panel purchase-schedule" aria-labelledby="scheduleHeading">
 <summary class="panel-heading"><h2 id="scheduleHeading">Schedule</h2></summary>
 <section class="schedule-group" aria-labelledby="purchaseHeading">
 <h3 id="purchaseHeading" class="summary-subheading">Purchase</h3>
-<div class="schedule-row-scroll" role="region" aria-label="Purchase schedule cards" tabindex="0"><div class="grid schedule-grid">
+<div class="schedule-row-scroll horizontal-scroll" role="region" aria-label="Purchase schedule cards" tabindex="0"><div class="grid schedule-grid">
 <div class="card"><label>Current BTC price</label><div class="value" id="spot">—</div><div class="small" id="spotUpdated">Kraken public price page</div></div>
 <div class="card"><label id="quoteBalanceLabel">Available fiat balance on exchange</label><div class="value" id="quoteBalance">—</div><div class="small" id="quoteBalanceUpdated">Waiting for account check</div></div>
 <div class="card time-card"><label>Next purchase <span id="nextPurchaseStatus">Scheduled</span></label><div class="value time-value" id="nextPurchaseAt">—</div></div>
@@ -291,7 +308,7 @@ body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
 </section>
 <section class="schedule-group" aria-labelledby="withdrawalHeading">
 <h3 id="withdrawalHeading" class="summary-subheading">Withdrawal</h3>
-<div class="schedule-row-scroll" role="region" aria-label="Withdrawal schedule cards" tabindex="0"><div class="grid schedule-grid">
+<div class="schedule-row-scroll horizontal-scroll" role="region" aria-label="Withdrawal schedule cards" tabindex="0"><div class="grid schedule-grid">
 <div class="card btc-balance-card"><label>Current BTC balance</label><div class="value" id="exchangeBtcBalance">—</div><div class="small" id="exchangeBtcValue">—</div><div class="small" id="exchangeBtcUpdated">Waiting for account check</div><div class="withdraw-action"><button id="manualWithdraw" type="button" aria-describedby="withdrawal-note withdrawalFeedback">Withdraw BTC manually</button><p id="withdrawalFeedback" class="export-feedback withdraw-feedback hidden" role="alert"></p></div></div>
 <div class="card"><div class="field"><label for="monthlyDeposit">Expected monthly deposit (<span id="monthlyDepositCurrency">EUR</span>)</label><input id="monthlyDeposit" type="number" min="0" step="0.01" inputmode="decimal" value="0"></div><div class="small">Forecast only · assumes deposits on the configured deposit day · saved in this browser</div></div>
 <div class="card time-card"><label>Estimated automatic withdrawal date</label><div class="value time-value" id="estimatedWithdrawalAt">—</div><div class="small" id="estimatedWithdrawalStatus">Waiting for account check</div></div>
@@ -308,7 +325,7 @@ body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
 <div class="field"><label for="end">To</label><input id="end" type="datetime-local"></div>
 <button id="refresh">Load report</button>
 </div><div id="error" class="error hidden"></div>
-<div class="period-summary-content" role="region" aria-labelledby="periodSummaryHeading"><h3 id="periodSummaryHeading" class="summary-subheading">Period Report</h3><div class="grid period-summary-grid">
+<div class="period-summary-content" role="region" aria-labelledby="periodSummaryHeading"><h3 id="periodSummaryHeading" class="summary-subheading">Period Report</h3><div class="horizontal-scroll report-scroll" role="region" aria-label="Period report cards" tabindex="0"><div class="report-cards"><div class="grid period-summary-grid">
 <div class="card"><label>BTC purchases</label><div class="value" id="buyCount">—</div><div class="small" id="buyBtc"></div></div>
 <div class="card"><label>Purchase volume</label><div class="value" id="buyVolume">—</div><div class="small" id="avgPrice"></div></div>
 <div class="card"><label>Trading fees</label><div class="value" id="tradeFees">—</div></div>
@@ -318,8 +335,9 @@ body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
 <div class="card"><label>Profit / loss on period purchases</label><div class="value" id="profitLoss">—</div><div class="small" id="profitLossBasis">Current value of BTC bought in this period minus trading fees</div></div>
 <div class="card"><label>Net BTC in period</label><div class="value" id="netBtc">—</div><div class="small">Purchases minus gross BTC withdrawals</div></div>
 </div>
+</div></div>
 <h3 class="summary-subheading activity-subheading" id="activityHeading">Period Activity</h3>
-<section class="panel activity-panel" aria-labelledby="activityHeading"><div class="activity-heading"><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><span id="pageInfo" class="notice"></span><div class="pagination-navigation"><button class="secondary" id="previousPage">Previous</button><button class="secondary" id="nextPage">Next</button></div><form class="page-jump" id="pageJump" aria-label="Jump to activity page"><label for="pageNumber">Go to page</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><button class="secondary" id="goToPage" type="submit">Go</button></form></div></section></div>
+<section class="panel activity-panel" aria-labelledby="activityHeading"><div class="activity-heading"><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap horizontal-scroll" role="region" aria-label="Period activity table" tabindex="0"><table><thead><tr><th>Date</th><th>Type</th><th>BTC</th><th>Price</th><th>Value</th><th>Fee</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><span id="pageInfo" class="notice"></span><div class="pagination-navigation"><button class="secondary" id="previousPage">Previous</button><button class="secondary" id="nextPage">Next</button></div><form class="page-jump" id="pageJump" aria-label="Jump to activity page"><label for="pageNumber">Go to page</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><button class="secondary" id="goToPage" type="submit">Go</button></form></div></section></div>
 <div class="bottom-actions"><button id="download" aria-describedby="exportMessage">Download Parqet CSV</button></div>
 <p id="exportMessage" class="export-feedback hidden" role="alert"></p>
 </details>
@@ -331,6 +349,25 @@ body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
 </ol>
 </footer>
 </main>
+<script data-ui-scroll-areas>
+(()=>{
+ const areas=[...document.querySelectorAll(".horizontal-scroll")];
+ const timers=new WeakMap();
+ function update(area){area.classList.toggle("has-overflow",area.scrollWidth>area.clientWidth+1)}
+ const observer=new ResizeObserver(()=>areas.forEach(update));
+ areas.forEach(area=>{
+  observer.observe(area);
+  if(area.firstElementChild)observer.observe(area.firstElementChild);
+  area.addEventListener("scroll",()=>{
+   area.classList.add("is-scrolling");
+   clearTimeout(timers.get(area));
+   timers.set(area,setTimeout(()=>area.classList.remove("is-scrolling"),180));
+  },{passive:true});
+  update(area);
+ });
+ document.querySelectorAll("details.panel").forEach(panel=>panel.addEventListener("toggle",()=>areas.forEach(update)));
+})();
+</script>
 <script data-ui-scroll>
 (()=>{
  const brand=document.querySelector(".top .dashboard-brand");
