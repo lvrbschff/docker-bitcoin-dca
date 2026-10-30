@@ -125,7 +125,3 @@ See [Architecture and operation](docs/architecture.md) for container components,
 ## Disclaimer
 
 Provided “as is” without warranty or investment, tax or legal advice. You are responsible for configuration, API credentials, monitoring and verifying transactions and exports. To the fullest extent permitted by law, the maintainer accepts no liability for financial losses, fees, outages, withdrawal errors or data loss. This does not exclude liability that cannot legally be excluded.
-
-## Support
-
-- Bitcoin: `bc1qg7crlvea9rsacfgnujhrjy6judvjnkjz9crvvq`
