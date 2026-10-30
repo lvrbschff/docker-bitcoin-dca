@@ -91,57 +91,29 @@ Submitted withdrawals block further withdrawals until resolved. Uncertain Kraken
 
 ## Dashboard and Parqet export
 
+The web UI is fully responsive on desktop, tablet and mobile. Card rows and tables scroll horizontally only when needed.
+
 - **Configuration:** exchange, purchase settings and withdrawal target.
 - **Schedule:** exchange balances, purchase timing and estimated automatic withdrawal timing. **Expected monthly deposit** is a browser-saved forecast assumption; it adds funds on each deposit day and recalculates future intervals using actual calendar months. It does not initiate deposits or change trading.
 - **Period Analysis:** date filters, summary, paginated activity and CSV export. Activities cannot be deleted through the UI.
 
-Panel expansion, selected dates and entries per page are remembered in this browser. Refreshes retain existing values while loading; errors appear beside the affected section. Manual withdrawals use a confirmation dialog showing destination, gross BTC, fee and net BTC; unavailable fee estimates are explicitly labelled.
+View preferences are saved in this browser. Refreshes preserve existing values; withdrawal confirmations show the destination, gross BTC, fee and net BTC.
 
 Display currencies are EUR and USD. Reference BTC prices come from Kraken’s public [BTC/EUR](https://www.kraken.com/convert/btc/eur) and [BTC/USD](https://www.kraken.com/convert/btc/usd) pages, including when trading on Bitvavo. Saved or cached prices are labelled.
 
 **Download Parqet CSV** exports one consolidated Buy row for the **last confirmed withdrawal in the selected range**:
 
-| CSV field | Value |
-| --- | --- |
-| Cost | Real purchase costs plus trading fees since the preceding confirmed withdrawal, in EUR. USD costs use historical reference rates. |
-| BTC quantity | Ending withdrawal’s net BTC after network fees. |
-| Date | Ending withdrawal date. |
+The row uses real purchase costs plus trading fees in EUR, the ending withdrawal’s net BTC after network fees, and its date. USD costs use historical reference rates.
 
 The complete withdrawal cycle is used even when the selected start falls inside it. For the first withdrawal, all preceding recorded real purchases are included. Later purchases, simulations and failed or unconfirmed withdrawals are excluded. At least one real purchase is required. Fees are already included in cost and net BTC; the CSV fee field is zero.
 
 Import using [Parqet’s CSV importer](https://faq.parqet.com/de/articles/870989-csv-import-aktivitaten-aus-einer-eigenen-csv-datei-importieren). Re-exporting a withdrawal can create duplicates.
 
-## Architecture and operation
+## Updates and data
 
-One container runs the dashboard and a worker in one Python process. The worker serializes account checks, orders and manual withdrawals.
+Back up both `./state` and `bitcoin-dca-webui-data`. After updating the source, run `docker compose up -d --build`. **Do not run `docker compose down -v`: it deletes the activity volume.**
 
-~~~mermaid
-flowchart LR
-    Browser <--> Web["Dashboard and reports"]
-    Web <-->|Action queue| Worker["Account worker"]
-    Worker <--> Adapter["Kraken or Bitvavo adapter"]
-    Adapter <--> Exchange["Exchange API"]
-    Worker <--> State["./state → /data"]
-    Worker <--> Data["Named volume → /webui-data"]
-    Web <--> Data
-    Web --> Sources["Kraken prices / Frankfurter FX"]
-~~~
-
-- `bot.py`, `worker.py`, `withdrawals.py`: scheduling and account actions.
-- `exchange.py`, `kraken.py`, `bitvavo.py`: exchange access.
-- `web_ui.py`, `analytics.py`, `reporting.py`: dashboard and exports.
-- `activity.py`: SQLite activity, reporting data and persistence.
-- `Dockerfile` builds the image; `docker-compose.yml` configures runtime, port and storage.
-
-**Keep and back up both mounts:** `./state` holds pending requests and scheduling state; `bitcoin-dca-webui-data` holds `activity.sqlite3`, FX cache and `dashboard.json`. Stop the bot for a consistent backup, or use a SQLite-aware backup. Legacy JSON activity is imported once; downgrading to a JSON-only release loses access to newer SQLite activity.
-
-After updating the source, rebuild with `docker compose up -d --build`. **Do not use `docker compose down -v` when updating.**
-
-View recent logs with `docker compose logs --tail=200`. INFO logs show schedule inputs, next purchase times, orders, withdrawals and errors. Review logs before sharing: they can contain balances and transaction identifiers.
-
-Docker checks health every five minutes; the saved heartbeat must be running and less than 15 minutes old. A supervisor exits the process if the worker stops or stalls for ten minutes, allowing `restart: unless-stopped` to restart it. Docker’s unhealthy status alone does not restart a container. Health monitors worker responsiveness, not exchange availability or trading success.
-
-The [publish workflow](.github/workflows/publish.yml) builds GHCR images on main pushes, version tags and manual runs; it does not run the test suite. Credentials belong on the Docker host and are not included in the image.
+See [Architecture and operation](docs/architecture.md) for components, storage, health checks, logs and image publishing.
 
 ## Limitations
 
