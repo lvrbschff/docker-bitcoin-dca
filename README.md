@@ -27,7 +27,7 @@ Create an API key for your selected exchange. Grant withdrawal permissions only 
 | [Bitvavo](https://docs.bitvavo.com/docs/get-started/) | View access; Trade digital assets for live buys; Withdraw digital assets for withdrawals | `BITVAVO_API_KEY`, `BITVAVO_API_SECRET` |
 | [Kraken](https://support.kraken.com/in/articles/360000919966-how-to-create-an-api-key?mode=consumerapp) | Query Funds, Query Open Orders & Trades, Query Closed Orders & Trades; Modify Orders for live buys; Withdraw Funds for withdrawals | `KRAKEN_API_KEY`, `KRAKEN_API_SECRET` |
 
-Fill in only the selected exchange’s credentials. **Never commit `.env` or API credentials.**
+Fill in only the selected exchange’s credentials. Never commit `.env` or API credentials.
 
 For withdrawals, first save and verify the destination on the exchange, then configure:
 
