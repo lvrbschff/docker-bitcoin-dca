@@ -19,6 +19,7 @@ dialog{max-width:600px;width:calc(100% - 32px);max-height:calc(100dvh - 32px);ov
 @media(max-width:600px){:root{--section-gap:16px;--field-gap:14px}main{padding:0 12px 24px;margin-top:22px}header{gap:10px;margin-bottom:20px}header img{width:40px;height:40px}h1{font-size:21px}.grid{grid-template-columns:minmax(0,1fr)}.panel{padding:16px}h2{font-size:18px}input,select{font-size:16px}.embedded main{padding:16px 12px}.option-card{min-height:100px;padding:14px}.connection-check{align-items:flex-start}.inline-status{flex-basis:100%}.actions.end button{flex:1 1 auto}}
 @media(max-width:420px){dialog{padding:18px}dialog dl{grid-template-columns:minmax(0,1fr)}dialog dd{margin-bottom:6px}}
 @media(prefers-reduced-motion:reduce){button,.button,.option-card input[type=checkbox],.option-card input[type=checkbox]::after{transition:none}}
+.review-list{margin:0}dialog .review-list{display:grid;grid-template-columns:minmax(0,1fr);gap:0}.review-list dt{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 12px 6px;font-size:13px;color:var(--text);border:1px solid var(--line);border-bottom:0;border-radius:9px 9px 0 0}.review-list dd{margin:0 0 12px;padding:0 12px 12px;border:1px solid var(--line);border-top:0;border-radius:0 0 9px 9px}.review-list .review-changed{background:#8bafff0c;border-color:#8bafff65}.review-badge{font-size:11px;color:var(--accent);white-space:nowrap}.review-comparison{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:10px;align-items:center}.review-side{min-width:0;overflow-wrap:anywhere}.review-caption{display:block;color:var(--muted);font-size:11px;margin-bottom:4px}.review-old{color:var(--muted)}.review-new{color:var(--accent);font-weight:600}.review-arrow{color:var(--muted)}.review-unchanged{color:var(--muted)}#unchangedReview{margin:4px 0 16px}#unchangedReview summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}#unchangedReview[open] summary{margin-bottom:8px}@media(max-width:360px){.review-comparison{gap:6px;font-size:13px}}
 </style></head><body><main><header><img src="/bitcoin-dca-icon-v3.png" alt=""><h1>Bitcoin DCA Dashboard</h1></header>
 <section id="accountPanel" class="panel" hidden><h2>1. Create your account</h2><p>Create your dashboard credentials to continue with configuration.</p><form id="accountForm"><div class="grid"><div><label for="newUsername">Username</label><input id="newUsername" autocomplete="username" minlength="3" maxlength="64" required></div><div><label for="newPassword">Password</label><input id="newPassword" type="password" autocomplete="new-password" minlength="12" maxlength="1024" required></div><div><label for="confirmPassword">Confirm password</label><input id="confirmPassword" type="password" autocomplete="new-password" minlength="12" required></div></div><p class="hint">Use at least 12 characters. No default account is created.</p><button>Create account and continue</button></form></section>
 <form id="settingsForm" hidden>
@@ -36,7 +37,7 @@ dialog{max-width:600px;width:calc(100% - 32px);max-height:calc(100dvh - 32px);ov
 </div><p class="hint">These options also control the dashboard buttons and notes.</p></section>
 <div class="actions end"><button id="save" type="submit">Review and save</button></div></form>
 <p id="status" role="status" aria-live="polite"></p>
-<dialog id="review"><h2>Confirm configuration</h2><dl id="reviewValues"></dl><p>Settings are saved in the container’s persistent data directory. Changes take effect without rebuilding the container.</p><div class="actions end"><button type="button" class="secondary" id="cancel">Cancel</button><button type="button" id="confirm">Save configuration</button></div></dialog>
+<dialog id="review" aria-labelledby="reviewTitle" aria-describedby="reviewDescription"><h2 id="reviewTitle">Confirm configuration</h2><p id="reviewDescription" class="hint" role="status"></p><dl id="reviewValues" class="review-list"></dl><details id="unchangedReview"><summary id="unchangedReviewTitle">Unchanged settings</summary><dl id="unchangedReviewValues" class="review-list"></dl></details><p>Settings are saved in the container’s persistent data directory. Changes take effect without rebuilding the container.</p><div class="actions end"><button type="button" class="secondary" id="cancel">Cancel</button><button type="button" id="confirm">Save configuration</button></div></dialog>
 </main><script>
 const initial=__INITIAL__, $=id=>document.getElementById(id);let pending=null;
 function connectionMessage(text,error=false){$('connectionStatus').textContent=text;$('connectionStatus').classList.toggle('is-error',error)}
@@ -93,7 +94,50 @@ $('quote').addEventListener('change',updatePurchaseCurrencyLabel);selectedExchan
 function values(){const result={};for(const input of document.querySelectorAll('[data-setting]')){if(exchangeEditorFields.has(input.id)&&$('exchangeEditor').hidden)continue;result[input.id]=input.type==='checkbox'?input.checked:input.type==='number'&&['deposit_day','startup_delay_seconds','check_interval_seconds','order_status_check_seconds'].includes(input.id)?Number(input.value):input.value}return result}
 $('accountForm').addEventListener('submit',async e=>{e.preventDefault();if($('newPassword').value!==$('confirmPassword').value){message('Passwords do not match.',true);return}const b=e.submitter;b.disabled=true;try{await request('/api/setup/account',{username:$('newUsername').value,password:$('newPassword').value});location.href='/settings'}catch(err){message(err.message,true)}finally{b.disabled=false}});
 $('testConnection').addEventListener('click',async()=>{if(!exchangeCredentialsReady())return;const b=$('testConnection');b.disabled=true;b.ariaBusy='true';b.textContent='Testing…';connectionMessage('Testing connection…');try{connectionMessage((await request('/api/settings/test',values())).message)}catch(err){connectionMessage(err.message,true)}finally{b.disabled=false;b.ariaBusy='false';b.textContent='Test connection'}});
-$('settingsForm').addEventListener('submit',e=>{e.preventDefault();if(!exchangeCredentialsReady())return;const editingCredentials=showCredentials&&!$('dashboardEditor').hidden;if(initial.passwordChangeRequired&&!editingCredentials){message('Open Change dashboard credentials to update the initial password before saving.',true);return}if(editingCredentials&&$('password').value!==$('passwordConfirm').value){message('New passwords do not match.',true);return}pending={settings:values()};if(editingCredentials)Object.assign(pending,{username:$('username').value,password:$('password').value,current_password:$('current_password').value});$('reviewValues').replaceChildren();const v={...initial.settings,...pending.settings};for(const [name,value] of [['Exchange',v.exchange],['Display currency',v.display_currency],['Timezone',v.timezone],['Purchase currency',v.quote],['Trading mode',v.live?'LIVE — real orders':'Dry run'],['BTC per purchase',v.buy_amount==='0'?'Exchange minimum':v.buy_amount],['Automatic withdrawals',v.withdrawals_enabled?'Enabled · threshold '+v.withdraw_threshold+' '+v.quote:'Disabled'],['Withdrawal destination',v.exchange==='KRAKEN'?v.kraken_withdraw_key:v.withdraw_address+' · '+v.withdraw_network],['Manual withdrawals',v.manual_withdrawal_enabled?'Enabled':'Disabled'],['Parqet CSV',v.parqet_enabled?'Enabled':'Disabled']]){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=name;dd.textContent=value||'Not configured';$('reviewValues').append(dt,dd)}$('review').showModal()});
+function renderReview(){
+ const before=initial.settings,after={...before,...pending.settings},rows=[];
+ const number=value=>Number.isFinite(Number(value))?String(Number(value)):String(value??'');
+ const enabled=value=>value?'Enabled':'Disabled';
+ function add(name,oldValue,newValue,changed=oldValue!==newValue){rows.push({name,before:String(oldValue||'Not configured'),after:String(newValue||'Not configured'),changed:!initial.complete||changed})}
+ add('Exchange',before.exchange,after.exchange);
+ add('Purchase currency',before.quote,after.quote);
+ for(const prefix of ['kraken','bitvavo'])for(const part of ['key','secret']){
+  const key=prefix+'_api_'+part,entered=typeof pending.settings[key]==='string'&&pending.settings[key].trim()!=='';
+  if(prefix!==after.exchange.toLowerCase()&&!entered)continue;
+  const configured=Boolean(before[key+'_configured']),oldValue=configured?'Configured (hidden)':'Not configured';
+  add((prefix==='kraken'?'Kraken':'Bitvavo')+' API '+part,oldValue,entered?'Will be updated (hidden)':oldValue,entered);
+ }
+ const target=settings=>settings.exchange==='KRAKEN'?'Kraken · '+(settings.kraken_withdraw_key||'Not configured'):'Bitvavo · '+(settings.withdraw_address||'Not configured')+' · '+(settings.withdraw_network||'BTC');
+ add('Withdrawal target',target(before),target(after));
+ for(const [key,label] of [['buy_amount','BTC per purchase'],['deposit_day','Deposit day'],['startup_delay_seconds','Startup delay'],['check_interval_seconds','Account check interval'],['order_status_check_seconds','Open order check interval'],['withdraw_threshold','Automatic withdrawal threshold']]){
+  const format=(settings)=>key==='buy_amount'?(Number(settings[key])===0?'Exchange minimum':number(settings[key])+' BTC'):key==='withdraw_threshold'?number(settings[key])+' '+settings.quote:number(settings[key])+(key.endsWith('_seconds')?' seconds':'');
+  add(label,format(before),format(after));
+ }
+ add('Live trading',before.live?'LIVE — real orders':'Dry run',after.live?'LIVE — real orders':'Dry run');
+ for(const [key,label] of [['withdrawals_enabled','Automatic withdrawals'],['manual_withdrawal_enabled','Manual withdrawals'],['parqet_enabled','Parqet CSV']])add(label,enabled(before[key]),enabled(after[key]));
+ add('Display currency',before.display_currency,after.display_currency);
+ add('Timezone',before.timezone,after.timezone);
+ if('username'in pending)add('Dashboard username',initial.username,pending.username.trim());
+ if(pending.password)add('Dashboard password','Configured (hidden)','Will be changed (hidden)',true);
+ $('reviewValues').replaceChildren();$('unchangedReviewValues').replaceChildren();$('unchangedReview').open=false;
+ const changed=rows.filter(row=>row.changed).length;
+ $('reviewDescription').textContent=!initial.complete?'New configuration — review the settings below.':changed?changed+' change'+(changed===1?'':'s')+' — compare Before and After.':'No changes. Your current settings will be retained.';
+ $('unchangedReview').hidden=changed===rows.length;$('unchangedReviewTitle').textContent='Unchanged settings ('+(rows.length-changed)+')';
+ for(const row of rows){
+  const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=row.name;
+  if(row.changed){
+   dt.className='review-changed';dd.className='review-changed';const badge=document.createElement('span');badge.className='review-badge';badge.textContent=initial.complete?'Changed':'New';dt.append(badge);
+   const comparison=document.createElement('div');comparison.className='review-comparison';
+   function side(caption,value,className){const box=document.createElement('div'),label=document.createElement('span'),text=document.createElement('span');box.className='review-side';label.className='review-caption';label.textContent=caption;text.className=className;text.textContent=value;box.append(label,text);return box}
+   if(initial.complete){const arrow=document.createElement('span');arrow.className='review-arrow';arrow.setAttribute('aria-hidden','true');arrow.textContent='→';comparison.append(side('Before',row.before,'review-old'),arrow)}
+   else comparison.style.gridTemplateColumns='minmax(0,1fr)';
+   comparison.append(side(initial.complete?'After':'New setting',row.after,'review-new'));dd.append(comparison);
+  }else{dt.className='review-unchanged';dd.className='review-unchanged';dd.textContent=row.after}
+  $(row.changed?'reviewValues':'unchangedReviewValues').append(dt,dd);
+ }
+}
+$('settingsForm').addEventListener('submit',e=>{e.preventDefault();if(!exchangeCredentialsReady())return;const editingCredentials=showCredentials&&!$('dashboardEditor').hidden;if(initial.passwordChangeRequired&&!editingCredentials){message('Open Change dashboard credentials to update the initial password before saving.',true);return}if(editingCredentials&&$('password').value!==$('passwordConfirm').value){message('New passwords do not match.',true);return}pending={settings:values()};if(editingCredentials)Object.assign(pending,{username:$('username').value.trim(),password:$('password').value,current_password:$('current_password').value});renderReview();$('review').showModal()});
+
 function logSettingsCancellation(){fetch('/api/ui-events',{method:'POST',headers:{'Content-Type':'application/json','X-DCA-Action':'ui-event'},body:JSON.stringify({event:'settings_save_cancelled'}),keepalive:true}).catch(()=>{})}
 $('cancel').addEventListener('click',()=>{$('review').close();pending=null;logSettingsCancellation()});$('review').addEventListener('cancel',()=>{pending=null;logSettingsCancellation()});
 $('confirm').addEventListener('click',async()=>{if(!pending)return;const b=$('confirm');b.disabled=true;try{const d=await request('/api/settings',pending);pending=null;if(initial.embedded){window.parent.postMessage({type:'dca-settings-saved'},location.origin)}else{location.href='/'}}catch(err){$('review').close();message(err.message,true)}finally{b.disabled=false}});

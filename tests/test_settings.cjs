@@ -4,7 +4,7 @@ const root=path.resolve(__dirname,'..');
 const page=execFileSync('python3',['-c',`import sys,json;sys.path.insert(0,'app');from settings_ui import PAGE;from configuration import DEFAULTS;print(PAGE.replace('__INITIAL__',json.dumps(dict(settings={**DEFAULTS,'kraken_api_key_configured':True,'kraken_api_secret_configured':True},username='operator',complete=True,passwordChangeRequired=False,createAccount=False))))`],{cwd:root,encoding:'utf8'});
 const script=page.match(/<script>([\s\S]*?)<\/script>/)[1];
 class Element{
- constructor(tag='div'){this.tag=tag;this.value='';this.type='';this.dataset={};this.children=[];this.listeners={};this.hidden=false;this.disabled=false;this.checked=false;this.textContent='';this.options=[{},{}];this.classList={toggle(){}}}
+ constructor(tag='div'){this.style={};this.tag=tag;this.value='';this.type='';this.dataset={};this.children=[];this.listeners={};this.hidden=false;this.disabled=false;this.checked=false;this.textContent='';this.options=[{},{}];this.classList={toggle(){}}}
  append(...children){for(const c of children){c.parentElement=this;this.children.push(c);if(c.id)elements[c.id]=c}}
  replaceChildren(){this.children=[]}
  addEventListener(name,fn){this.listeners[name]=fn}
@@ -17,6 +17,7 @@ const requests=[],location={href:''};let reject=false;
 const context={document:{getElementById:id=>elements[id],createElement:tag=>new Element(tag),querySelectorAll:()=>Object.values(elements).filter(el=>'setting'in el.dataset)},location,
  fetch:async(url,options)=>{requests.push({url,body:JSON.parse(options.body)});return {ok:!reject,json:async()=>reject?{error:'Connection failed'}:{message:'Connected',saved:true}}}};
 vm.runInNewContext(script,context);
+function allText(el){return el.textContent+' '+el.children.map(allText).join(' ')}
 async function event(id,name='click'){return elements[id].listeners[name]({preventDefault(){},submitter:elements[id]})}
 (async()=>{
  assert.equal(elements.withdraw_thresholdLabel.textContent,'Automatic withdrawal threshold (EUR)');elements.quote.value='USD';await event('quote','change');assert.equal(elements.withdraw_thresholdLabel.textContent,'Automatic withdrawal threshold (USD)');
@@ -35,7 +36,7 @@ async function event(id,name='click'){return elements[id].listeners[name]({preve
  const testing=event('testConnection');assert.equal(elements.connectionStatus.textContent,'Testing connection…');assert.equal(elements.testConnection.disabled,true);await testing;assert.equal(requests.at(-1).url,'/api/settings/test');assert.equal(requests.at(-1).body.bitvavo_api_key,'fictional-key');assert.equal(elements.connectionStatus.textContent,'Connected');
  const count=requests.length;elements.display_currency.value='USD';elements.timezone.value='Asia/Tokyo';elements.withdrawals_enabled.checked=true;elements.withdraw_threshold.value='1200';
  await event('settingsForm','submit');assert.equal(elements.review.open,true);assert.equal(requests.length,count,'Review must not save yet');
- const text=elements.reviewValues.children.map(x=>x.textContent).join(' ');assert.match(text,/LIVE|Dry run/);assert.match(text,/1200 EUR/);
+ const text=allText(elements.reviewValues);assert.match(text+allText(elements.unchangedReviewValues),/LIVE|Dry run/);assert.match(text,/1200 EUR/);assert.match(text,/1000 EUR/);assert.match(text,/Before/);assert.match(text,/After/);assert.equal(elements.unchangedReview.hidden,false);assert.match(allText(elements.unchangedReviewValues),/BTC per purchase/);assert(!text.includes('fictional-key'));assert(!text.includes('fictional-secret'));assert.match(text,/Will be updated \(hidden\)/);
  await event('cancel');assert.equal(elements.review.open,false);await event('confirm');assert.equal(requests.filter(r=>r.url==='/api/settings').length,0,'Cancelled review must not submit');assert.equal(requests.at(-1).body.event,'settings_save_cancelled');
  await event('settingsForm','submit');await event('confirm');assert.equal(requests.at(-1).url,'/api/settings');assert.equal(requests.at(-1).body.settings.withdrawals_enabled,true);assert.equal(requests.at(-1).body.settings.display_currency,'USD');assert.equal(requests.at(-1).body.settings.timezone,'Asia/Tokyo');
  await event('editDashboardCredentials');assert.equal(elements.dashboardEditor.hidden,false);
@@ -46,6 +47,8 @@ async function event(id,name='click'){return elements[id].listeners[name]({preve
  await event('settingsForm','submit');await event('confirm');const closedPayload=requests.at(-1).body;assert(!('username'in closedPayload));assert(!('password'in closedPayload));assert(!('bitvavo_api_key'in closedPayload.settings));assert(!('withdraw_address'in closedPayload.settings));
  vm.runInContext('initial.passwordChangeRequired=true',context);const beforeUpgrade=requests.length;await event('settingsForm','submit');assert.equal(requests.length,beforeUpgrade);assert.match(elements.status.textContent,/Open Change dashboard credentials/);vm.runInContext('initial.passwordChangeRequired=false',context);
  reject=true;await event('testConnection');assert.equal(elements.testConnection.disabled,false);assert.equal(elements.connectionStatus.textContent,'Connection failed');
+ vm.runInContext('pending={settings:{buy_amount:"0.000"}};renderReview()',context);assert.equal(elements.reviewValues.children.length,0);assert.match(elements.reviewDescription.textContent,/No changes/);
+ vm.runInContext('pending={settings:{},username:"renamed",password:"PRIVATE-DASHBOARD-PASSWORD"};renderReview()',context);const credentialReview=allText(elements.reviewValues);assert.match(credentialReview,/operator/);assert.match(credentialReview,/renamed/);assert.match(credentialReview,/Will be changed \(hidden\)/);assert(!credentialReview.includes('PRIVATE-DASHBOARD-PASSWORD'));
  console.log('Settings UI passed: credentials, exchange fields, read-only test, review/cancel/save and validation');
 })().catch(error=>{console.error(error);process.exitCode=1});
 
@@ -57,7 +60,7 @@ for(const match of setupPage.matchAll(/<(\w+)\b([^>]*\bid="([^"]+)"[^>]*)>/g)){c
 const setupRequests=[];vm.runInNewContext(setupPage.match(/<script>([\s\S]*?)<\/script>/)[1],{document:{getElementById:id=>setupElements[id],createElement:tag=>new SetupElement(tag),querySelectorAll:()=>Object.values(setupElements).filter(el=>'setting'in el.dataset)},location:{href:''},fetch:async(url,options)=>{setupRequests.push({url,body:JSON.parse(options.body)});return {ok:true,json:async()=>({})}}});
 assert.equal(setupElements.timezone.value,'Pacific/Chatham');assert.equal(setupElements.timezone.children.at(-1).value,'Pacific/Chatham');
 assert.equal(setupElements.dashboardCredentials,undefined);assert.equal(setupElements.username,undefined);
-setupElements.settingsForm.listeners.submit({preventDefault(){}});assert.equal(setupElements.review.open,true);
+setupElements.settingsForm.listeners.submit({preventDefault(){}});assert.equal(setupElements.review.open,true);assert.match(setupElements.reviewDescription.textContent,/New configuration/);assert(!allText(setupElements.reviewValues).includes('Before'));
 assert.equal(setupRequests.length,0,'Step two reviews settings without editing account credentials');
 console.log('First-run step two passed without credential fields');
 
