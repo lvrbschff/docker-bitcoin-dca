@@ -2,6 +2,17 @@
 
 Release history based on the published [GitHub Releases](https://github.com/oli792dev/docker-bitcoin-dca/releases). Entries are newest first; dates use Europe/Berlin. Releases without notes are marked explicitly.
 
+## [v0.3.4](https://github.com/oli792dev/docker-bitcoin-dca/releases/tag/v0.3.4) — 2026-10-30
+
+- Standardized log levels and reduced routine INFO output.
+- Added logs for withdrawal status changes.
+- Kept temporary network failures at WARNING without stack traces.
+- Preserved INFO logs for purchase scheduling and user actions.
+
+## [v0.3.3](https://github.com/oli792dev/docker-bitcoin-dca/releases/tag/v0.3.3) — 2026-10-30
+
+- Improved the web UI appearance.
+
 ## [v0.3.2](https://github.com/oli792dev/docker-bitcoin-dca/releases/tag/v0.3.2) — 2026-10-30
 
 - Reworked the application architecture, moving Python runtime modules into `app/`.
