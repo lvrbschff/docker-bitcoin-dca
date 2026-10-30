@@ -17,6 +17,7 @@ from urllib.parse import parse_qs, urlparse
 from secrets import token_urlsafe
 from threading import RLock
 import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 import price_cache
 from exchange_errors import UncertainWithdrawalError
@@ -113,7 +114,7 @@ HTML = """<!doctype html>
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#1b2a49 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
 .dashboard-brand{display:flex;align-items:center;gap:12px;margin-bottom:6px;min-width:0}.dashboard-logo{display:block;width:48px;height:48px;flex:0 0 48px;border-radius:11px}.dashboard-brand h1{min-width:0;overflow-wrap:anywhere}
 main{max-width:1180px;margin:0 auto;padding:36px 22px 64px}.top{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:26px}.eyebrow{color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}h1{font-size:30px;margin:4px 0}.sub{color:var(--muted);margin:0}
-.bottom-actions{display:flex;justify-content:flex-end;margin-top:20px}.badge{border:1px solid var(--line);border-radius:999px;padding:8px 12px;color:var(--muted);font-size:12px}.top-actions{display:flex;flex-direction:column;align-items:flex-end;gap:10px}.top-actions form{margin:0}.withdraw-action{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:0}#withdrawMessage:empty{display:none}.top-actions .field{min-width:170px}.top-actions .field label{margin-bottom:5px}
+.bottom-actions{display:flex;justify-content:flex-end;margin-top:20px}.badge{border:1px solid var(--line);border-radius:999px;padding:8px 12px;color:var(--muted);font-size:12px}.top-actions{display:flex;flex-direction:column;align-items:flex-end;gap:10px}.top-actions form{margin:0;flex:0 0 auto}.top-actions>button{width:auto;flex:0 0 auto}.withdraw-action{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:0}#withdrawMessage:empty{display:none}.top-actions .field{min-width:170px}.top-actions .field label{margin-bottom:5px}
 .panel{background:linear-gradient(145deg,rgba(21,31,52,.96),rgba(15,22,39,.96));border:1px solid var(--line);border-radius:18px;padding:20px;margin:18px 0;box-shadow:0 14px 40px #0002}
 .panel.activity-panel{margin:0;background:#0c1425a8;box-shadow:none}
 .controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}select,input,button{font:inherit;color:var(--text);background:#0c1425;border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%}button{width:auto;cursor:pointer;background:var(--accent);border-color:var(--accent);color:#081122;font-weight:700}button.secondary{background:transparent;color:var(--text);border-color:var(--line)}
@@ -132,7 +133,7 @@ input,select{min-width:0;max-width:100%}.card label,.small,.notice,.error{overfl
 .value{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .time-value,.countdown-value{white-space:normal;overflow-wrap:anywhere}
 .tablewrap{width:100%;max-width:100%;min-width:0;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
-#activities td{padding:5px 10px}#activities button{padding:3px 9px;line-height:1.4;font-size:13px;border-radius:7px}
+#activities td{padding:5px 10px}.activity-status{font-size:12px;white-space:nowrap}.status-confirmed{color:#5ed6b0}.status-pending{color:#e7c174}.status-failed{color:#ffacac}.status-muted{color:var(--muted)}#activities button{padding:3px 9px;line-height:1.4;font-size:13px;border-radius:7px}
 .page-jump{display:flex;align-items:center;gap:8px;margin:0;font-size:12px;color:var(--muted)}.page-jump input{width:76px;padding:7px 8px}.page-jump button{flex:none}
 .pagination{flex-wrap:wrap}.pagination .notice{flex:1;min-width:100px}
 @media(max-width:1100px){.period-summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.controls{grid-template-columns:repeat(3,minmax(0,1fr))}.controls>button{grid-column:1/-1}}
@@ -210,12 +211,12 @@ body.header-actions-hidden .top-actions{opacity:0;transform:translateY(-8px);vis
 
 /* Compact header controls share one row and wrap only when space is limited. */
 .top{align-items:flex-start;flex-wrap:wrap}
-.top-actions{flex-direction:row;align-items:flex-end;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-left:auto}
+.top-actions{display:flex;flex-direction:row;align-items:flex-end;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-left:auto}
 .top-actions button,.top-actions select{padding:8px 10px;min-height:38px;font-size:13px;border-radius:9px}
 .top-actions .field{min-width:130px}
 .top-actions .field label{margin-bottom:4px;font-size:11px}
 @media(max-width:600px){
- .top-actions{margin-left:0;justify-content:flex-start;align-items:flex-end;width:100%}
+ .top-actions{margin-left:0;justify-content:flex-end;align-items:flex-end;width:100%}
  .top-actions .field{min-width:120px}
  .top-actions button,.top-actions select{min-height:44px}
 }
@@ -309,7 +310,7 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 </head>
 <body>
 <div class="compact-brand-bar"><div class="compact-brand-inner"><img src="/bitcoin-dca-icon-v3.png" width="36" height="36" alt=""><span>Bitcoin DCA Dashboard</span></div></div><main>
-<header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Dashboard</h1></div></div><div class="top-actions"><div class="field"><label for="displayCurrency">Display currency</label><select id="displayCurrency"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select></div><button id="openSettings" type="button" aria-haspopup="dialog" aria-controls="settingsDialog">Settings</button><form method="post" action="/logout"><button type="submit">Log out</button></form></div></header>
+<header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Dashboard</h1></div></div><div class="top-actions"><button id="openSettings" type="button" aria-haspopup="dialog" aria-controls="settingsDialog">Settings</button><form method="post" action="/logout"><button type="submit">Log out</button></form></div></header>
 <details open class="panel" aria-labelledby="configurationHeading">
 <summary class="panel-heading"><h2 id="configurationHeading">Configuration</h2></summary>
 <div class="horizontal-scroll configuration-scroll" role="region" aria-label="Configuration cards" tabindex="0"><div class="grid configuration-grid">
@@ -367,7 +368,7 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 </div>
 </div></div>
 <h3 class="summary-subheading activity-subheading" id="activityHeading">Period Activity</h3>
-<section class="panel activity-panel" aria-labelledby="activityHeading"><div class="activity-heading"><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap horizontal-scroll" role="region" aria-label="Period activity table" tabindex="0"><table><thead><tr><th>Date</th><th>Type</th><th class="num">BTC</th><th class="num">Price</th><th class="num">Value</th><th class="num">Fee</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><span id="pageInfo" class="notice"></span><div class="pagination-navigation"><button class="secondary" id="previousPage">Previous</button><button class="secondary" id="nextPage">Next</button></div><form class="page-jump" id="pageJump" aria-label="Jump to activity page"><label for="pageNumber">Go to page</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><button class="secondary" id="goToPage" type="submit">Go</button></form></div></section></div>
+<section class="panel activity-panel" aria-labelledby="activityHeading"><div class="activity-heading"><div class="page-size"><label for="pageSize">Entries per page</label><select id="pageSize"><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div></div><div class="tablewrap horizontal-scroll" role="region" aria-label="Period activity table" tabindex="0"><table><thead><tr><th>Date</th><th>Type</th><th class="num">BTC</th><th class="num">Price</th><th class="num">Value</th><th class="num">Fee</th><th>Status</th></tr></thead><tbody id="activities"></tbody></table></div><div class="pagination"><span id="pageInfo" class="notice"></span><div class="pagination-navigation"><button class="secondary" id="previousPage">Previous</button><button class="secondary" id="nextPage">Next</button></div><form class="page-jump" id="pageJump" aria-label="Jump to activity page"><label for="pageNumber">Go to page</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><button class="secondary" id="goToPage" type="submit">Go</button></form></div></section></div>
 <div class="bottom-actions" id="parqet-actions"><button id="download" aria-describedby="exportMessage">Download Parqet CSV</button></div>
 <div class="feedback-wrap"><p id="exportMessage" class="export-feedback hidden" role="alert"></p><button class="secondary feedback-close" type="button" data-dismiss="exportMessage" aria-label="Close export message">×</button></div>
 </details>
@@ -397,7 +398,7 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
   frame.src='/settings?embedded=1';dialog.showModal();
  });
  document.getElementById('closeSettings').addEventListener('click',()=>dialog.close());
- dialog.addEventListener('close',()=>{frame.src='about:blank';});
+ dialog.addEventListener('close',()=>{frame.src='about:blank';fetch('/api/ui-events',{method:'POST',headers:{'Content-Type':'application/json','X-DCA-Action':'ui-event'},body:JSON.stringify({event:'settings_closed'}),keepalive:true}).catch(()=>{});});
  window.addEventListener('message',event=>{
   if(event.origin!==window.location.origin||event.source!==frame.contentWindow)return;
   if(event.data?.type==='dca-settings-close')dialog.close();
@@ -581,6 +582,17 @@ async function loadIntervals(){
 }
 $("interval").addEventListener("change",()=>{applySelectedInterval();saveReportView();currentPage=1;loadAnalytics()});
 ["start","end"].forEach(id=>$(id).addEventListener("change",()=>{$("interval").value="";saveReportView()}));
+function activityStatus(row){
+ if(row.simulated)return {label:"Simulated",tone:"muted"};
+ if(row.type==="Buy")return row.purchaseStatus&&row.purchaseStatus!=="confirmed"?{label:"Unverified",tone:"muted"}:{label:"Confirmed ✓",tone:"confirmed"};
+ if(row.type!=="TransferOut")return {label:"—",tone:"muted"};
+ const status=String(row.withdrawalStatus||"legacy_unverified").toLowerCase();
+ if(status==="completed")return {label:"Confirmed ✓",tone:"confirmed"};
+ if(["failed","failure"].includes(status))return {label:"Failed",tone:"failed"};
+ if(["canceled","cancelled"].includes(status))return {label:"Cancelled",tone:"muted"};
+ if(status==="legacy_unverified")return {label:"Unverified",tone:"muted"};
+ return {label:"Pending",tone:"pending"};
+}
 function renderActivities(){
  const body=$("activities");body.innerHTML="";
  const pageSize=Number($("pageSize").value),total=activityTotal,totalPages=activityPages;
@@ -588,16 +600,17 @@ function renderActivities(){
  const start=(currentPage-1)*pageSize,end=Math.min(start+pageSize,total);
  for(const row of activityRows){
   const rate=Number.isFinite(activityRates[row.currency])?activityRates[row.currency]:1,currency=Number.isFinite(activityRates[row.currency])?displayCurrency:row.currency;
-  const tr=document.createElement("tr"),type=row.simulated?"Simulated buy (dry run)":(row.type==="TransferOut"?"Withdrawal":row.type),vals=[Number.isFinite(Date.parse(row.datetime))?dateLabel(Date.parse(row.datetime)):"—",type||"—",activityBtc(row.shares),activityMoney(row.price,rate,currency,"/BTC"),activityMoney(row.amount,rate,currency),(row.simulated&&knownNumber(row.fee)?"~":"")+activityMoney(row.fee,rate,currency)];
-  vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i>=2)td.className="num";tr.appendChild(td)});
+  const status=activityStatus(row);
+  const tr=document.createElement("tr"),type=row.simulated?"Simulated buy (dry run)":(row.type==="TransferOut"?"Withdrawal":row.type),vals=[Number.isFinite(Date.parse(row.datetime))?dateLabel(Date.parse(row.datetime)):"—",type||"—",activityBtc(row.shares),activityMoney(row.price,rate,currency,"/BTC"),activityMoney(row.amount,rate,currency),(row.simulated&&knownNumber(row.fee)?"~":"")+activityMoney(row.fee,rate,currency),status.label];
+  vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i>=2&&i<=5)td.className="num";if(i===6)td.className="activity-status status-"+status.tone;tr.appendChild(td)});
   body.appendChild(tr)
  }
- if(!total){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=6;td.textContent="No BTC activity in this period.";td.className="notice";tr.appendChild(td);body.appendChild(tr)}
+ if(!total){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=7;td.textContent="No BTC activity in this period.";td.className="notice";tr.appendChild(td);body.appendChild(tr)}
  const occupiedRows=activityRows.length||(!total?1:0);
  for(let i=occupiedRows;i<pageSize;i++){
   const tr=document.createElement("tr");tr.className="activity-placeholder";tr.ariaHidden="true";
-  for(let column=0;column<6;column++){
-   const td=document.createElement("td");td.textContent="\u00a0";if(column>=2)td.className="num";tr.appendChild(td);
+  for(let column=0;column<7;column++){
+   const td=document.createElement("td");td.textContent="\u00a0";if(column>=2&&column<=5)td.className="num";tr.appendChild(td);
   }
   body.appendChild(tr);
  }
@@ -614,12 +627,10 @@ $("pageJump").addEventListener("submit",event=>{
  if(!activityTotal||!Number.isInteger(page)||page<1||page>activityPages)return;
  if(page!==currentPage){currentPage=page;loadAnalytics()}
 });
-$("displayCurrency").addEventListener("change",()=>{displayCurrency=$("displayCurrency").value;renderExchangeBtcValue();localStorage.setItem("bitcoinDcaDisplayCurrency",displayCurrency);loadAnalytics()});
 async function loadAnalytics(){
  const request=++reportRequest;saveReportView();sectionFeedback("reportFeedback","Updating report…");
  try{showError("");const p=selectedPeriod();const response=await fetch("/api/analytics?start="+p.start+"&end="+p.end+"&page="+currentPage+"&limit="+$("pageSize").value);const d=await response.json();if(!response.ok)throw new Error(d.error||"Could not load the report.");if(request!==reportRequest)return;quote=d.quote;
- if(!displayCurrency){const saved=localStorage.getItem("bitcoinDcaDisplayCurrency");displayCurrency=["EUR","USD"].includes(saved)?saved:(["EUR","USD"].includes(quote)?quote:"EUR")}
- $("displayCurrency").value=displayCurrency;
+ displayCurrency=["EUR","USD"].includes(d.configuration.displayCurrency)?d.configuration.displayCurrency:(["EUR","USD"].includes(quote)?quote:"EUR");
  const ex=d.exchange==="KRAKEN"?"Kraken":d.exchange==="BITVAVO"?"Bitvavo":d.exchange;document.title="Bitcoin DCA Dashboard";
  let livePrice=Number((d.snapshot||{}).price||0),currencyRates={[quote]:1};
  const currencies=Object.keys(d.summaryByCurrency||{});
@@ -632,7 +643,7 @@ async function loadAnalytics(){
   $("spotUpdated").textContent=(market.stale?"Cached Kraken price · fetched ":"Kraken public price page · fetched ")+new Date(Number(market.updatedAt)*1000).toLocaleTimeString("en-GB");
  }catch(priceError){
   if(request!==reportRequest)return;
-  displayCurrency=quote;fxRate=1;$("displayCurrency").value=quote;
+  displayCurrency=quote;fxRate=1;
   if(!(livePrice>0)&&balanceDisplayCurrency===quote&&balanceDisplayPrice>0)livePrice=balanceDisplayPrice;
   $("spotUpdated").textContent=livePrice>0?"Last available price":"Live price unavailable";
   sectionFeedback("priceFeedback","Live price unavailable; showing the saved bot price where available.",true);
@@ -999,7 +1010,10 @@ class Handler(BaseHTTPRequestHandler):
         if not self.runtime:
             self._json(404, {'error': 'Settings unavailable.'})
             return
-        if path != '/api/setup/account' and not self._require_authentication(): return
+        operation = {'/api/setup/account': 'Initial account creation', '/api/settings/test': 'Exchange connection test', '/api/settings': 'Settings update'}[path]
+        if path != '/api/setup/account' and not self._require_authentication():
+            LOG.info('%s rejected: authentication required', operation)
+            return
         try:
             payload = self._settings_body()
             if path == '/api/setup/account':
@@ -1013,21 +1027,25 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header('Cache-Control', 'no-store')
                 self.end_headers()
                 self.wfile.write(b'{}')
-                LOG.info('Initial dashboard account created; configuration is required')
             elif path == '/api/settings/test':
                 self._json(200, self.runtime.test_connection(payload))
             else:
                 changed = self.runtime.save(payload)
                 if changed:
                     with _SESSION_LOCK: _SESSIONS.clear()
+                    LOG.info('Dashboard account credentials updated; all dashboard sessions invalidated')
                 self._json(200, {'saved': True, 'signInRequired': changed})
         except (ValueError, UnicodeDecodeError) as exc:
+            LOG.info('%s rejected: invalid request, configuration or account verification', operation)
             self._json(400, {'error': str(exc)})
-        except requests.RequestException:
+        except requests.RequestException as exc:
+            LOG.warning('%s unavailable: exchange/network request failed (%s)', operation, type(exc).__name__)
             # Exchange errors may contain request details. Never echo them to the browser.
             self._json(502, {'error': 'Exchange connection failed. Check credentials, permissions and internet access.'})
-        except Exception:
-            LOG.error('Settings operation failed; configuration was not confirmed')
+        except Exception as exc:
+            LOG.error('%s failed unexpectedly (%s); configuration was not confirmed', operation, type(exc).__name__)
+            # Omit exception text and locals: exchange errors can contain secrets.
+            LOG.debug('Settings failure stack:\n%s', ''.join(traceback.format_list(traceback.extract_tb(exc.__traceback__))))
             self._json(500, {'error': 'Settings could not be confirmed. Check persistent storage and try again.'})
 
     def _dashboard_html(self):
@@ -1071,6 +1089,8 @@ class Handler(BaseHTTPRequestHandler):
                 "withdrawal_cancelled": "Manual withdrawal cancelled in dashboard; no submission",
                 "withdrawal_expired": "Manual withdrawal confirmation expired; no submission",
                 "export_clicked": "Parqet CSV export button clicked",
+                "settings_closed": "Settings dialog closed",
+                "settings_save_cancelled": "Settings review cancelled; no save submitted",
             }
             try:
                 length = int(self.headers.get("Content-Length", "0"))
@@ -1151,6 +1171,7 @@ class Handler(BaseHTTPRequestHandler):
                 if parsed.path == '/api/settings':
                     self._json(401, {'error': 'Create an account first.'})
                 else:
+                    LOG.info('First-run setup opened; dashboard account creation is required')
                     self._send(200, settings_page(self.runtime.store, create_account=True), 'text/html; charset=utf-8')
                 return
             if parsed.path in ('/configure', '/settings') and not self._has_valid_session():
@@ -1164,6 +1185,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._json(200, self.runtime.store.public())
                     return
                 if parsed.path in ('/configure', '/settings') or not data['complete'] or data['account'].get('password_change_required'):
+                    LOG.info('Settings opened' if data['complete'] else 'First-run bot configuration opened')
                     self._send(200, settings_page(self.runtime.store, embedded=parse_qs(parsed.query).get("embedded") == ["1"]), 'text/html; charset=utf-8')
                     return
         if parsed.path == "/" and not self._has_valid_session():

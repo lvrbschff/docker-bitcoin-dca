@@ -4,6 +4,8 @@ import http.client
 import io
 import json
 import os
+import logging
+import requests
 import tempfile
 import threading
 import unittest
@@ -200,6 +202,35 @@ class ConfigurationTests(unittest.TestCase):
         self.assertFalse(self.store.public()['passwordChangeRequired'])
 
 
+    def test_display_currency_is_saved_without_rescheduling(self):
+        self.ready()
+        self.app.save({'settings': {'display_currency':'USD'}})
+        self.assertEqual(self.store.public()['settings']['display_currency'],'USD')
+        self.assertEqual(self.app.settings['display_currency'],'USD')
+        self.assertFalse(self.app.worker.reconfigure.is_set())
+        self.assertEqual(config.ConfigStore(self.store.path,environ={}).public()['settings']['display_currency'],'USD')
+        with self.assertRaises(ValueError): self.app.save({'settings':{'display_currency':'GBP'}})
+
+    def test_old_configuration_gains_display_currency_default(self):
+        self.ready()
+        data=self.store.snapshot();data['settings'].pop('display_currency')
+        self.store.path.write_text(json.dumps(data))
+        reloaded=config.ConfigStore(self.store.path,environ={})
+        self.assertEqual(reloaded.public()['settings']['display_currency'],'EUR')
+        self.assertTrue(reloaded.authenticate('operator',PASSWORD))
+
+    def test_setup_step_two_omits_credentials_but_settings_keeps_them(self):
+        self.account()
+        page=settings_ui.settings_page(self.store)
+        self.assertNotIn('<h2>Dashboard Credentials</h2>',page)
+        self.assertNotIn('id="username"',page)
+        self.assertIn('id="connectionStatus"',page)
+        self.app.save({'settings':CREDENTIALS})
+        page=settings_ui.settings_page(self.store)
+        self.assertIn('<h2>Dashboard Credentials</h2>',page)
+        self.assertIn('id="dashboardOptions"',page)
+        self.assertIn('role="switch"',page)
+
     def test_setup_html_escapes_embedded_data(self):
         self.ready(kraken_withdraw_key='</script><script>alert(1)</script>')
         page = settings_ui.settings_page(self.store)
@@ -228,6 +259,44 @@ class ConfigurationTests(unittest.TestCase):
             if 'Set-Cookie' in headers: self.cookie = headers['Set-Cookie'].split(';')[0]
             return result['status'], h.wfile.getvalue().decode()
         return request
+
+    def test_setup_and_settings_logs_describe_changes_without_secret_values(self):
+        with self.assertLogs('bitcoin-dca.settings',level='INFO') as captured:
+            self.ready()
+            self.app.save({'settings':{'parqet_enabled':False,'kraken_api_key':'PRIVATE-NEW-KEY'}})
+            self.app.test_connection({})
+        output='\n'.join(captured.output)
+        self.assertIn('Initial dashboard account created',output)
+        self.assertIn('First-run bot configuration completed',output)
+        self.assertIn('changed fields=kraken_api_key,parqet_enabled',output)
+        self.assertIn('connection test started',output)
+        self.assertIn('connection test succeeded',output)
+        for secret in [PASSWORD,'PRIVATE-NEW-KEY',CREDENTIALS['kraken_api_secret']]:
+            self.assertNotIn(secret,output)
+        self.assertTrue(all(record.levelno==logging.INFO for record in captured.records))
+
+    def test_settings_failures_use_expected_levels_and_redact_exception_text(self):
+        request=self.server()
+        request('/api/setup/account',{'username':'operator','password':PASSWORD})
+        for error,status,level in [(ValueError('PRIVATE-ERROR-DETAIL'),400,logging.INFO),
+                                   (requests.ReadTimeout('PRIVATE-ERROR-DETAIL'),502,logging.WARNING),
+                                   (RuntimeError('PRIVATE-ERROR-DETAIL'),500,logging.ERROR)]:
+            with self.subTest(error=type(error).__name__):
+                with patch.object(self.app,'test_connection',side_effect=error):
+                    with self.assertLogs(web_ui.LOG,level='DEBUG') as captured:
+                        result=request('/api/settings/test',{})
+                self.assertEqual(result[0],status)
+                self.assertEqual(captured.records[0].levelno,level)
+                self.assertNotIn('PRIVATE-ERROR-DETAIL','\n'.join(captured.output))
+                self.assertTrue(all(record.exc_info is None for record in captured.records))
+
+    def test_settings_blocked_by_pending_transaction_is_logged_at_info(self):
+        self.ready()
+        self.app.state_path.write_text(json.dumps({'pending_order':{'id':'pending'}}))
+        with self.assertLogs('bitcoin-dca.settings',level='INFO') as captured:
+            with self.assertRaises(ValueError): self.app.save({'settings':{'live':True}})
+        self.assertIn('Settings update blocked',captured.output[0])
+        self.assertEqual(captured.records[0].levelno,logging.INFO)
 
     def test_settings_dialog_uses_authenticated_embedded_page(self):
         request=self.server()

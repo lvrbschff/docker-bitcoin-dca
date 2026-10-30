@@ -88,6 +88,7 @@ class Runtime:
             account_changed = bool(payload.get('password') or payload.get('username', account['username']) != account['username'])
             if account.get('password_change_required') or account_changed:
                 if not self.store.authenticate(account['username'], payload.get('current_password', '')):
+                    LOG.info('Settings account update rejected: current password verification failed')
                     raise ValueError('Your current password is incorrect.')
                 username = payload.get('username') or account['username']
                 password = payload.get('password', '')
@@ -100,6 +101,7 @@ class Runtime:
             identity_changed = any(values[key] != previous['settings'][key] for key in IDENTITY_FIELDS)
             financial_mode_changed = values['live'] != previous['settings']['live']
             if (identity_changed or financial_mode_changed) and (self.unresolved() or self.worker.queue.unfinished_tasks):
+                LOG.info('Settings update blocked: unresolved transactions or queued account actions; configuration unchanged')
                 raise ValueError('Resolve pending orders, withdrawals and queued requests before changing exchange, credentials, currency or trading mode.')
             settings = runtime_settings(values)
             adapter = create_exchange(settings)
@@ -130,6 +132,10 @@ class Runtime:
                 self.startup_pending = True
                 self.ready_at = time.monotonic() + (values['startup_delay_seconds'] if not previous['complete'] else 0)
                 self.worker.reconfigure.set()
+            changed_fields = sorted(key for key in values if values[key] != previous['settings'][key])
+            if not previous['complete']:
+                LOG.info('First-run bot configuration completed: exchange=%s; live trading=%s; startup delay=%ss', values['exchange'], values['live'], values['startup_delay_seconds'])
+            LOG.info('Settings applied: changed fields=%s; account credentials changed=%s; purchase schedule refresh requested=%s', ','.join(changed_fields) or 'none', account_changed, schedule_changed)
             LOG.info('Application settings saved: exchange=%s; live trading=%s; automatic withdrawals=%s; manual withdrawals=%s; Parqet=%s', values['exchange'], values['live'], values['withdrawals_enabled'], values['manual_withdrawal_enabled'], values['parqet_enabled'])
             return account_changed
 
@@ -137,10 +143,13 @@ class Runtime:
         # Read-only and serialized so a connection test cannot race a financial action.
         with self.lock:
             values = validate(payload, self.store.snapshot()['settings'])
+            LOG.info('Exchange connection test started: exchange=%s; quote currency=%s; read-only balance access', values['exchange'], values['quote'])
+            started = time.monotonic()
             api = create_exchange(runtime_settings(values))
             try:
                 api.balance(values['quote'])
                 api.balance('BTC')
+                LOG.info('Exchange connection test succeeded: exchange=%s; duration=%.2fs; no orders or withdrawals submitted', values['exchange'], time.monotonic() - started)
                 return {'message': 'Connection successful. Account balances are accessible; no order or withdrawal was submitted.'}
             finally:
                 if hasattr(api, 'session'): api.session.close()

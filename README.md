@@ -16,20 +16,20 @@ cd docker-bitcoin-dca
 docker compose up -d --build
 ~~~
 
-Open `http://<docker-host-ip>:6890`. On a fresh installation, create your username and password first (at least 12 characters), then configure your exchange and API credentials. Review and save to open the dashboard. There is no default account. New installations start in dry-run mode; API access and internet are required even for simulations.
+Open `http://<docker-host-ip>:6890`. The setup wizard first creates your username and password (12+ characters), then configures the exchange, API access and purchases. There is no default account; new installations start in dry run.
 
-**Settings**, next to **Log out**, lets you change the account, exchange, API credentials, purchase amount, deposit day, timezone, startup/check intervals and trading mode. It also controls automatic withdrawals and their threshold, the destination, manual withdrawals and Parqet export. Disabled features hide their controls and notes and are blocked by the server. Empty API fields retain saved credentials; secrets are never displayed again.
+**Settings**, beside **Log out**, opens a dialog for **Dashboard Credentials**, exchange access, purchases and withdrawal settings. **Trading and dashboard** groups the live-trading, automatic/manual withdrawal and Parqet switches with display currency. Disabled features also hide their controls and notes.
 
 | Exchange | API permissions | Bitcoin withdrawal destination |
 | --- | --- | --- |
 | [Bitvavo](https://docs.bitvavo.com/docs/get-started/) | View access; Trade digital assets for live buys; Withdraw digital assets for withdrawals | Address and network saved and verified on Bitvavo |
 | [Kraken](https://support.kraken.com/articles/360000919966-how-to-create-an-api-key) | Query Funds; Query Open/Closed Orders & Trades; Modify Orders for live buys; Withdraw Funds for withdrawals | Exact label of a saved Bitcoin withdrawal method, not the address itself |
 
-**Test connection** checks account balance access without placing an order or withdrawal. Enable live trading only after reviewing the dry-run schedule. Exchange, currency, credential and trading-mode changes are blocked while orders, withdrawals or queued actions remain unresolved.
+**Test connection** reads balances without trading; progress and results appear beside the button. API access and internet are required even for dry runs. Exchange, credential, currency and trading-mode changes are blocked while transactions remain unresolved.
 
-Application settings persist in `./state/config.json`; passwords are hashed, API credentials are stored in this private file. Protect it and its backups. Never commit `.env`, `state/` or API credentials. Existing installations import their environment settings once; saved settings then take precedence. A weak initial dashboard password must be changed in Settings.
+Settings persist in `./state/config.json`; passwords are hashed and API credentials stay private. Empty API fields keep saved credentials. Protect this file and backups; never commit credentials or `.env`. Existing saved configurations are retained.
 
-Docker still controls ports, volumes and restart policy. To change the default port, copy `.env.example` to `.env` and set `WEB_UI_PORT`. The port is published on all host interfaces; HTTP is unencrypted, so use an HTTPS reverse proxy on untrusted networks. Environment-only/headless operation remains available; see [Architecture and operation](docs/architecture.md).
+Compose manages only port, log level, volumes and restart policy. Optional `.env` overrides are `WEB_UI_PORT` (6890) and `LOG_LEVEL` (INFO). HTTP is unencrypted; use HTTPS on untrusted networks. See [Architecture and operation](docs/architecture.md) for migration and headless operation.
 
 ## Purchases and withdrawals
 
@@ -57,11 +57,11 @@ The web UI is fully responsive on desktop, tablet and mobile. Card rows and tabl
 
 - **Configuration:** exchange, purchase settings and withdrawal target.
 - **Schedule:** exchange balances, purchase timing and estimated automatic withdrawal timing. **Expected monthly deposit** is a browser-saved forecast assumption; it adds funds on each deposit day and recalculates future intervals using actual calendar months. It does not initiate deposits or change trading.
-- **Period Analysis:** date filters, summary, paginated activity and CSV export. Activities cannot be deleted through the UI.
+- **Period Analysis:** date filters, summary, activity status (confirmed, pending, failed or simulated) and CSV export. Activities cannot be deleted through the UI.
 
-View preferences are saved in this browser. Refreshes preserve existing values; withdrawal confirmations show the destination, gross BTC, fee and net BTC.
+View preferences are saved in this browser; the To field resets to now on page load. Refreshes preserve existing values; withdrawal confirmations show the destination, gross BTC, fee and net BTC.
 
-Display currencies are EUR and USD. Reference BTC prices come from Kraken’s public [BTC/EUR](https://www.kraken.com/convert/btc/eur) and [BTC/USD](https://www.kraken.com/convert/btc/usd) pages, including when trading on Bitvavo. Saved or cached prices are labelled.
+Display currency is set to EUR or USD in Settings. Reference BTC prices come from Kraken’s public [BTC/EUR](https://www.kraken.com/convert/btc/eur) and [BTC/USD](https://www.kraken.com/convert/btc/usd) pages, including when trading on Bitvavo. Saved or cached prices are labelled.
 
 **Download Parqet CSV** exports one consolidated Buy row for the last confirmed withdrawal in the selected range:
 

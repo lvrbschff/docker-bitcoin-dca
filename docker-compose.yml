@@ -3,31 +3,10 @@ services:
     build: .
     container_name: bitcoin-dca
     restart: unless-stopped
-    # Application settings are managed in the UI. These legacy defaults are
-    # imported once for existing installations; saved configuration takes precedence.
+    # Configure the account, exchange and bot settings in the web UI.
     environment:
-      EXCHANGE: ${EXCHANGE:-KRAKEN}
-      QUOTE_CURRENCY: EUR
-      BUY_AMOUNT: "0"
-      DEPOSIT_DAY: "1"
-      startup_delay_seconds: "60"
-      TIMEZONE: Europe/Berlin
-      LIVE_TRADING: "false"
-      CHECK_INTERVAL_SECONDS: "300"
-      ORDER_STATUS_CHECK_SECONDS: "30"
-      WITHDRAWALS_ENABLED: "false"
-      WITHDRAW_THRESHOLD_QUOTE: "1000"
-      WITHDRAW_ADDRESS: ${WITHDRAW_ADDRESS:-}
-      WITHDRAW_NETWORK: ${WITHDRAW_NETWORK:-BTC}
-      WEB_UI_ENABLED: "true"
       WEB_UI_PORT: "${WEB_UI_PORT:-6890}"
-      WEB_UI_USERNAME: ${WEB_UI_USERNAME:-admin}
-      WEB_UI_PASSWORD: ${WEB_UI_PASSWORD:-admin}
-      BITVAVO_API_KEY: ${BITVAVO_API_KEY:-}
-      BITVAVO_API_SECRET: ${BITVAVO_API_SECRET:-}
-      KRAKEN_API_KEY: ${KRAKEN_API_KEY:-}
-      KRAKEN_API_SECRET: ${KRAKEN_API_SECRET:-}
-      KRAKEN_WITHDRAW_KEY: ${KRAKEN_WITHDRAW_KEY:-}
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     ports:
       - "${WEB_UI_PORT:-6890}:${WEB_UI_PORT:-6890}"
     volumes:

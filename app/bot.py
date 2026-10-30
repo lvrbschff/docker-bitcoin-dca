@@ -227,7 +227,9 @@ def persist_bot_buy(api, order, settings, event_id, fallback_timestamp_ms):
     records = api.normalize_bot_buy(
         order, settings["quote"], event_id, fallback_timestamp_ms
     )
-    for record in records: record["exchange"] = settings["exchange"]
+    for record in records:
+        record["exchange"] = settings["exchange"]
+        record["purchaseStatus"] = "confirmed"
     return records, append_activity_records(records)
 
 

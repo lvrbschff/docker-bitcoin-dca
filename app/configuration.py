@@ -4,6 +4,7 @@ import copy
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import tempfile
@@ -12,12 +13,14 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+LOG = logging.getLogger('bitcoin-dca.settings')
+
 SECRET_FIELDS = tuple(f'{exchange}_api_{part}' for exchange in ('kraken', 'bitvavo') for part in ('key', 'secret'))
 DEFAULTS = dict(exchange='KRAKEN', quote='EUR', buy_amount='0', deposit_day=1,
                 startup_delay_seconds=60, order_status_check_seconds=30, check_interval_seconds=300,
                 timezone='Europe/Berlin', live=False, withdrawals_enabled=False,
                 withdraw_threshold='1000', withdraw_address='', withdraw_network='BTC', kraken_withdraw_key='',
-                manual_withdrawal_enabled=True, parqet_enabled=True,
+                manual_withdrawal_enabled=True, parqet_enabled=True, display_currency='EUR',
                 **{key: '' for key in SECRET_FIELDS})
 ENV_NAMES = dict(exchange='EXCHANGE', quote='QUOTE_CURRENCY', buy_amount='BUY_AMOUNT', deposit_day='DEPOSIT_DAY',
                  startup_delay_seconds='startup_delay_seconds', order_status_check_seconds='ORDER_STATUS_CHECK_SECONDS',
@@ -69,6 +72,9 @@ def validate(values, previous=None, require_credentials=True):
             raise ValueError(f'Invalid {key}.')
     result['exchange'] = result['exchange'].upper()
     result['quote'] = result['quote'].upper()
+    result['display_currency'] = result['display_currency'].upper()
+    if result['display_currency'] not in ('EUR', 'USD'):
+        raise ValueError('Display currency must be EUR or USD.')
     result['withdraw_network'] = result['withdraw_network'].strip().upper()
     for key in SECRET_FIELDS + ('withdraw_address', 'kraken_withdraw_key'):
         result[key] = result[key].strip()
@@ -116,7 +122,8 @@ class ConfigStore:
         if self.path.exists():
             os.chmod(self.path, 0o600)
             self.data = json.loads(self.path.read_text())
-            validate(self.data['settings'], require_credentials=self.data['complete'])
+            self.data['settings'] = validate(self.data['settings'], require_credentials=self.data['complete'])
+            LOG.debug('Stored application configuration loaded; setup complete=%s', self.data['complete'])
             return
         values = dict(DEFAULTS)
         for key, env_name in ENV_NAMES.items():
@@ -130,6 +137,7 @@ class ConfigStore:
             password = env.get('WEB_UI_PASSWORD') or 'admin'
             self.data['account'] = dict(username=env.get('WEB_UI_USERNAME') or 'admin', password_hash=password_hash(password), password_change_required=len(password) < 12 or password == 'admin')
             self._write(self.data)
+            LOG.info('Legacy environment configuration imported: exchange=%s; password change required=%s', self.data['settings']['exchange'], self.data['account']['password_change_required'])
 
     def _write(self, data):
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -174,6 +182,7 @@ class ConfigStore:
             data['account'] = account_values(username, password)
             self._write(data)
             self.data = data
+            LOG.info('Initial dashboard account created; bot configuration is required')
 
     def commit(self, settings, account=None):
         with self.lock:
