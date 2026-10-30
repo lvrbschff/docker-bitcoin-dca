@@ -101,7 +101,7 @@ View preferences are saved in this browser. Refreshes preserve existing values; 
 
 Display currencies are EUR and USD. Reference BTC prices come from Kraken’s public [BTC/EUR](https://www.kraken.com/convert/btc/eur) and [BTC/USD](https://www.kraken.com/convert/btc/usd) pages, including when trading on Bitvavo. Saved or cached prices are labelled.
 
-**Download Parqet CSV** exports one consolidated Buy row for the **last confirmed withdrawal in the selected range**:
+**Download Parqet CSV** exports one consolidated Buy row for the last confirmed withdrawal in the selected range:
 
 The row uses real purchase costs plus trading fees in EUR, the ending withdrawal’s net BTC after network fees, and its date. USD costs use historical reference rates.
 
