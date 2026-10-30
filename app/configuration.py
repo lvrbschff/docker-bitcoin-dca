@@ -15,7 +15,6 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 LOG = logging.getLogger('bitcoin-dca.settings')
 CONFIG_PATH = Path('/webui-data/config.json')
-LEGACY_CONFIG_PATH = Path('/data/config.json')
 
 SECRET_FIELDS = tuple(f'{exchange}_api_{part}' for exchange in ('kraken', 'bitvavo') for part in ('key', 'secret'))
 DEFAULTS = dict(exchange='KRAKEN', quote='EUR', buy_amount='0', deposit_day=1,
@@ -128,11 +127,6 @@ class ConfigStore:
         if self.path.exists():
             self.data = self._read(self.path)
             LOG.debug('Stored application configuration loaded; setup complete=%s', self.data['complete'])
-            return
-        if path is None and LEGACY_CONFIG_PATH.exists():
-            self.data = self._read(LEGACY_CONFIG_PATH)
-            self._write(self.data)
-            LOG.info('Application configuration migrated to the persistent web UI volume; dashboard account and settings retained')
             return
         values = dict(DEFAULTS)
         for key, env_name in ENV_NAMES.items():

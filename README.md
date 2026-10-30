@@ -27,9 +27,9 @@ Open `http://<docker-host-ip>:6890`. The setup wizard first creates your usernam
 
 **Test connection** reads balances without trading; progress and results appear beside the button. API access and internet are required even for dry runs. Exchange, credential, currency and trading-mode changes are blocked while transactions remain unresolved.
 
-Settings persist as `config.json` in the named volume `bitcoin-dca-webui-data`; passwords are hashed and API credentials stay private. Empty API fields keep saved credentials. Protect this file and backups; never commit credentials or `.env`. All runtime state and activity also live in this volume; no host state directory is required. Existing installations must [migrate their old state once](docs/architecture.md#move-existing-state-to-the-named-volume) before using the volume-only Compose file. Reuse the same volume on redeployment.
+Settings persist as `config.json` in the named volume `bitcoin-dca-webui-data`; passwords are hashed and API credentials stay private. Empty API fields keep saved credentials. Protect this file and backups; never commit credentials or `.env`. All runtime state and activity also live in this volume; no host state directory is required. Reuse the same volume on redeployment.
 
-Compose manages only port, log level, volumes and restart policy. Optional `.env` overrides are `WEB_UI_PORT` (6890) and `LOG_LEVEL` (INFO). HTTP is unencrypted; use HTTPS on untrusted networks. See [Architecture and operation](docs/architecture.md) for migration and headless operation.
+Compose manages only port, log level, volumes and restart policy. Optional `.env` overrides are `WEB_UI_PORT` (6890) and `LOG_LEVEL` (INFO). HTTP is unencrypted; use HTTPS on untrusted networks. See [Architecture and operation](docs/architecture.md) for storage and headless operation.
 
 ## Purchases and withdrawals
 

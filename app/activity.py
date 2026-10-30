@@ -12,7 +12,7 @@ from threading import RLock
 
 ACTIVITY_PATH = Path('/webui-data/activity.json')  # Legacy source; never overwritten.
 SNAPSHOT_PATH = Path('/webui-data/dashboard.json')
-LEGACY_ACTIVITY_PATHS = ()  # storage.py copies legacy input before the ledger opens.
+LEGACY_ACTIVITY_PATHS = ()
 LEGACY_SNAPSHOT_PATHS = ()
 _ACTIVITY_LOCK = RLock()
 

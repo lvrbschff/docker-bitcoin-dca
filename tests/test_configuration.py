@@ -249,48 +249,9 @@ class ConfigurationTests(unittest.TestCase):
         self.assertIn('id="dashboardOptions"',page)
         self.assertIn('role="switch"',page)
 
-    def test_default_configuration_migrates_to_named_volume_and_survives_redeployment(self):
-        self.ready(display_currency='USD')
-        legacy=self.store.path; volume=self.root/'webui-data'/'config.json'
-        with patch.object(config,'CONFIG_PATH',volume),patch.object(config,'LEGACY_CONFIG_PATH',legacy):
-            with self.assertLogs('bitcoin-dca.settings',level='INFO') as captured:
-                migrated=config.ConfigStore(environ={})
-            self.assertIn('migrated to the persistent web UI volume',captured.output[0])
-            self.assertEqual(migrated.path,volume)
-            self.assertEqual(migrated.snapshot(),self.store.snapshot())
-            self.assertTrue(migrated.authenticate('operator',PASSWORD))
-            self.assertEqual(volume.stat().st_mode & 0o777,0o600)
-            legacy.unlink()  # A new deployment no longer has the old bind-mounted file.
-            reloaded=config.ConfigStore(environ={})
-            self.assertTrue(reloaded.authenticate('operator',PASSWORD))
-            self.assertTrue(reloaded.snapshot()['complete'])
-            self.assertEqual(reloaded.public()['settings']['display_currency'],'USD')
-            self.assertEqual(reloaded.snapshot()['settings']['kraken_api_key'],CREDENTIALS['kraken_api_key'])
-
-    def test_volume_configuration_takes_precedence_over_old_config(self):
-        self.ready()
-        volume=self.root/'webui-data'/'config.json';volume.parent.mkdir()
-        data=self.store.snapshot();data['settings']['display_currency']='USD'
-        volume.write_text(json.dumps(data))
-        with patch.object(config,'CONFIG_PATH',volume),patch.object(config,'LEGACY_CONFIG_PATH',self.store.path):
-            reloaded=config.ConfigStore(environ={'KRAKEN_API_KEY':'different'})
-        self.assertEqual(reloaded.public()['settings']['display_currency'],'USD')
-        volume.write_text('corrupt')
-        with patch.object(config,'CONFIG_PATH',volume),patch.object(config,'LEGACY_CONFIG_PATH',self.store.path):
-            with self.assertRaises(ValueError):config.ConfigStore(environ={})
-
-    def test_failed_volume_migration_leaves_old_config_untouched(self):
-        self.ready()
-        before=self.store.path.read_bytes();volume=self.root/'webui-data'/'config.json'
-        with patch.object(config,'CONFIG_PATH',volume),patch.object(config,'LEGACY_CONFIG_PATH',self.store.path),patch.object(config.os,'replace',side_effect=OSError('disk unavailable')):
-            with self.assertRaises(OSError):config.ConfigStore(environ={})
-        self.assertEqual(self.store.path.read_bytes(),before)
-        self.assertFalse(volume.exists())
-        self.assertEqual(list(volume.parent.glob('.config-*')),[])
-
     def test_fresh_default_setup_writes_account_and_settings_to_volume(self):
         volume=self.root/'webui-data'/'config.json'
-        with patch.object(config,'CONFIG_PATH',volume),patch.object(config,'LEGACY_CONFIG_PATH',self.root/'missing.json'):
+        with patch.object(config,'CONFIG_PATH',volume):
             fresh=config.ConfigStore(environ={})
             fresh.create_account('new-operator',PASSWORD)
             fresh.commit(config.validate(CREDENTIALS))
