@@ -25,7 +25,7 @@ __SCROLL_CSS__
 .panel,.credential-editor,#settingsForm{min-width:0}
 .settings-card-grid{grid-template-columns:repeat(2,minmax(240px,1fr))}
 .settings-card-grid>div:not(.option-card){padding:var(--card-padding);border:1px solid var(--line);border-radius:10px;background:#0d1525;min-width:0}
-@media(max-width:600px){.settings-card-grid{grid-template-columns:none;grid-template-rows:repeat(2,auto);grid-auto-flow:column;grid-auto-columns:minmax(240px,1fr)}}
+@media(max-width:600px){:root{--card-padding:12px 16px;--control-gap:6px}.settings-card-grid{grid-template-columns:none;grid-template-rows:repeat(2,auto);grid-auto-flow:column;grid-auto-columns:minmax(288px,1fr)}.option-card{min-height:88px}.option-card small{line-height:1.5}}
 </style></head><body><main><header><img src="/bitcoin-dca-icon-v3.png" alt=""><h1>Bitcoin DCA Dashboard</h1></header>
 <section id="accountPanel" class="panel" hidden><h2>1. Create your account</h2><p>Create your login credentials to continue with configuration.</p><form id="accountForm"><div class="horizontal-scroll" tabindex="0" aria-label="Settings fields"><div class="grid settings-card-grid"><div><label for="newUsername">Username</label><input id="newUsername" autocomplete="username" minlength="3" maxlength="64" required></div><div><label for="newPassword">Password</label><input id="newPassword" type="password" autocomplete="new-password" minlength="12" maxlength="1024" required></div><div><label for="confirmPassword">Confirm password</label><input id="confirmPassword" type="password" autocomplete="new-password" minlength="12" required></div></div></div><p class="hint">Use at least 12 characters. No default account is created.</p><button>Create account and continue</button></form></section>
 <form id="settingsForm" hidden>
