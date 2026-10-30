@@ -273,9 +273,8 @@ body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
 .horizontal-scroll.is-scrolling::-webkit-scrollbar-thumb{background:#8bafff}
 .horizontal-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 .configuration-scroll .configuration-grid{grid-template-columns:repeat(4,minmax(220px,1fr))}
-.report-cards{min-width:956px}
-.report-scroll .period-summary-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
-.report-scroll .summary-secondary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.report-cards{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:14px;min-width:0}
+.report-scroll .period-summary-grid,.report-scroll .summary-secondary-grid{display:contents}
 </style>
 </head>
 <body>
