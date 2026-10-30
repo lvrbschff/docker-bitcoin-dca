@@ -1051,8 +1051,6 @@ class Handler(BaseHTTPRequestHandler):
         if not settings.get('withdrawals_enabled', False): hidden += ['#automatic-withdrawal-note']
         styles = '<style>' + ','.join(hidden) + '{display:none!important}</style>' if hidden else ''
         page = HTML.replace('</head>', styles + '</head>')
-        if self.runtime and self.runtime.exchange_check_pending:
-            page = page.replace('</header>', '</header><p class="export-feedback" role="alert">New transactions are paused until the automatic exchange check passes and open orders or withdrawals are closed.</p>', 1)
         if not settings.get('withdrawals_enabled', False):
             page = page.replace('Schedule and automatic withdrawal</strong>', 'Purchase schedule</strong>')
         if not settings.get('parqet_enabled', True):
