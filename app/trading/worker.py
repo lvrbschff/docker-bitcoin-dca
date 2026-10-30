@@ -1,16 +1,16 @@
 """Single account worker: queued web actions, periodic checks and bounded health age."""
 import logging
 import requests
-from exchange_errors import UncertainWithdrawalError
+from app.exchanges.exchange_errors import UncertainWithdrawalError
 import os
 import queue
 import threading
 import time
 import uuid
-from activity import write_json_atomic
+from app.data.activity import write_json_atomic
 
 LOG=logging.getLogger('bitcoin-dca.worker')
-from storage import HEALTH_PATH
+from app.data.storage import HEALTH_PATH
 HEARTBEAT_WRITE_INTERVAL_SECONDS=300
 
 

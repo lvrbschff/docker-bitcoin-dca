@@ -4,11 +4,11 @@ from pathlib import Path
 import tempfile
 from unittest import TestCase
 from unittest.mock import patch
-import bot
-import healthcheck
-import runtime
-import storage
-import worker
+from app.trading import bot
+from app.core import healthcheck
+from app.trading import runtime
+from app.data import storage
+from app.trading import worker
 
 
 class StorageTests(TestCase):
@@ -66,8 +66,8 @@ class StorageTests(TestCase):
 
 class AtomicFileTests(TestCase):
     def test_atomic_writers_are_shared_private_and_preserve_previous_data_on_error(self):
-        import activity
-        import configuration
+        from app.data import activity
+        from app.core import configuration
         with tempfile.TemporaryDirectory() as directory:
             path=Path(directory)/'nested'/'data.json'
             self.assertIs(activity.write_json_atomic,storage.write_json_atomic)

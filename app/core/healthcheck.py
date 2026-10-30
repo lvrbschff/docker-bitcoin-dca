@@ -2,7 +2,7 @@
 import json
 import sys
 import time
-from storage import HEALTH_PATH
+from app.data.storage import HEALTH_PATH
 
 def healthy(path=HEALTH_PATH):
     try:

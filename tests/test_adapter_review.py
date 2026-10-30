@@ -7,8 +7,11 @@ from decimal import Decimal as D
 from pathlib import Path
 from unittest.mock import Mock,patch
 import requests
-import bitvavo,kraken,web_ui,healthcheck
-from exchange_errors import DefinitiveRejection
+from app.exchanges import bitvavo
+from app.exchanges import kraken
+from app.webpage import web_ui
+from app.core import healthcheck
+from app.exchanges.exchange_errors import DefinitiveRejection
 
 
 class AdapterReviewTests(unittest.TestCase):

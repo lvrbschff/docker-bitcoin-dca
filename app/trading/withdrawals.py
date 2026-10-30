@@ -1,10 +1,10 @@
 """Reconcile submitted withdrawals conservatively against exchange history."""
 import time
 import logging
-from logging_utils import log_transition
+from app.core.logging_utils import log_transition
 from decimal import Decimal
 from datetime import datetime, timezone
-from activity import withdrawal_records, update_activity_record
+from app.data.activity import withdrawal_records, update_activity_record
 
 
 LOG = logging.getLogger("bitcoin-dca.withdrawals")

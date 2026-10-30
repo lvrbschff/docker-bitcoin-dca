@@ -8,8 +8,16 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal as D
 from pathlib import Path
 from unittest.mock import Mock, patch
-import activity, analytics, bot, reporting, web_ui, withdrawals, price_cache, worker, healthcheck
-from exchange_errors import DefinitiveRejection
+from app.data import activity
+from app.data import analytics
+from app.trading import bot
+from app.data import reporting
+from app.webpage import web_ui
+from app.trading import withdrawals
+from app.webpage import price_cache
+from app.trading import worker
+from app.core import healthcheck
+from app.exchanges.exchange_errors import DefinitiveRejection
 
 
 class ReviewTests(unittest.TestCase):

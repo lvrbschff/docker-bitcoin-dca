@@ -10,10 +10,10 @@ from zoneinfo import ZoneInfo
 import calendar
 import threading
 from functools import wraps
-from exchange_errors import DefinitiveRejection, UncertainWithdrawalError
-from logging_utils import log_transition, clear_transition
-from adaptive_dca import evaluate as evaluate_adaptive_dca
-from withdrawals import reconcile_withdrawals
+from app.exchanges.exchange_errors import DefinitiveRejection, UncertainWithdrawalError
+from app.core.logging_utils import log_transition, clear_transition
+from app.trading.adaptive_dca import evaluate as evaluate_adaptive_dca
+from app.trading.withdrawals import reconcile_withdrawals
 
 BOT_LOCK = threading.RLock()
 
@@ -25,8 +25,8 @@ def serialized(function):
     return locked
 
 import requests
-from activity import append_activity_records, read_dashboard_snapshot, write_dashboard_snapshot, ledger_balance, withdrawal_records, write_json_atomic, get_activity_record, latest_real_buy
-from storage import STATE_PATH, prepare_storage
+from app.data.activity import append_activity_records, read_dashboard_snapshot, write_dashboard_snapshot, ledger_balance, withdrawal_records, write_json_atomic, get_activity_record, latest_real_buy
+from app.data.storage import STATE_PATH, prepare_storage
 
 LOG = logging.getLogger("bitcoin-dca")
 
@@ -676,9 +676,9 @@ def main():
     os.umask(0o077)
     logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(), format="%(asctime)s %(levelname)s %(message)s")
     prepare_storage()
-    from runtime import Runtime
-    from worker import supervise
-    from web_ui import serve
+    from app.trading.runtime import Runtime
+    from app.trading.worker import supervise
+    from app.webpage.web_ui import serve
     runtime = Runtime()
     port = int(os.getenv("WEB_UI_PORT", "6890"))
     if not 1 <= port <= 65535:
@@ -687,6 +687,3 @@ def main():
     threading.Thread(target=supervise, args=(runtime.worker,), daemon=True).start()
     serve(runtime.settings, port, runtime.worker.submit, worker=runtime.worker, runtime=runtime)
 
-
-if __name__ == "__main__":
-    main()

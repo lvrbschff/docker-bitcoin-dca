@@ -7,10 +7,10 @@ from unittest.mock import Mock, patch
 from urllib.parse import parse_qs
 
 import requests
-import activity
-import bot
-import kraken
-from exchange_errors import DefinitiveRejection
+from app.data import activity
+from app.trading import bot
+from app.exchanges import kraken
+from app.exchanges.exchange_errors import DefinitiveRejection
 
 
 class KrakenTransportTests(unittest.TestCase):

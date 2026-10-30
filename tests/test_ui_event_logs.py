@@ -3,7 +3,7 @@ import io
 import json
 import unittest
 from unittest.mock import Mock, patch
-import web_ui
+from app.webpage import web_ui
 
 class UiEventLogTests(unittest.TestCase):
     def handler(self, event, authenticated=True, header="ui-event"):

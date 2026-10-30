@@ -1,7 +1,7 @@
 """First-run account creation and authenticated application settings."""
 import re
 import json
-from scroll_ui import SCROLL_CSS, SCROLL_SCRIPT
+from app.webpage.scroll_ui import SCROLL_CSS, SCROLL_SCRIPT
 
 PAGE = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Settings · Bitcoin DCA Dashboard</title><link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><style>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#273650;--text:#ecf1ff;--muted:#9daec9;--accent:#8bafff;--section-gap:20px;--field-gap:16px;--card-padding:16px;--control-gap:8px}

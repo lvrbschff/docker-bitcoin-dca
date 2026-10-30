@@ -3,7 +3,10 @@ from pathlib import Path
 from decimal import Decimal as D
 from unittest.mock import patch
 import requests
-import bot, activity, web_ui, reporting
+from app.trading import bot
+from app.data import activity
+from app.webpage import web_ui
+from app.data import reporting
 
 class API:
     supports_withdrawal_idempotency=False
@@ -43,7 +46,7 @@ class Tests(unittest.TestCase):
                 record=activity.read_activity_records()[0];self.assertTrue(record['manual']);self.assertEqual(D(record['row']['shares']),D('.0044'));self.assertEqual(D(record['networkFeeBtc']),D('.0001'))
                 self.assertEqual(record['withdrawalStatus'],'submitted')
                 self.assertEqual(reporting.parqet_aggregate_rows([{'row':{'type':'Buy','identifier':'BTC','shares':'.0045','amount':'359','fee':'.8975','currency':'EUR','datetime':'2026-10-20T00:00:00Z'}},record],exchange),[])
-                from withdrawals import reconcile_withdrawals
+                from app.trading.withdrawals import reconcile_withdrawals
                 reconcile_withdrawals(self.api,self.s,force=True)
                 record=activity.read_activity_records()[0]
                 self.assertEqual(record['withdrawalStatus'],'completed')

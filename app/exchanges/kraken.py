@@ -11,8 +11,8 @@ from decimal import Decimal
 from urllib.parse import urlencode
 
 import requests
-from exchange_errors import DefinitiveRejection
-from read_cache import ReadCache
+from app.exchanges.exchange_errors import DefinitiveRejection
+from app.exchanges.read_cache import ReadCache
 
 BASE_URL = "https://api.kraken.com/0"
 LOG = logging.getLogger("bitcoin-dca.kraken")

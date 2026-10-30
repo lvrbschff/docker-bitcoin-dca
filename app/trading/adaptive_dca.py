@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal, DecimalException
 import requests
-from activity import cache_get_many, cache_put_many
+from app.data.activity import cache_get_many, cache_put_many
 
 BASE_URL = 'https://api.kraken.com/0/public/'
 DAY_SECONDS = 86400

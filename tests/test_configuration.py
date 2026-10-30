@@ -10,12 +10,12 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
-import activity
-import bot
-import configuration as config
-import runtime
-import settings_ui
-import web_ui
+from app.data import activity
+from app.trading import bot
+from app.core import configuration as config
+from app.trading import runtime
+from app.webpage import settings_ui
+from app.webpage import web_ui
 
 PASSWORD = 'a-long-private-password'
 CREDENTIALS = {'kraken_api_key': 'fictional-key', 'kraken_api_secret': 'c2VjcmV0'}

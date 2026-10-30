@@ -4,6 +4,8 @@ Release history based on the published [GitHub Releases](https://github.com/oli7
 
 ## Unreleased
 
+- Organized application modules into webpage, trading, exchanges, data and core packages; updated imports, Docker startup and health checks.
+
 - Added optional Adaptive DCA with 200-day price-deviation tiers and adjustable strength (0–2).
 - Recalculated purchase intervals from the adjusted quantity, retaining exchange minimums, fees and budget guards.
 - Cached completed daily reference prices in the persistent volume and used ordinary DCA when reference data is unavailable.

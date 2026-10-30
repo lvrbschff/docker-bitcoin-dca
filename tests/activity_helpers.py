@@ -1,6 +1,6 @@
 """Record-list fixtures for report presentation tests; production aggregates in SQLite."""
 from decimal import Decimal
-from activity import bitcoin_activity_records, withdrawal_gross
+from app.data.activity import bitcoin_activity_records, withdrawal_gross
 
 
 def totals_from_records(records):

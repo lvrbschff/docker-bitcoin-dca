@@ -2,16 +2,16 @@
 from activity_helpers import totals_from_records
 from unittest import TestCase
 from unittest.mock import Mock, patch
-from configuration import DEFAULTS, runtime_settings
-import analytics
-import bot
+from app.core.configuration import DEFAULTS, runtime_settings
+from app.data import analytics
+from app.trading import bot
 import unittest
 from datetime import datetime, timezone
 from decimal import Decimal as D
-from web_ui import withdrawal_forecast
+from app.webpage.web_ui import withdrawal_forecast
 from decimal import Decimal
-from analytics import report
-import web_ui
+from app.data.analytics import report
+from app.webpage import web_ui
 
 
 class ActivityStatusTests(TestCase):
@@ -123,7 +123,7 @@ class ScheduleBalanceTests(unittest.TestCase):
 
 class AdaptiveIndicatorTests(TestCase):
     def test_tier_boundaries_and_strength_follow_the_agreed_formula(self):
-        from adaptive_dca import tier_factor
+        from app.trading.adaptive_dca import tier_factor
         for z,expected in [('-3','2'),('-2','2'),('-1.99','1.5'),('-1','1.5'),('-.99','1.25'),('-.5','1.25'),('-.49','1'),('.49','1'),('.5','.8'),('.99','.8'),('1','.67'),('1.99','.67'),('2','.5')]:
             with self.subTest(z=z):self.assertEqual(tier_factor(D(z)),D(expected))
         for tier in ('2','.5'):
@@ -131,7 +131,7 @@ class AdaptiveIndicatorTests(TestCase):
             self.assertEqual(D(tier)**D(2),D(4) if tier=='2' else D('.25'))
 
     def fixture(self):
-        import adaptive_dca
+        from app.trading import adaptive_dca
         now=datetime(2026,10,30,12,tzinfo=timezone.utc)
         day=int(now.timestamp())//86400*86400
         rows=[[day-i*86400,0,0,0,str(100+i)] for i in range(200,0,-1)]
@@ -166,7 +166,7 @@ class AdaptiveIndicatorTests(TestCase):
             self.assertEqual(result['factor'],'1');self.assertEqual(result['status'],'unavailable')
 
     def test_configuration_limits_and_older_saved_defaults(self):
-        from configuration import validate
+        from app.core.configuration import validate
         for value in ('-1','2.1','.15','NaN','Infinity','invalid'):
             with self.subTest(value=value),self.assertRaises(ValueError):validate({'adaptive_dca_strength':value},require_credentials=False)
         self.assertFalse(validate({},require_credentials=False)['adaptive_dca_enabled'])

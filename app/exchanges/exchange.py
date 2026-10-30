@@ -1,6 +1,6 @@
 """Exchange adapter factory."""
-from bitvavo import Bitvavo
-from kraken import Kraken
+from app.exchanges.bitvavo import Bitvavo
+from app.exchanges.kraken import Kraken
 
 
 def create_exchange(settings):

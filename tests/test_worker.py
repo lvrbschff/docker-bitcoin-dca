@@ -1,7 +1,7 @@
 """Offline regression coverage grouped by worker scheduling and health."""
 import unittest
 from unittest.mock import Mock, patch
-import worker
+from app.trading import worker
 import queue
 from unittest import TestCase
 

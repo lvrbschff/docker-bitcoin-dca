@@ -4,10 +4,10 @@ from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import Mock, patch
 import requests
-import worker
-import web_ui
-import withdrawals
-from logging_utils import log_transition, clear_transition
+from app.trading import worker
+from app.webpage import web_ui
+from app.trading import withdrawals
+from app.core.logging_utils import log_transition, clear_transition
 
 class LoggingLevelTests(TestCase):
     def test_waiting_state_is_info_once_and_debug_until_it_changes(self):

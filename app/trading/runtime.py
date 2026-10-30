@@ -3,10 +3,10 @@ import json
 import logging
 import time
 from pathlib import Path
-from configuration import ConfigStore, account_values, runtime_settings, validate
-from exchange import create_exchange
-from storage import STATE_PATH
-from security import AttemptLimiter, PasswordConfirmationError
+from app.core.configuration import ConfigStore, account_values, runtime_settings, validate
+from app.exchanges.exchange import create_exchange
+from app.data.storage import STATE_PATH
+from app.core.security import AttemptLimiter, PasswordConfirmationError
 
 LOG = logging.getLogger('bitcoin-dca.settings')
 IDENTITY_FIELDS = ('exchange', 'quote', 'kraken_api_key', 'kraken_api_secret', 'bitvavo_api_key', 'bitvavo_api_secret')
@@ -14,8 +14,8 @@ IDENTITY_FIELDS = ('exchange', 'quote', 'kraken_api_key', 'kraken_api_secret', '
 
 class Runtime:
     def __init__(self, store=None, state_path=None):
-        from bot import BOT_LOCK
-        from worker import Worker
+        from app.trading.bot import BOT_LOCK
+        from app.trading.worker import Worker
         self.lock = BOT_LOCK
         self.store = store or ConfigStore()
         self.state_path = Path(state_path) if state_path is not None else STATE_PATH
@@ -35,9 +35,9 @@ class Runtime:
 
     def _check_exchange_activity(self):
         """Read-only startup gate; never submit or retry financial requests here."""
-        from activity import withdrawal_records, write_json_atomic
-        from withdrawals import reconcile_withdrawals
-        from logging_utils import log_transition
+        from app.data.activity import withdrawal_records, write_json_atomic
+        from app.trading.withdrawals import reconcile_withdrawals
+        from app.core.logging_utils import log_transition
         orders = self.api.open_orders()
         if not isinstance(orders, list):
             raise ValueError('Open exchange orders could not be verified.')
@@ -62,12 +62,12 @@ class Runtime:
         return True
 
     def unresolved(self):
-        from activity import withdrawal_records
+        from app.data.activity import withdrawal_records
         state = json.loads(self.state_path.read_text()) if self.state_path.exists() else {}
         return bool(state.get('pending_order') or state.get('pending_withdrawal') or withdrawal_records(unresolved=True))
 
     def _synchronize_state(self):
-        from activity import write_json_atomic
+        from app.data.activity import write_json_atomic
         identity = [self.settings['exchange'], self.settings['quote']]
         state = json.loads(self.state_path.read_text()) if self.state_path.exists() else {}
         if (state.get('configuration_account', identity) != identity
@@ -83,7 +83,7 @@ class Runtime:
             write_json_atomic(self.state_path, state)
 
     def cycle(self):
-        from bot import run_once, update_dashboard_schedule, latest_recorded_buy_time
+        from app.trading.bot import run_once, update_dashboard_schedule, latest_recorded_buy_time
         with self.lock:
             if not self.api:
                 return self.worker.interval
@@ -106,7 +106,7 @@ class Runtime:
             return run_once(self.api, self.settings, self.worker.interval)
 
     def action(self, action, session, token=None):
-        from bot import manual_withdrawal_service
+        from app.trading.bot import manual_withdrawal_service
         with self.lock:
             if not self.api or not self.settings['manual_withdrawal_enabled']:
                 raise ValueError('Manual withdrawals are disabled in Settings.')
@@ -177,7 +177,7 @@ class Runtime:
             self.service = None  # Invalidate all previews after any configuration change.
             self.worker.interval = values['check_interval_seconds']
             if identity_changed:
-                from activity import write_dashboard_snapshot
+                from app.data.activity import write_dashboard_snapshot
                 write_dashboard_snapshot({'exchange': values['exchange'], 'quote': values['quote'], 'nextPurchaseAt': None, 'nextPurchaseStatus': 'Waiting for account check'})
             if not previous['complete'] or identity_changed or financial_mode_changed:
                 self.exchange_check_pending = True

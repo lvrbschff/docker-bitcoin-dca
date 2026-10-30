@@ -7,9 +7,9 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
-import activity
-import reporting
-import web_ui
+from app.data import activity
+from app.data import reporting
+from app.webpage import web_ui
 
 
 def record(name, day, kind='Buy', status='completed', amount='80', simulated=False):

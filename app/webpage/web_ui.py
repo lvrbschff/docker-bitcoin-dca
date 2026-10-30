@@ -5,7 +5,7 @@ import logging
 import re
 import requests
 import ssl
-from tls import TLSHandshakeError
+from app.webpage.tls import TLSHandshakeError
 from datetime import datetime, timezone, timedelta
 import calendar
 from zoneinfo import ZoneInfo
@@ -18,19 +18,19 @@ from secrets import token_urlsafe
 from threading import RLock
 import time
 import traceback
-from security import AttemptLimiter, PasswordConfirmationError
+from app.core.security import AttemptLimiter, PasswordConfirmationError
 from concurrent.futures import ThreadPoolExecutor
-import price_cache
-from exchange_errors import UncertainWithdrawalError
-from favicon_assets import FAVICON_ICO, FAVICON_PNG, APPLE_TOUCH_ICON_PNG, FAVICON_MASK_SVG
-from analytics import report as build_report
-from activity import parqet_interval_records, withdrawal_records, read_report
+from app.webpage import price_cache
+from app.exchanges.exchange_errors import UncertainWithdrawalError
+from app.webpage.favicon_assets import FAVICON_ICO, FAVICON_PNG, APPLE_TOUCH_ICON_PNG, FAVICON_MASK_SVG
+from app.data.analytics import report as build_report
+from app.data.activity import parqet_interval_records, withdrawal_records, read_report
 
-from activity import read_dashboard_snapshot
-from reporting import parqet_aggregate_rows, parqet_csv
+from app.data.activity import read_dashboard_snapshot
+from app.data.reporting import parqet_aggregate_rows, parqet_csv
 
 
-from scroll_ui import SCROLL_CSS, SCROLL_SCRIPT
+from app.webpage.scroll_ui import SCROLL_CSS, SCROLL_SCRIPT
 
 def withdrawal_forecast(settings, snapshot, monthly_deposit, now):
     """Project monthly deposits and purchases at a constant BTC price and order cost."""
@@ -1101,7 +1101,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.runtime:
-            from configuration import runtime_settings
+            from app.core.configuration import runtime_settings
             self.settings = runtime_settings(self.runtime.store.snapshot()['settings'])
         parsed = urlparse(self.path)
         if parsed.path in ('/api/setup/account', '/api/settings', '/api/settings/test', '/api/settings/forecast'):
@@ -1179,7 +1179,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.runtime:
-            from configuration import runtime_settings
+            from app.core.configuration import runtime_settings
             self.settings = runtime_settings(self.runtime.store.snapshot()['settings'])
         parsed = urlparse(self.path)
         if parsed.path == '/healthz':
@@ -1201,7 +1201,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, FAVICON_SVG, "image/svg+xml; charset=utf-8", cache_control="public, max-age=86400")
             return
         if self.runtime and parsed.path in ('/', '/configure', '/settings', '/api/settings'):
-            from settings_ui import settings_page
+            from app.webpage.settings_ui import settings_page
             data = self.runtime.store.snapshot()
             if not data['account']:
                 if parsed.path == '/api/settings':
@@ -1398,7 +1398,7 @@ def _row_timestamp_ms(row):
 
 def serve(settings, port, withdrawal_service=None, worker=None, runtime=None):
     import os
-    from tls import certificate_hosts, https_context, renew_certificates, HTTPSWebServer
+    from app.webpage.tls import certificate_hosts, https_context, renew_certificates, HTTPSWebServer
     from threading import Thread, Event
     if runtime is not None:
         runtime.session_validator = session_is_valid

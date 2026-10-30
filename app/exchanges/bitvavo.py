@@ -9,8 +9,8 @@ from urllib.parse import urlencode
 
 import requests
 from contextlib import contextmanager
-from exchange_errors import DefinitiveRejection
-from read_cache import ReadCache
+from app.exchanges.exchange_errors import DefinitiveRejection
+from app.exchanges.read_cache import ReadCache
 
 BASE_URL = "https://api.bitvavo.com/v2"
 

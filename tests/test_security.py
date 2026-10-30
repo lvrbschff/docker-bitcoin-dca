@@ -6,12 +6,12 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import Mock, patch
-import activity
-import configuration
-import runtime
-import security
-import tls
-import web_ui
+from app.data import activity
+from app.core import configuration
+from app.trading import runtime
+from app.core import security
+from app.webpage import tls
+from app.webpage import web_ui
 
 PASSWORD = 'a-long-private-password'
 

@@ -9,13 +9,13 @@ from decimal import Decimal
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import activity
-import analytics
-import bitvavo
-import bot
-import kraken
-import reporting
-import web_ui
+from app.data import activity
+from app.data import analytics
+from app.exchanges import bitvavo
+from app.trading import bot
+from app.exchanges import kraken
+from app.data import reporting
+from app.webpage import web_ui
 
 
 class BitcoinOnlyTests(unittest.TestCase):
@@ -44,10 +44,11 @@ class BitcoinOnlyTests(unittest.TestCase):
 
     def test_web_ui_always_starts_using_the_saved_runtime_settings(self):
         with patch.dict(os.environ,{'WEB_UI_ENABLED':'false','EXCHANGE':'BITVAVO','LIVE_TRADING':'false'},clear=True), \
-                patch('runtime.Runtime') as runtime_class, patch('web_ui.serve') as serve, \
+                patch('app.trading.runtime.Runtime') as runtime_class, patch('app.webpage.web_ui.serve') as serve, \
                 patch.object(bot,'prepare_storage'),patch.object(bot.threading,'Thread'):
             app=runtime_class.return_value;app.settings=self.settings
-            bot.main()
+            import runpy
+            runpy.run_module("app", run_name="__main__")
         runtime_class.assert_called_once_with()
         app.worker.start.assert_called_once_with()
         serve.assert_called_once_with(self.settings,6890,app.worker.submit,worker=app.worker,runtime=app)

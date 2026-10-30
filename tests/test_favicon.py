@@ -5,8 +5,8 @@ import unittest
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from unittest.mock import Mock
-import favicon_assets
-import web_ui
+from app.webpage import favicon_assets
+from app.webpage import web_ui
 
 
 class FaviconTests(unittest.TestCase):

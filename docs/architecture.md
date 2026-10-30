@@ -13,15 +13,22 @@ flowchart LR
     Worker <--> Data["bitcoin-dca-webui-data → /webui-data"]
     Web <--> Data
     Web --> Sources["Kraken prices / Frankfurter FX"]
+    Worker -->|Adaptive reference prices| Sources
 ~~~
 
-- `app/bot.py`, `app/worker.py`, `app/withdrawals.py`: scheduling and account actions.
-- `app/exchange.py`, `app/kraken.py`, `app/bitvavo.py`: exchange access.
-- `app/web_ui.py`, `app/analytics.py`, `app/reporting.py`: dashboard and exports.
-- `app/configuration.py`, `app/runtime.py`, `app/settings_ui.py`: private persistent configuration, runtime application and setup/settings pages.
-- `app/activity.py`: SQLite activity, reporting data and persistence.
-- `app/storage.py`: volume paths and atomic initialization of new storage.
-The application source lives in `app/`; tests live in `tests/`. Docker copies `app/` into its `/app` working directory, so container startup and healthcheck commands are unchanged.
+The application is a Python package organized by responsibility:
+
+~~~text
+app/
+├── __main__.py   # python -m app
+├── webpage/      # HTTPS dashboard, settings, icons and browser assets
+├── trading/      # Bot, worker, runtime, withdrawals and adaptive DCA
+├── exchanges/    # Kraken/Bitvavo adapters and transport helpers
+├── data/         # Volume storage, activity ledger, analytics and CSV exports
+└── core/         # Configuration, access security, logging and health checks
+~~~
+
+Tests live in `tests/`. Docker copies the package to `/app/app` and starts it with `python -u -m app`. Its healthcheck runs `python -m app.core.healthcheck`; package imports use one shared set of worker locks and runtime modules.
 
 - `Dockerfile` builds the image; `docker-compose.yml` configures runtime, port and storage.
 
