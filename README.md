@@ -36,7 +36,7 @@ For withdrawals, first save and verify the destination on the exchange, then con
 | Bitvavo | `WITHDRAW_ADDRESS` and `WITHDRAW_NETWORK` |
 | Kraken | `KRAKEN_WITHDRAW_KEY`: the exact label of the saved Bitcoin withdrawal address, not the address itself |
 
-Set `WEB_UI_USERNAME` and **change `WEB_UI_PASSWORD`** in `.env` (defaults: `admin` / `admin`). `WEB_UI_PORT` defaults to `6890`. The port is published on all host interfaces; HTTP is unencrypted, so use an HTTPS reverse proxy on untrusted networks.
+Set `WEB_UI_USERNAME` and change `WEB_UI_PASSWORD` in `.env` (defaults: `admin` / `admin`). `WEB_UI_PORT` defaults to `6890`. The port is published on all host interfaces; HTTP is unencrypted, so use an HTTPS reverse proxy on untrusted networks.
 
 ### 2. Configure the bot
 
