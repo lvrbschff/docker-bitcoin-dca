@@ -1,5 +1,4 @@
 name: Publish container
-run-name: Publish container image
 
 on:
   push:
