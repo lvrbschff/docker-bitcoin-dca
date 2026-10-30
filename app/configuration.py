@@ -101,6 +101,10 @@ def validate(values, previous=None, require_credentials=True):
     except (ZoneInfoNotFoundError, ValueError):
         raise ValueError('Enter a valid timezone, for example Europe/Berlin.') from None
     prefix = result['exchange'].lower()
+    if require_credentials and previous and result['exchange'] != previous['exchange']:
+        keys = [f'{prefix}_api_key', f'{prefix}_api_secret']
+        if any(not isinstance(values.get(key), str) or not values[key].strip() for key in keys):
+            raise ValueError('Changing exchanges requires entering the API key and API secret for the selected exchange again.')
     if require_credentials and not all(result[f'{prefix}_api_{part}'] for part in ('key', 'secret')):
         raise ValueError('API key and secret are required for the selected exchange.')
     if prefix == 'kraken' and result['kraken_api_secret']:

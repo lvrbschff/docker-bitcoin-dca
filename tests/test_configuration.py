@@ -124,6 +124,24 @@ class ConfigurationTests(unittest.TestCase):
         self.app.worker.queue.put('queued-action')
         with self.assertRaises(ValueError): self.app.save({'settings': {'live': True}})
 
+    def test_exchange_switch_requires_explicit_keys_even_if_old_keys_are_saved(self):
+        self.ready(bitvavo_api_key='old-bitvavo-key',bitvavo_api_secret='old-bitvavo-secret')
+        previous=self.store.snapshot();self.api_factory.reset_mock()
+        for update in [{'exchange':'BITVAVO'},
+                       {'exchange':'BITVAVO','bitvavo_api_key':'new-key'},
+                       {'exchange':'BITVAVO','bitvavo_api_secret':'new-secret'},
+                       {'exchange':'BITVAVO','bitvavo_api_key':' ','bitvavo_api_secret':''}]:
+            with self.subTest(update=update):
+                with self.assertRaisesRegex(ValueError,'entering the API key and API secret'):
+                    self.app.save({'settings':update})
+                with self.assertRaisesRegex(ValueError,'entering the API key and API secret'):
+                    self.app.test_connection(update)
+                self.assertEqual(self.store.snapshot(),previous)
+        self.api_factory.assert_not_called()
+        self.app.save({'settings':{'exchange':'BITVAVO','bitvavo_api_key':'new-key','bitvavo_api_secret':'new-secret'}})
+        self.assertEqual(self.store.snapshot()['settings']['bitvavo_api_key'],'new-key')
+        self.assertEqual(self.store.snapshot()['settings']['bitvavo_api_secret'],'new-secret')
+
     def test_feature_toggles_do_not_recalculate_purchase_schedule(self):
         self.ready()
         self.app.state_path.write_text(json.dumps({'pending_withdrawal': {'id': 'x'}}))
