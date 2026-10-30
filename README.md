@@ -85,7 +85,7 @@ Live orders are submitted once and verified before another purchase. Open orders
 
 Automatic withdrawals require `WITHDRAWALS_ENABLED=true`, `LIVE_TRADING=true`, withdrawal permissions and a configured destination. Account checks compare **all available exchange BTC × current exchange price** against `WITHDRAW_THRESHOLD_QUOTE`. This includes BTC acquired outside the bot. When reached, the bot withdraws the available balance, less withdrawal fees.
 
-For a manual withdrawal, click **Withdraw BTC manually** in **Current BTC balance**, review the destination and amount, then confirm. Live trading and destination permissions are required; the automatic toggle and threshold do not apply.
+For a manual withdrawal, click **Withdraw BTC manually** in Current BTC balance, review the destination and amount, then confirm. Live trading and destination permissions are required; the automatic toggle and threshold do not apply.
 
 Submitted withdrawals block further withdrawals until resolved. Uncertain Kraken withdrawals are not automatically resent; Bitvavo may retry the same idempotent request. Verify exchange status before intervening.
 
