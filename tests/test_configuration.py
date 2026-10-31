@@ -41,15 +41,19 @@ class ConfigurationTests(unittest.TestCase):
         self.app.save({'current_password':PASSWORD,'settings': {**CREDENTIALS, **settings}})
         self.app.worker.reconfigure.clear()
 
-    def test_adaptive_settings_persist_and_refresh_the_schedule(self):
+    def test_retired_adaptive_settings_do_not_block_existing_volume_startup(self):
         self.ready()
-        self.app.save({'settings':{'adaptive_dca_enabled':True,'adaptive_dca_strength':'1.5'}})
-        self.assertTrue(self.app.worker.reconfigure.is_set())
-        saved=config.ConfigStore(self.store.path)
-        self.assertTrue(saved.snapshot()['settings']['adaptive_dca_enabled'])
-        restarted=runtime.Runtime(saved,self.app.state_path)
-        self.assertEqual(restarted.settings['adaptive_dca_strength'],'1.5')
-        self.assertTrue(restarted.settings['adaptive_dca_enabled'])
+        saved=json.loads(self.store.path.read_text())
+        saved['settings'].update(adaptive_dca_enabled=True,adaptive_dca_strength='1.5')
+        self.store.path.write_text(json.dumps(saved))
+        restored=config.ConfigStore(self.store.path)
+        self.assertTrue(restored.snapshot()['complete'])
+        self.assertTrue(restored.authenticate('operator',PASSWORD))
+        self.assertNotIn('adaptive_dca_enabled',restored.snapshot()['settings'])
+        self.assertNotIn('adaptive_dca_strength',restored.public()['settings'])
+        restarted=runtime.Runtime(restored,self.app.state_path)
+        self.assertEqual(restarted.settings['buy_amount'],self.app.settings['buy_amount'])
+        with self.assertRaises(ValueError):config.validate({'adaptive_dca_enabled':True},require_credentials=False)
 
     def test_cosmetic_save_reuses_adapter_and_validation_failure_closes_replacement(self):
         self.ready()

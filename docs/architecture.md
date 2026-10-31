@@ -13,7 +13,6 @@ flowchart LR
     Worker <--> Data["bitcoin-dca-webui-data → /webui-data"]
     Web <--> Data
     Web --> Sources["Kraken prices / Frankfurter FX"]
-    Worker -->|Adaptive reference prices| Sources
 ~~~
 
 The application is a Python package organized by responsibility:
@@ -22,7 +21,7 @@ The application is a Python package organized by responsibility:
 app/
 ├── __main__.py   # python -m app
 ├── webpage/      # HTTPS dashboard, settings, icons and browser assets
-├── trading/      # Bot, worker, runtime, withdrawals and adaptive DCA
+├── trading/      # Bot, worker, runtime and withdrawals
 ├── exchanges/    # Kraken/Bitvavo adapters and transport helpers
 ├── data/         # Volume storage, activity ledger, analytics and CSV exports
 └── core/         # Configuration, access security, logging and health checks
@@ -119,19 +118,3 @@ Persistent JSON files share a durable atomic writer with private temporary files
 Tests are grouped by behavior rather than individual historical bug reports. Financial uncertainty, duplicate prevention, credential access, session expiry, storage failure and schedule boundaries retain regression coverage. Exchange responses are mocked; these tests do not place real orders or prove live exchange permissions. Local TLS handshakes use in-memory sockets.
 
 Kraken funding calls currently use its supported legacy endpoints. Track the [official funding API notice](https://docs.kraken.com/api-reference/funding/get-status-of-recent-withdrawals) before a future adapter migration; changing financial endpoints requires separate compatibility validation.
-
-## Adaptive DCA
-
-Disabled by default. In Bot Configuration, the final two controls enable weighting and set strength (0–2 in 0.1 steps; default 1). The base quantity is the configured BTC amount raised to exchange base/notional minimums. The signed score is `(current reference price − mean) / population standard deviation` of 200 consecutive completed UTC daily closes. Kraken public OHLC data is cached per purchase currency and UTC day in the volume-backed SQLite cache. The unfinished daily candle is excluded. Kraken trading reuses its fresh ticker; Bitvavo trading uses a public Kraken ticker so the score has one consistent reference source. EUR/USD display selection does not affect the indicator.
-
-| Score z | Tier factor |
-|---|---:|
-| z ≤ −2 | 2 |
-| −2 < z ≤ −1 | 1.5 |
-| −1 < z ≤ −0.5 | 1.25 |
-| −0.5 < z < 0.5 | 1 |
-| 0.5 ≤ z < 1 | 0.8 |
-| 1 ≤ z < 2 | 0.67 |
-| z ≥ 2 | 0.5 |
-
-Effective requested factor = tier factor raised to strength. Zero strength is neutral; strength 2 allows factors from 0.25 to 4. Exchange minimums and upward quantity rounding apply afterward. The actual adjusted cost, including fees and buffer, determines affordable purchases and the interval anchored to the last executed purchase. Insufficient funds wait for a usable budget; the strategy never borrows or bypasses exchange rules. Missing, stale, incomplete or invalid prices and zero deviation fall back to the base amount. Changes to adaptive settings request a schedule refresh. Withdrawal forecasts use the adjusted amount and assume the current factor remains constant. The dashboard shows settings, mean, one standard deviation and the applied purchase factor; the activity ledger and exports retain actual fills.

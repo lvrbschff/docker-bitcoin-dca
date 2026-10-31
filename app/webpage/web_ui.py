@@ -267,7 +267,7 @@ body.compact-brand-visible .compact-brand-bar{pointer-events:auto}
 
 /* Scroll only when content cannot fit; preserve a usable card width. */
 __SCROLL_CSS__
-.configuration-scroll .configuration-grid{grid-template-columns:repeat(5,minmax(220px,1fr))}
+.configuration-scroll .configuration-grid{grid-template-columns:repeat(4,minmax(220px,1fr))}
 .report-cards{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:var(--tile-gap);min-width:0}
 .report-scroll .period-summary-grid,.report-scroll .summary-secondary-grid{display:contents}
 
@@ -307,7 +307,6 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 <div class="card"><label>Exchange</label><div class="value" id="settingExchange">—</div></div>
 <div class="card"><label>Quote currency</label><div class="value" id="settingQuoteCurrency">—</div></div>
 <div class="card"><label>Trading mode</label><div class="value" id="tradingMode">—</div></div>
-<div class="card"><label>Adaptive DCA</label><div class="value" id="adaptiveDca">—</div><div class="small" id="adaptiveDcaNote">200-day average: — · 1σ: —</div></div>
 <div class="card"><label>Purchase amount</label><div class="value" id="buyAmount">—</div><div class="small" id="buyAmountNote"></div></div>
 <div class="card"><label>Deposit day (day of month)</label><div class="value" id="depositDay">—</div></div>
 <div class="card"><label>Automatic withdrawals</label><div class="value" id="withdrawEnabled">—</div></div>
@@ -366,7 +365,7 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 <footer class="dashboard-footnotes" aria-labelledby="notesHeading">
 <h2 id="notesHeading">Notes</h2>
 <ol>
-<li id="schedule-note"><strong>Schedule and automatic withdrawal</strong><p>Purchase interval = time from the last purchase to the next deposit day ÷ purchases affordable with the current fiat balance, including estimated fees and a planning buffer. Without a previous purchase, planning starts from now. Next purchase = last purchase + interval; elapsed time reduces the wait. Adaptive DCA multiplies the base BTC amount by the deviation tier raised to the configured strength and recalculates the interval from that adjusted amount. It uses 200 completed UTC daily closes and their price standard deviation. Tiers below −2/−1/−0.5 deviations: 2×/1.5×/1.25×; above +0.5/+1/+2: 0.8×/0.67×/0.5×; otherwise 1×. Missing reference data uses the base amount; exchange minimums can limit reductions. Open orders block further purchases. Balances reflect the last account check; the display BTC price comes from Kraken’s public converter pages.</p><p id="automatic-withdrawal-note"><span id="automaticWithdrawalDestination"></span> The automatic withdrawal threshold uses all available exchange BTC valued in the purchase currency, including BTC acquired outside this bot. Remaining purchases = (threshold ÷ current BTC price − available BTC) ÷ BTC per purchase, rounded up. The forecast projects these purchases using the current budget, price and order costs. Expected monthly deposit adds assumed funds on each deposit day; unused funds carry over and intervals are recalculated for actual calendar months. This affects only the forecast. Adaptive DCA forecasts assume the current purchase factor stays unchanged. The estimated date is the final required purchase; withdrawal follows an eligible bot check. If the threshold is already reached, the estimate is now. Countdown = estimated date − current time, with a minimum of zero. Estimates require automatic withdrawals and live trading; future prices, fees, deposits and execution may change them.</p><div id="withdrawal-note" class="note-subsection"><h3 class="note-subheading">Manual withdrawal</h3><p id="withdrawalDestination">Loading withdrawal configuration…</p><p id="withdrawMessage" role="status" aria-live="polite"></p><p>After confirmation, sends all available BTC minus the exchange withdrawal fee. Requires live trading activated; the automatic withdrawal setting and threshold do not apply. Withdrawals appear immediately in Period activity.<span id="manual-export-note"> Only confirmed ones qualify for export.</span></p></div></li>
+<li id="schedule-note"><strong>Schedule and automatic withdrawal</strong><p>Purchase interval = time from the last purchase to the next deposit day ÷ purchases affordable with the current fiat balance, including estimated fees and a planning buffer. Without a previous purchase, planning starts from now. Next purchase = last purchase + interval; elapsed time reduces the wait. Open orders block further purchases. Balances reflect the last account check; the display BTC price comes from Kraken’s public converter pages.</p><p id="automatic-withdrawal-note"><span id="automaticWithdrawalDestination"></span> The automatic withdrawal threshold uses all available exchange BTC valued in the purchase currency, including BTC acquired outside this bot. Remaining purchases = (threshold ÷ current BTC price − available BTC) ÷ BTC per purchase, rounded up. The forecast projects these purchases using the current budget, price and order costs. Expected monthly deposit adds assumed funds on each deposit day; unused funds carry over and intervals are recalculated for actual calendar months. This affects only the forecast. The estimated date is the final required purchase; withdrawal follows an eligible bot check. If the threshold is already reached, the estimate is now. Countdown = estimated date − current time, with a minimum of zero. Estimates require automatic withdrawals and live trading; future prices, fees, deposits and execution may change them.</p><div id="withdrawal-note" class="note-subsection"><h3 class="note-subheading">Manual withdrawal</h3><p id="withdrawalDestination">Loading withdrawal configuration…</p><p id="withdrawMessage" role="status" aria-live="polite"></p><p>After confirmation, sends all available BTC minus the exchange withdrawal fee. Requires live trading activated; the automatic withdrawal setting and threshold do not apply. Withdrawals appear immediately in Period activity.<span id="manual-export-note"> Only confirmed ones qualify for export.</span></p></div></li>
 <li id="report-note"><strong>Period analysis and Parqet export</strong><p>Choose a custom range or an interval between withdrawals. Historical amounts are converted from their original currencies to the display currency.</p><p id="parqet-note">The Parqet-readable CSV exports only the complete cycle after the previous confirmed withdrawal through the last confirmed withdrawal in the selected range. It includes real purchase costs and trading fees, and the ending withdrawal’s net BTC after network fees. Later purchases, simulations and unconfirmed or failed withdrawals are excluded. A confirmed withdrawal and at least one real purchase in its cycle are required.</p></li>
 </ol>
 </footer>
@@ -457,21 +456,6 @@ function renderPurchaseCountdown(){
  renderCountdown("withdrawalCountdown",estimatedWithdrawalTimestamp);
  if(estimatedWithdrawalTimestamp===null)$("withdrawalCountdown").textContent="Not estimated";
 }
-function renderPurchaseAmount(configured,effective,adaptive,enabled,strength){
- const minimum=Number(configured)===0,actual=Number(effective),known=Number.isFinite(actual)&&actual>0;
- $("adaptiveDca").textContent=enabled?"Enabled · strength "+Number(strength??1).toFixed(1):"Disabled";
- const quote=adaptive?.quote||$("settingQuoteCurrency").textContent||"EUR";
- $("adaptiveDcaNote").textContent="200-day average: "+(adaptive?.mean?money(adaptive.mean,quote)+"/BTC":"—")+" · 1σ: "+(adaptive?.standardDeviation?money(adaptive.standardDeviation,quote):"—");
- if(enabled){
-  $("buyAmount").textContent=known?btc(actual):"—";
-  if(!adaptive){$("buyAmountNote").textContent="Adaptive DCA · waiting for account check";return}
-  const base=Number(adaptive.baseAmount),factor=Number(adaptive.factor);
-  $("buyAmountNote").textContent="Base "+(base>0?btc(base):minimum?"exchange minimum":btc(configured))+" · factor "+factor.toFixed(2)+"× · "+(adaptive.status==="active"?"z "+Number(adaptive.zScore).toFixed(2):adaptive.status==="unavailable"?"reference data unavailable; base amount":"neutral")+(Number(adaptive.effectiveFactor)>factor+0.000001?" · exchange minimum/precision applies":"");
- }else{
-  $("buyAmount").textContent=minimum?(known?btc(actual):"—"):btc(configured);
-  $("buyAmountNote").textContent=minimum?"(exchange minimum)"+(known?"":" · waiting for account check"):"";
- }
-}
 async function refreshPurchaseSchedule(){
  const request=++scheduleRequest;sectionFeedback("scheduleFeedback","Updating schedule…");
  try{
@@ -482,7 +466,10 @@ async function refreshPurchaseSchedule(){
   $("monthlyDepositCurrency").textContent=schedule.quote;
   if(!monthlyDepositDirty&&!monthlyDepositSaving)$("monthlyDeposit").value=schedule.expectedMonthlyDeposit??"";
   if(schedule.configuredBuyAmount!==undefined){
-   renderPurchaseAmount(schedule.configuredBuyAmount,schedule.effectiveBuyAmount,schedule.adaptiveDca,schedule.adaptiveDcaEnabled,schedule.adaptiveDcaStrength);
+   const minimumMode=Number(schedule.configuredBuyAmount)===0;
+   const effective=Number(schedule.effectiveBuyAmount);
+   $("buyAmount").textContent=minimumMode?(effective>0?btc(effective):"—"):btc(schedule.configuredBuyAmount);
+   $("buyAmountNote").textContent=minimumMode?"(exchange minimum)"+(effective>0?"":" · waiting for account check"):"";
   }
   $("quoteBalanceLabel").textContent="Available "+schedule.quote+" balance on exchange";
   const balanceKnown=schedule.quoteBalance!==null&&schedule.quoteBalance!==undefined&&Number.isFinite(Number(schedule.quoteBalance));
@@ -657,7 +644,10 @@ async function loadAnalytics(){
  $("settingExchange").textContent=ex;$("settingQuoteCurrency").textContent=quote;$("tradingMode").textContent=d.configuration.liveTrading?"Live":"Dry run";
  const amountSnapshot=d.snapshot||{};
  const effectiveMinimum=amountSnapshot.exchange===d.exchange&&amountSnapshot.quote===quote?Number((amountSnapshot.withdrawalForecastPlan||{}).orderAmount):NaN;
- renderPurchaseAmount(d.configuration.buyAmount,effectiveMinimum,amountSnapshot.exchange===d.exchange&&amountSnapshot.quote===quote?(amountSnapshot.withdrawalForecastPlan||{}).adaptiveDca:null,d.configuration.adaptiveDcaEnabled,d.configuration.adaptiveDcaStrength);
+ $("buyAmount").textContent=Number(d.configuration.buyAmount)===0
+  ?(Number.isFinite(effectiveMinimum)&&effectiveMinimum>0?btc(effectiveMinimum):"—")
+  :btc(d.configuration.buyAmount);
+ $("buyAmountNote").textContent=Number(d.configuration.buyAmount)===0?"(exchange minimum)"+(Number.isFinite(effectiveMinimum)&&effectiveMinimum>0?"":" · waiting for account check"):"";
  $("depositDay").textContent=String(d.configuration.depositDay);$("withdrawEnabled").textContent=d.configuration.withdrawalsEnabled?"Enabled":"Disabled";
  $("threshold").textContent=money(Number(d.configuration.withdrawalThreshold)*fxRate,displayCurrency);$("thresholdNote").textContent="Threshold in "+quote+", shown in "+displayCurrency;
  $("buyCount").textContent=d.summary.buyCount;$("buyBtc").textContent=btc(d.summary.boughtBtc);
@@ -1303,9 +1293,6 @@ class Handler(BaseHTTPRequestHandler):
                     "exchange": self.settings["exchange"],
                     "quoteBalance": snapshot.get("quoteBalance") if balance_matches else None,
                     "configuredBuyAmount": str(self.settings.get("buy_amount", 0)),
-                    "adaptiveDcaEnabled": self.settings.get("adaptive_dca_enabled", False),
-                    "adaptiveDcaStrength": self.settings.get("adaptive_dca_strength", "1"),
-                    "adaptiveDca": (snapshot.get("withdrawalForecastPlan") or {}).get("adaptiveDca") if balance_matches else None,
                     "effectiveBuyAmount": (snapshot.get("withdrawalForecastPlan") or {}).get("orderAmount") if balance_matches else None,
                     "btcBalance": snapshot.get("btcBalance") if balance_matches else None,
                     "estimatedWithdrawalAt": forecast_at,

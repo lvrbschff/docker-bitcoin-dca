@@ -21,7 +21,6 @@ DEFAULTS = dict(exchange='KRAKEN', quote='EUR', buy_amount='0', deposit_day=1,
                 startup_delay_seconds=60, order_status_check_seconds=30, check_interval_seconds=300,
                 timezone='Europe/Berlin', live=False, withdrawals_enabled=False,
                 withdraw_threshold='1000', withdraw_address='', withdraw_network='BTC', kraken_withdraw_key='',
-                adaptive_dca_enabled=False, adaptive_dca_strength='1',
                 manual_withdrawal_enabled=True, parqet_enabled=True, display_currency='EUR', expected_monthly_deposit='',
                 **{key: '' for key in SECRET_FIELDS})
 
@@ -90,13 +89,6 @@ def validate(values, previous=None, require_credentials=True):
             if key == 'expected_monthly_deposit':
                 raise ValueError('Expected monthly deposit must be a finite non-negative amount.') from None
             raise ValueError(f'{key} must be a finite positive amount (purchase amount may be zero).') from None
-    try:
-        strength = Decimal(result['adaptive_dca_strength'])
-        if not strength.is_finite() or not 0 <= strength <= 2 or strength % Decimal('.1'):
-            raise InvalidOperation
-        result['adaptive_dca_strength'] = str(strength)
-    except InvalidOperation:
-        raise ValueError('Adaptive DCA strength must be 0–2 in steps of 0.1.') from None
     if not 1 <= result['deposit_day'] <= 31 or not 0 <= result['startup_delay_seconds'] <= 86400:
         raise ValueError('Deposit day must be 1–31; startup delay must be 0–86400 seconds.')
     if not 60 <= result['check_interval_seconds'] <= 86400 or not 1 <= result['order_status_check_seconds'] <= 3600:
@@ -139,7 +131,10 @@ class ConfigStore:
     def _read(path):
         os.chmod(path, 0o600)
         data = json.loads(path.read_text())
-        data['settings'] = validate(data['settings'], require_credentials=data['complete'])
+        # Retired feature settings must not prevent existing volumes from starting.
+        settings = {key: value for key, value in data['settings'].items()
+                    if key not in ('adaptive_dca_enabled', 'adaptive_dca_strength')}
+        data['settings'] = validate(settings, require_credentials=data['complete'])
         return data
 
     def _write(self, data):

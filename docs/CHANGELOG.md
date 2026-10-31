@@ -4,12 +4,10 @@ Release history based on the published [GitHub Releases](https://github.com/oli7
 
 ## Unreleased
 
+- Removed Adaptive DCA, its settings and dashboard statistics; preserved the reorganized application packages. Existing volumes ignore the retired settings.
+
 - Organized application modules into webpage, trading, exchanges, data and core packages; updated imports, Docker startup and health checks.
 
-- Added optional Adaptive DCA with 200-day price-deviation tiers and adjustable strength (0–2).
-- Recalculated purchase intervals from the adjusted quantity, retaining exchange minimums, fees and budget guards.
-- Cached completed daily reference prices in the persistent volume and used ordinary DCA when reference data is unavailable.
-- Added the adaptive controls at the end of Bot Configuration and a dashboard card before Purchase amount with the 200-day mean and one standard deviation.
 
 - Bounded concurrent HTTPS requests and rechecked sessions before queued manual withdrawals execute.
 - Followed paginated withdrawal histories and rejected incomplete or stalled responses safely.

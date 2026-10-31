@@ -38,10 +38,6 @@ const context={document:{getElementById:get,createElement:()=>new Element()},loc
 const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate)};
 (async()=>{
  vm.createContext(context);vm.runInContext(script,context);await settle();
- vm.runInContext('renderPurchaseAmount(".001",".002",{quote:"EUR",baseAmount:".001",factor:"2",effectiveFactor:"2",mean:"80000",standardDeviation:"5000",zScore:"-2.1",status:"active"},true,"1")',context);
- assert.match(get('adaptiveDca').textContent,/Enabled.*1.0/);assert.match(get('adaptiveDcaNote').textContent,/80,000/);assert.match(get('adaptiveDcaNote').textContent,/5,000/);assert.match(get('buyAmount').textContent,/0.002/);
- assert(html.indexOf('id="adaptiveDca"')<html.indexOf('id="buyAmount"'));
-
  assert.equal(get('monthlyDeposit').value,'','No value is imported from browser storage');
  get('monthlyDeposit').value='250';get('monthlyDeposit').handlers.input();await get('monthlyDeposit').handlers.change();assert.equal(configuredMonthlyDeposit,'250');assert.equal(forecastSaves.at(-1).monthlyDeposit,'250');assert.equal(stored.get('bitcoinDcaMonthlyDeposit'),'999','Browser storage is not read or rewritten');
  configuredMonthlyDeposit='350';await vm.runInContext('refreshPurchaseSchedule()',context);assert.equal(get('monthlyDeposit').value,'350','Other browsers receive the persisted server value');

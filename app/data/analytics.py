@@ -35,7 +35,7 @@ def report(settings, groups, snapshot, records):
     balance=Decimal(str(snapshot.get('trackedBtc','0')))
     price=Decimal(str(snapshot.get('price','0')))
     return {'quote':settings['quote'],'exchange':settings['exchange'],
-            'configuration':{'adaptiveDcaEnabled':bool(settings.get('adaptive_dca_enabled',False)), 'adaptiveDcaStrength':str(settings.get('adaptive_dca_strength','1')), 'displayCurrency':settings.get('display_currency','EUR'),'liveTrading':bool(settings['live']),'buyAmount':str(settings['buy_amount']),
+            'configuration':{'displayCurrency':settings.get('display_currency','EUR'),'liveTrading':bool(settings['live']),'buyAmount':str(settings['buy_amount']),
                              'depositDay':int(settings['deposit_day']),'withdrawalsEnabled':bool(settings['withdrawals_enabled']),
                              'withdrawalThreshold':str(settings['withdraw_threshold'])},
             'snapshot':{'exchange':snapshot.get('exchange'),'quote':snapshot.get('quote'),

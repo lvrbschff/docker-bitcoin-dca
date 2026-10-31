@@ -168,7 +168,7 @@ class Runtime:
                 raise
             # A shared mapping keeps existing HTTP handlers up to date. Preserve running
             # scheduling metadata for cosmetic feature toggles and account edits.
-            schedule_fields = ('exchange', 'quote', 'buy_amount', 'deposit_day', 'timezone', 'live', 'check_interval_seconds', 'startup_delay_seconds', 'order_status_check_seconds', 'adaptive_dca_enabled', 'adaptive_dca_strength')
+            schedule_fields = ('exchange', 'quote', 'buy_amount', 'deposit_day', 'timezone', 'live', 'check_interval_seconds', 'startup_delay_seconds', 'order_status_check_seconds')
             schedule_changed = not previous['complete'] or identity_changed or any(values[k] != previous['settings'][k] for k in schedule_fields)
             self.settings.update(settings)
             old_api = self.api

@@ -74,13 +74,6 @@ const fields=[
  ['withdraw_threshold','Automatic withdrawal threshold (purchase currency)','0.01','any',null,'Withdraw when all available exchange BTC reaches this value in the purchase currency. Requires automatic withdrawals and live trading.']
 ];
 for(const [key,title,min,step,max,description] of fields){const field=document.createElement('div'),label=document.createElement('label'),input=document.createElement('input'),hint=document.createElement('small');label.htmlFor=key;label.id=key+'Label';label.textContent=title;input.id=key;input.type='number';input.required=true;input.dataset.setting='';input.min=min;input.step=step;if(max)input.max=max;hint.id=key+'Hint';hint.className='hint field-description';hint.textContent=description;input.setAttribute('aria-describedby',hint.id);field.append(label,input,hint);$('purchaseFields').append(field)}
-const adaptiveCard=document.createElement('label'),adaptiveText=document.createElement('span'),adaptiveTitle=document.createElement('strong'),adaptiveHint=document.createElement('small'),adaptiveSwitch=document.createElement('input');
-adaptiveCard.className='option-card';adaptiveCard.htmlFor='adaptive_dca_enabled';adaptiveTitle.textContent='Enable adaptive DCA';adaptiveHint.textContent='Adjust BTC per purchase using its distance from the 200-day average. The purchase interval is recalculated too.';
-adaptiveSwitch.id='adaptive_dca_enabled';adaptiveSwitch.type='checkbox';adaptiveSwitch.dataset.setting='';adaptiveSwitch.setAttribute('role','switch');adaptiveText.append(adaptiveTitle,adaptiveHint);adaptiveCard.append(adaptiveText,adaptiveSwitch);$('purchaseFields').append(adaptiveCard);
-const strengthField=document.createElement('div'),strengthLabel=document.createElement('label'),strengthInput=document.createElement('input'),strengthHint=document.createElement('small');
-strengthLabel.htmlFor='adaptive_dca_strength';strengthLabel.textContent='Adaptive DCA strength';strengthInput.id='adaptive_dca_strength';strengthInput.type='number';strengthInput.min='0';strengthInput.max='2';strengthInput.step='0.1';strengthInput.required=true;strengthInput.dataset.setting='';strengthHint.className='hint field-description';strengthHint.id='adaptiveStrengthHint';strengthHint.textContent='Tier factor raised to strength: 0 keeps the base amount; 1 uses the standard tiers; 2 strengthens the effect. Range: 0–2.';strengthInput.setAttribute('aria-describedby',strengthHint.id);strengthField.append(strengthLabel,strengthInput,strengthHint);$('purchaseFields').append(strengthField);
-function updateAdaptiveStrength(){strengthInput.disabled=!adaptiveSwitch.checked}
-adaptiveSwitch.addEventListener('change',updateAdaptiveStrength);
 const exchangeEditorFields=new Set(['kraken_api_key','kraken_api_secret','bitvavo_api_key','bitvavo_api_secret','kraken_withdraw_key','withdraw_address','withdraw_network']);
 function setExchangeEditor(open){$('exchangeEditor').hidden=!open;$('exchangeEditor').disabled=!open;$('editExchangeCredentials').setAttribute('aria-expanded',String(open));$('editExchangeCredentials').textContent=open?'Close API access editor':'Edit API access and withdrawal target';if(!open){for(const key of exchangeEditorFields)$(key).value=key.includes('_api_')?'':(initial.settings[key]||'')}updateExchangeGuidance()}
 function setDashboardEditor(open){if(!showCredentials)return;$('dashboardEditor').hidden=!open;$('dashboardEditor').disabled=!open;$('editDashboardCredentials').setAttribute('aria-expanded',String(open));$('editDashboardCredentials').textContent=open?'Close credential editor':'Change login credentials';if(!open){$('username').value=initial.username||'';for(const key of ['current_password','password','passwordConfirm'])$(key).value=''}}
@@ -95,7 +88,6 @@ const timezoneGroups=[
 const timezoneValues=new Set();for(const [region,zones] of timezoneGroups){const group=document.createElement('optgroup');group.label=region;for(const [value,label] of zones){const option=document.createElement('option');option.value=value;option.textContent=label+' ('+value+')';group.append(option);timezoneValues.add(value)}$('timezone').append(group)}
 const savedTimezone=initial.settings.timezone;if(typeof savedTimezone==='string'&&!timezoneValues.has(savedTimezone)){const option=document.createElement('option');option.value=savedTimezone;option.textContent=savedTimezone+' (saved timezone)';$('timezone').append(option)}
 for(const input of document.querySelectorAll('[data-setting]')){const v=initial.settings[input.id];if(v===undefined)continue;if(input.type==='checkbox')input.checked=v;else input.value=v}
-updateAdaptiveStrength();
 $('accountPanel').hidden=!initial.createAccount;$('settingsForm').hidden=initial.createAccount;
 const showCredentials=Boolean($('dashboardCredentials'));if(showCredentials)$('username').value=initial.username||'';if(!initial.complete){$('pageHeading').textContent='2. Configure your bot';$('back').hidden=true}
 if(showCredentials){$('passwordRequired').hidden=!initial.passwordChangeRequired;if(initial.passwordChangeRequired){$('password').required=true;$('current_password').required=true}}
@@ -144,8 +136,6 @@ function renderReview(){
   const format=(settings)=>key==='buy_amount'?(Number(settings[key])===0?'Exchange minimum':number(settings[key])+' BTC'):key==='withdraw_threshold'?number(settings[key])+' '+settings.quote:number(settings[key])+(key.endsWith('_seconds')?' seconds':'');
   add(label,format(before),format(after));
  }
- add('Adaptive DCA',enabled(before.adaptive_dca_enabled),enabled(after.adaptive_dca_enabled));
- add('Adaptive DCA strength',number(before.adaptive_dca_strength),number(after.adaptive_dca_strength));
  add('Live trading',before.live?'LIVE — real orders':'Dry run',after.live?'LIVE — real orders':'Dry run');
  for(const [key,label] of [['withdrawals_enabled','Automatic withdrawals'],['manual_withdrawal_enabled','Manual withdrawals'],['parqet_enabled','Parqet CSV']])add(label,enabled(before[key]),enabled(after[key]));
  add('Display currency',before.display_currency,after.display_currency);
