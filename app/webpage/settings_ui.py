@@ -2,7 +2,7 @@
 import re
 import json
 from app.webpage.scroll_ui import SCROLL_CSS, SCROLL_SCRIPT
-from app.webpage.design_system import DESIGN_CSS
+from app.webpage.design_system import DESIGN_CSS, apply_appearance
 
 PAGE = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Settings · Bitcoin DCA Dashboard</title><link rel="icon" href="/favicon.ico"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)"><style>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#273650;--text:#ecf1ff;--muted:#9daec9;--accent:#8bafff;--section-gap:20px;--field-gap:16px;--card-padding:16px;--control-gap:8px}
@@ -40,6 +40,7 @@ __DESIGN_CSS__
 <label class="option-card" for="withdrawals_enabled"><span><strong>Automatic withdrawals</strong><small>Withdraw when the configured threshold is reached.</small></span><input id="withdrawals_enabled" type="checkbox" role="switch" data-setting></label>
 <label class="option-card" for="manual_withdrawal_enabled"><span><strong>Manual withdrawals</strong><small>Show the withdrawal button and require confirmation.</small></span><input id="manual_withdrawal_enabled" type="checkbox" role="switch" data-setting></label>
 <label class="option-card" for="parqet_enabled"><span><strong>Parqet CSV export</strong><small>Show and allow exports of confirmed withdrawal cycles.</small></span><input id="parqet_enabled" type="checkbox" role="switch" data-setting></label>
+<div class="option-card currency-card"><label for="appearance">Appearance</label><select id="appearance" data-setting aria-describedby="appearanceHint"><option value="system">Automatic / System</option><option value="light">Light</option><option value="dark">Dark</option></select><small id="appearanceHint" class="hint">Applies to the dashboard, sign-in and settings. Automatic follows your device appearance.</small></div>
 <div class="option-card currency-card"><label for="display_currency">Display currency</label><select id="display_currency" data-setting aria-describedby="displayCurrencyHint"><option value="EUR">Euro (EUR)</option><option value="USD">US Dollar (USD)</option></select><small id="displayCurrencyHint" class="hint">Display currency affects reporting only; purchases use the purchase currency.</small></div>
 <div class="option-card currency-card"><label for="timezone">Timezone</label><select id="timezone" data-setting aria-describedby="timezoneHint"></select><small id="timezoneHint" class="hint">Used for deposit days and schedule times.</small></div>
 </div></div><p class="hint">These options also control the dashboard buttons and notes.</p></section>
@@ -90,6 +91,7 @@ const timezoneGroups=[
 const timezoneValues=new Set();for(const [region,zones] of timezoneGroups){const group=document.createElement('optgroup');group.label=region;for(const [value,label] of zones){const option=document.createElement('option');option.value=value;option.textContent=label+' ('+value+')';group.append(option);timezoneValues.add(value)}$('timezone').append(group)}
 const savedTimezone=initial.settings.timezone;if(typeof savedTimezone==='string'&&!timezoneValues.has(savedTimezone)){const option=document.createElement('option');option.value=savedTimezone;option.textContent=savedTimezone+' (saved timezone)';$('timezone').append(option)}
 for(const input of document.querySelectorAll('[data-setting]')){const v=initial.settings[input.id];if(v===undefined)continue;if(input.type==='checkbox')input.checked=v;else input.value=v}
+$('appearance').addEventListener('change',()=>{document.documentElement.dataset.appearance=$('appearance').value});
 $('accountPanel').hidden=!initial.createAccount;$('settingsForm').hidden=initial.createAccount;
 const showCredentials=Boolean($('dashboardCredentials'));if(showCredentials)$('username').value=initial.username||'';if(!initial.complete){$('pageHeading').textContent='2. Configure your bot';$('back').hidden=true}
 if(showCredentials){$('passwordRequired').hidden=!initial.passwordChangeRequired;if(initial.passwordChangeRequired){$('password').required=true;$('current_password').required=true}}
@@ -140,6 +142,8 @@ function renderReview(){
  }
  add('Live trading',before.live?'LIVE — real orders':'Dry run',after.live?'LIVE — real orders':'Dry run');
  for(const [key,label] of [['withdrawals_enabled','Automatic withdrawals'],['manual_withdrawal_enabled','Manual withdrawals'],['parqet_enabled','Parqet CSV']])add(label,enabled(before[key]),enabled(after[key]));
+ const appearanceLabel=value=>({system:'Automatic / System',light:'Light',dark:'Dark'}[value]||'Automatic / System');
+ add('Appearance',appearanceLabel(before.appearance),appearanceLabel(after.appearance));
  add('Display currency',before.display_currency,after.display_currency);
  add('Timezone',before.timezone,after.timezone);
  if('username'in pending)add('Dashboard username',initial.username,pending.username.trim());
@@ -182,4 +186,4 @@ def settings_page(store, create_account=False, embedded=False, editor=None, edit
     page = PAGE
     if not data['complete'] and not data['passwordChangeRequired']:
         page = re.sub(r'<!--dashboard-credentials-start-->.*?<!--dashboard-credentials-end-->', '', page, flags=re.S)
-    return page.replace('__INITIAL__', encoded)
+    return apply_appearance(page.replace('__INITIAL__', encoded), data['settings'].get('appearance', 'system'))

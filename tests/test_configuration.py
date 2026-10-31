@@ -266,7 +266,7 @@ class ConfigurationTests(unittest.TestCase):
         self.assertFalse(self.store.public()['passwordChangeRequired'])
 
 
-    def test_display_currency_is_saved_without_rescheduling(self):
+    def test_dashboard_preferences_are_saved_without_rescheduling(self):
         self.ready()
         self.app.save({'current_password':PASSWORD,'settings': {'display_currency':'USD'}})
         self.assertEqual(self.store.public()['settings']['display_currency'],'USD')
@@ -274,13 +274,26 @@ class ConfigurationTests(unittest.TestCase):
         self.assertFalse(self.app.worker.reconfigure.is_set())
         self.assertEqual(config.ConfigStore(self.store.path).public()['settings']['display_currency'],'USD')
         with self.assertRaises(ValueError): self.app.save({'current_password':PASSWORD,'settings':{'display_currency':'GBP'}})
+        for appearance in ('light','dark','system'):
+            with self.subTest(appearance=appearance):
+                calls=self.api_factory.call_count
+                self.app.save({'settings':{'appearance':appearance}})
+                self.assertEqual(config.ConfigStore(self.store.path).public()['settings']['appearance'],appearance)
+                self.assertFalse(self.app.worker.reconfigure.is_set())
+                self.assertEqual(self.api_factory.call_count,calls)
+                handler=object.__new__(web_ui.Handler);handler.settings=self.app.settings
+                self.assertIn('data-appearance="'+appearance+'"',handler._dashboard_html())
+                self.assertIn('data-appearance="'+appearance+'"',handler._login_page())
+                self.assertIn('data-appearance="'+appearance+'"',settings_ui.settings_page(self.store,embedded=True))
+        with self.assertRaises(ValueError):self.app.save({'settings':{'appearance':'invalid'}})
 
     def test_old_configuration_gains_display_currency_default(self):
         self.ready()
-        data=self.store.snapshot();data['settings'].pop('display_currency')
+        data=self.store.snapshot();data['settings'].pop('display_currency');data['settings'].pop('appearance')
         self.store.path.write_text(json.dumps(data))
         reloaded=config.ConfigStore(self.store.path)
         self.assertEqual(reloaded.public()['settings']['display_currency'],'EUR')
+        self.assertEqual(reloaded.public()['settings']['appearance'],'system')
         self.assertTrue(reloaded.authenticate('operator',PASSWORD))
 
     def test_setup_step_two_omits_credentials_but_settings_keeps_them(self):

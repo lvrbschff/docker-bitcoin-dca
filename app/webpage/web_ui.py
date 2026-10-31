@@ -31,7 +31,7 @@ from app.data.reporting import parqet_aggregate_rows, parqet_csv
 
 
 from app.webpage.scroll_ui import SCROLL_CSS, SCROLL_SCRIPT
-from app.webpage.design_system import DESIGN_CSS
+from app.webpage.design_system import DESIGN_CSS, apply_appearance
 
 def withdrawal_forecast(settings, snapshot, monthly_deposit, now):
     """Project monthly deposits and purchases at a constant BTC price and order cost."""
@@ -786,8 +786,8 @@ _SESSIONS = {}
 HTML = HTML.replace("__SCROLL_CSS__", SCROLL_CSS).replace("__SCROLL_SCRIPT__", SCROLL_SCRIPT).replace("__DESIGN_CSS__", DESIGN_CSS)
 LOGIN_HTML = LOGIN_HTML.replace("__DESIGN_CSS__", DESIGN_CSS)
 
-def _login_page(error=""):
-    return LOGIN_HTML.replace("{{ERROR}}", html.escape(error))
+def _login_page(error="", appearance="system"):
+    return apply_appearance(LOGIN_HTML.replace("{{ERROR}}", html.escape(error)), appearance)
 
 
 class _PageTextParser(HTMLParser):
@@ -881,6 +881,9 @@ class Handler(BaseHTTPRequestHandler):
     worker = None
     tls_context = None
 
+    def _login_page(self, error=""):
+        return _login_page(error, (self.settings or {}).get("appearance", "system"))
+
     def setup(self):
         if self.tls_context is not None:
             self.request.settimeout(10)
@@ -942,7 +945,7 @@ class Handler(BaseHTTPRequestHandler):
             LOG.info('Dashboard sign-in rate limited')
             self.send_response(429)
             self.send_header('Retry-After', str(retry))
-            body = _login_page('Too many sign-in attempts. Please try again later.').encode('utf-8')
+            body = self._login_page('Too many sign-in attempts. Please try again later.').encode('utf-8')
             self.send_header('Content-Type', 'text/html; charset=utf-8')
             self.send_header('Content-Length', str(len(body)))
             self.send_header('Cache-Control', 'no-store')
@@ -956,12 +959,12 @@ class Handler(BaseHTTPRequestHandler):
             username = form.get("username", [""])[0]
             password = form.get("password", [""])[0]
         except (ValueError, UnicodeDecodeError):
-            self._send(400, _login_page("Please enter your username and password."), "text/html; charset=utf-8")
+            self._send(400, self._login_page("Please enter your username and password."), "text/html; charset=utf-8")
             return
 
         valid = bool(self.runtime and self.runtime.store.authenticate(username, password))
         if not valid:
-            self._send(401, _login_page("The username or password is incorrect."), "text/html; charset=utf-8")
+            self._send(401, self._login_page("The username or password is incorrect."), "text/html; charset=utf-8")
             return
 
         _LOGIN_ATTEMPTS.clear(client)
@@ -1075,7 +1078,7 @@ class Handler(BaseHTTPRequestHandler):
         if not settings.get('parqet_enabled', True):
             page = page.replace('Period analysis and Parqet export</strong>', 'Period analysis</strong>')
             page = page.replace('to review activity and prepare a Parqet export.', 'to review activity.')
-        return page
+        return apply_appearance(page, settings.get("appearance", "system"))
 
     def do_POST(self):
         if self.runtime:
@@ -1192,7 +1195,7 @@ class Handler(BaseHTTPRequestHandler):
                 if parse_qs(parsed.query).get('embedded') == ['1']:
                     self._send(401, '<script>parent.postMessage({type:"dca-settings-auth-required"},location.origin)</script>', 'text/html; charset=utf-8')
                     return
-                self._send(200, _login_page(), 'text/html; charset=utf-8')
+                self._send(200, self._login_page(), 'text/html; charset=utf-8')
                 return
             if self._has_valid_session():
                 if parsed.path == '/api/settings':
@@ -1203,7 +1206,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, settings_page(self.runtime.store, embedded=parse_qs(parsed.query).get("embedded") == ["1"], editor=parse_qs(parsed.query).get("editor", [None])[0], editor_exchange=parse_qs(parsed.query).get("exchange", [None])[0]), 'text/html; charset=utf-8')
                     return
         if parsed.path == "/" and not self._has_valid_session():
-            self._send(200, _login_page(), "text/html; charset=utf-8")
+            self._send(200, self._login_page(), "text/html; charset=utf-8")
             return
         if not self._require_authentication():
             return

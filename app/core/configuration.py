@@ -21,7 +21,7 @@ DEFAULTS = dict(exchange='KRAKEN', quote='EUR', buy_amount='0', deposit_day=1,
                 startup_delay_seconds=60, order_status_check_seconds=30, check_interval_seconds=300,
                 timezone='Europe/Berlin', live=False, withdrawals_enabled=False,
                 withdraw_threshold='1000', withdraw_address='', withdraw_network='BTC', kraken_withdraw_key='',
-                manual_withdrawal_enabled=True, parqet_enabled=True, display_currency='EUR', expected_monthly_deposit='',
+                manual_withdrawal_enabled=True, parqet_enabled=True, appearance='system', display_currency='EUR', expected_monthly_deposit='',
                 **{key: '' for key in SECRET_FIELDS})
 
 
@@ -67,6 +67,8 @@ def validate(values, previous=None, require_credentials=True):
             raise ValueError(f'Invalid {key}.')
     result['exchange'] = result['exchange'].upper()
     result['quote'] = result['quote'].upper()
+    if result['appearance'] not in ('system', 'light', 'dark'):
+        raise ValueError('Appearance must be Automatic / System, Light or Dark.')
     result['display_currency'] = result['display_currency'].upper()
     if result['display_currency'] not in ('EUR', 'USD'):
         raise ValueError('Display currency must be EUR or USD.')

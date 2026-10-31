@@ -1,4 +1,5 @@
 """Shared accessible web styling guided by Apple's Human Interface Guidelines."""
+import re
 PALETTES = {
     'light': {'bg':'#f5f5f7','panel':'#ffffff','surface':'#f2f2f7','control':'#ffffff',
               'line':'#d2d2d7','control-line':'#85858a','text':'#1d1d1f','muted':'#606067','accent':'#005bb5',
@@ -17,7 +18,7 @@ def _tokens(palette):
     return ';'.join('--'+key+':'+value for key,value in palette.items())
 
 
-DESIGN_CSS = ':root{'+_tokens(PALETTES['light'])+'}\n' + '@media(prefers-color-scheme:dark){:root{'+_tokens(PALETTES['dark'])+'}}\n' + '''
+DESIGN_CSS = ':root{'+_tokens(PALETTES['light'])+'}\n' + '@media(prefers-color-scheme:dark){:root:not([data-appearance="light"]){'+_tokens(PALETTES['dark'])+'}}\n' + ':root[data-appearance="light"]{'+_tokens(PALETTES['light'])+';color-scheme:light}\n:root[data-appearance="dark"]{'+_tokens(PALETTES['dark'])+';color-scheme:dark}\n' + '''
 /* Semantic surfaces, system typography and an 8-point spacing rhythm. */
 :root{color-scheme:light dark;--panel-padding:24px;--section-space:24px;--subsection-space:20px;--tile-gap:16px;--section-gap:24px;--field-gap:16px;--card-padding:20px;--control-gap:8px;font-size:106.25%;accent-color:var(--primary)}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-padding-top:88px}
@@ -54,7 +55,9 @@ body :is(button,a,input,select,summary,[tabindex]):focus-visible{outline:3px sol
 .btc-balance-card #manualWithdraw{font-size:.82rem;padding:10px 14px;min-height:44px;border-radius:10px}
 .controls input,.controls select,.controls>button{height:48px;min-height:48px;font-size:.94rem}
 /* Disclosure headers are grouped surfaces rather than decorative banners. */
-details.panel{border-radius:16px}
+details.panel{border-radius:16px;overflow:hidden;isolation:isolate;background-clip:padding-box;border-color:var(--line)}
+details.panel>.panel-heading,details.panel>.report-heading,details.panel:not([open])>summary{border-radius:0;box-shadow:none}
+body details.panel>summary:focus-visible{outline-offset:-4px}
 .panel>.panel-heading,.panel>.report-heading{margin:calc(-1 * var(--panel-padding)) calc(-1 * var(--panel-padding)) var(--panel-padding);padding:16px var(--panel-padding);background:var(--panel);border-bottom:1px solid var(--line);border-radius:15px 15px 0 0}
 .panel>.panel-heading h2,.panel>.report-heading h2{font-size:1.18rem;font-weight:600;line-height:1.35}
 summary{min-height:44px}details.panel>summary{min-height:56px}
@@ -126,12 +129,28 @@ dialog h2,.confirmation-dialog h2{font-size:1.18rem;font-weight:600}
  dialog,.confirmation-dialog{padding:20px;border-radius:20px}.settings-dialog{padding:0}
 }
 @media(prefers-contrast:more){
- :root{--line:#767676;--control-line:#454545;--muted:#45454a;--accent:#004b96}
+ :root,:root[data-appearance="light"]{--line:#767676;--control-line:#454545;--muted:#45454a;--accent:#004b96}
  .panel,.card,.option-card,input,select,button,.button{border-width:2px}
  .compact-brand-bar{background:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none}
 }
-@media(prefers-color-scheme:dark) and (prefers-contrast:more){:root{--line:#aeaeae;--control-line:#e0e0e6;--muted:#e0e0e6;--accent:#a6ccff}}
+@media(prefers-color-scheme:dark) and (prefers-contrast:more){:root:not([data-appearance="light"]){--line:#aeaeae;--control-line:#e0e0e6;--muted:#e0e0e6;--accent:#a6ccff}}
+@media(prefers-contrast:more){:root[data-appearance="dark"]{--line:#aeaeae;--control-line:#e0e0e6;--muted:#e0e0e6;--accent:#a6ccff}}
 @media(prefers-reduced-transparency:reduce){.compact-brand-bar{background:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 @media(forced-colors:active){button,.button,input,select,.panel,.card,.option-card{border:1px solid ButtonText}.compact-brand-bar{background:Canvas;backdrop-filter:none;-webkit-backdrop-filter:none}}
 '''
+
+
+
+def apply_appearance(page, appearance='system'):
+    """Choose the saved appearance before first paint, including public sign-in."""
+    if appearance not in ('system', 'light', 'dark'):
+        appearance = 'system'
+    page = page.replace('<html lang="en">', '<html lang="en" data-appearance="'+appearance+'">', 1)
+    if appearance != 'system':
+        colors = iter([PALETTES[appearance]['bg']])
+        def theme_color(match):
+            color = next(colors, None)
+            return '<meta name="theme-color" content="'+color+'">' if color else ''
+        page = re.sub(r'<meta name="theme-color"[^>]*>', theme_color, page)
+    return page

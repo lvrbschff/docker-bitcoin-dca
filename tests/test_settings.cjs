@@ -14,7 +14,7 @@ class Element{
 }
 const elements={};for(const match of page.matchAll(/<(\w+)\b([^>]*\bid="([^"]+)"[^>]*)>/g)){const el=new Element(match[1]);el.id=match[3];el.type=(match[2].match(/type="([^"]+)"/)||[])[1]||'';if(match[2].includes('data-setting'))el.dataset.setting='';elements[el.id]=el}
 const requests=[],location={href:''};let reject=false;
-const context={document:{getElementById:id=>elements[id],createElement:tag=>new Element(tag),querySelectorAll:()=>Object.values(elements).filter(el=>'setting'in el.dataset)},location,
+const context={document:{documentElement:{dataset:{}},getElementById:id=>elements[id],createElement:tag=>new Element(tag),querySelectorAll:()=>Object.values(elements).filter(el=>'setting'in el.dataset)},location,
  fetch:async(url,options)=>{requests.push({url,body:JSON.parse(options.body)});return {ok:!reject,json:async()=>reject?{error:'Connection failed'}:{message:'Connected',saved:true}}}};
 vm.runInNewContext(script,context);
 function allText(el){return el.textContent+' '+el.children.map(allText).join(' ')}
@@ -23,6 +23,7 @@ async function event(id,name='click'){if(id==='confirm'&&!elements.passwordConfi
  assert.equal(elements.withdraw_thresholdLabel.textContent,'Automatic withdrawal threshold (EUR)');elements.quote.value='USD';await event('quote','change');assert.equal(elements.withdraw_thresholdLabel.textContent,'Automatic withdrawal threshold (USD)');
  assert(page.includes('<small id="displayCurrencyHint" class="hint">Display currency affects reporting only; purchases use the purchase currency.</small>'));assert(page.includes('aria-describedby="displayCurrencyHint"'));
  assert.equal(elements.kraken_api_key.value,'');assert.equal(elements.kraken_api_key.placeholder,'Saved · leave empty to keep');
+ assert.equal(elements.appearance.value,'system');elements.appearance.value='dark';await event('appearance','change');assert.equal(context.document.documentElement.dataset.appearance,'dark');
  assert.equal(elements.timezone.value,'Europe/Berlin');assert.equal(elements.timezone.tag,'select');assert.equal(elements.timezone.children.length,6);
  assert(elements.timezone.children.some(group=>group.children.some(option=>option.value==='Asia/Tokyo')));
  assert.equal(elements.dashboardEditor.hidden,true);assert.equal(elements.dashboardEditor.disabled,true);assert.equal(elements.exchangeEditor.hidden,true);assert.equal(elements.exchangeEditor.disabled,true);
@@ -38,7 +39,7 @@ async function event(id,name='click'){if(id==='confirm'&&!elements.passwordConfi
  await event('settingsForm','submit');assert.equal(elements.review.open,true);assert.equal(requests.length,count,'Review must not save yet');
  const text=allText(elements.reviewValues);assert.match(text+allText(elements.unchangedReviewValues),/LIVE|Dry run/);assert.match(text,/1200 EUR/);assert.match(text,/1000 EUR/);assert.match(text,/Before/);assert.match(text,/After/);assert.equal(elements.unchangedReview.hidden,false);assert.match(allText(elements.unchangedReviewValues),/BTC per purchase/);assert(!text.includes('fictional-key'));assert(!text.includes('fictional-secret'));assert.match(text,/Will be updated \(hidden\)/);
  await event('cancel');assert.equal(elements.review.open,false);await event('confirm');assert.equal(requests.filter(r=>r.url==='/api/settings').length,0,'Cancelled review must not submit');assert.equal(requests.at(-1).body.event,'settings_save_cancelled');
- await event('settingsForm','submit');await event('confirm');assert.equal(requests.at(-1).url,'/api/settings');assert.equal(requests.at(-1).body.settings.withdrawals_enabled,true);assert.equal(requests.at(-1).body.settings.display_currency,'USD');assert.equal(requests.at(-1).body.settings.timezone,'Asia/Tokyo');
+ await event('settingsForm','submit');await event('confirm');assert.equal(requests.at(-1).url,'/api/settings');assert.equal(requests.at(-1).body.settings.withdrawals_enabled,true);assert.equal(requests.at(-1).body.settings.display_currency,'USD');assert.equal(requests.at(-1).body.settings.timezone,'Asia/Tokyo');assert.equal(requests.at(-1).body.settings.appearance,'dark');
  await event('editDashboardCredentials');assert.equal(location.href,'/settings?editor=dashboard');vm.runInContext('setDashboardEditor(true)',context);assert.equal(elements.dashboardEditor.hidden,false);
  elements.password.value='new-long-password';elements.passwordConfirm.value='different';const before=requests.length;await event('settingsForm','submit');assert.equal(requests.length,before);assert.match(elements.status.textContent,/do not match/);
  vm.runInContext('setDashboardEditor(false)',context);assert.equal(elements.dashboardEditor.hidden,true);assert.equal(elements.password.value,'');

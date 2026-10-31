@@ -4,6 +4,9 @@ Release history based on the published [GitHub Releases](https://github.com/oli7
 
 ## Unreleased
 
+- Added volume-saved Light, Dark and Automatic / System appearance in dashboard settings, applied consistently to sign-in, dashboard and settings.
+- Fixed main panel corners by clipping header backgrounds inside one continuous rounded border.
+
 - Unified dashboard, login, setup and settings around an Apple HIG-inspired design system with automatic light/dark appearance.
 - Added system typography, consistent grouped surfaces, accessible contrast, larger control targets, keyboard skip links and reduced-motion/transparency support.
 - Replaced decorative button glow with restrained interaction feedback and applied shared styling to all dialogs and credential editors.

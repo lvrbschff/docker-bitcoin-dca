@@ -104,3 +104,15 @@ class DesignAccessibilityTests(unittest.TestCase):
                 self.assertIn('viewport-fit=cover',page)
         for preference in ('prefers-color-scheme:dark','prefers-contrast:more','prefers-reduced-motion:reduce','prefers-reduced-transparency:reduce','forced-colors:active'):
             self.assertIn(preference,DESIGN_CSS)
+
+
+    def test_explicit_appearance_sets_initial_palette_and_browser_chrome_safely(self):
+        from app.webpage.design_system import apply_appearance
+        for appearance,color in [('light','#f5f5f7'),('dark','#000000')]:
+            page=apply_appearance(web_ui.LOGIN_HTML,appearance)
+            self.assertIn('data-appearance="'+appearance+'"',page)
+            self.assertEqual(page.count('name="theme-color"'),1)
+            self.assertIn('<meta name="theme-color" content="'+color+'">',page)
+        page=apply_appearance(web_ui.HTML,'system')
+        self.assertEqual(page.count('name="theme-color"'),2)
+        self.assertIn('data-appearance="system"',apply_appearance(web_ui.HTML,'"><script>bad</script>'))
