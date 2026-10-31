@@ -69,3 +69,38 @@ class FaviconTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class DesignAccessibilityTests(unittest.TestCase):
+    def test_semantic_text_and_controls_have_accessible_contrast_in_both_appearances(self):
+        from app.webpage.design_system import PALETTES
+        def luminance(color):
+            channels=[int(color[i:i+2],16)/255 for i in (1,3,5)]
+            linear=[v/12.92 if v<=.04045 else ((v+.055)/1.055)**2.4 for v in channels]
+            return sum(v*w for v,w in zip(linear,(.2126,.7152,.0722)))
+        def contrast(a,b):
+            low,high=sorted((luminance(a),luminance(b)))
+            return (high+.05)/(low+.05)
+        for appearance,colors in PALETTES.items():
+            for role in ('text','muted','accent','green','red','warning'):
+                for background in ('bg','panel','surface','control'):
+                    with self.subTest(appearance=appearance,role=role,background=background):
+                        self.assertGreaterEqual(contrast(colors[role],colors[background]),4.5)
+            self.assertGreaterEqual(contrast(colors['primary'],colors['on-primary']),4.5)
+            self.assertGreaterEqual(contrast(colors['control-line'],colors['control']),3)
+
+    def test_dashboard_login_setup_and_settings_share_the_accessible_theme(self):
+        from app.webpage import settings_ui
+        from app.webpage.design_system import DESIGN_CSS
+        from types import SimpleNamespace
+        pages=[web_ui.HTML,web_ui.LOGIN_HTML,settings_ui.PAGE,
+               settings_ui.settings_page(SimpleNamespace(),create_account=True)]
+        for page in pages:
+            with self.subTest(page=page[:100]):
+                self.assertIn(DESIGN_CSS,page)
+                self.assertNotIn('__DESIGN_CSS__',page)
+                self.assertIn('class="skip-link"',page)
+                self.assertIn('id="main-content"',page)
+                self.assertIn('viewport-fit=cover',page)
+        for preference in ('prefers-color-scheme:dark','prefers-contrast:more','prefers-reduced-motion:reduce','prefers-reduced-transparency:reduce','forced-colors:active'):
+            self.assertIn(preference,DESIGN_CSS)

@@ -31,6 +31,7 @@ from app.data.reporting import parqet_aggregate_rows, parqet_csv
 
 
 from app.webpage.scroll_ui import SCROLL_CSS, SCROLL_SCRIPT
+from app.webpage.design_system import DESIGN_CSS
 
 def withdrawal_forecast(settings, snapshot, monthly_deposit, now):
     """Project monthly deposits and purchases at a constant BTC price and order cost."""
@@ -106,14 +107,14 @@ HTML = """<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bitcoin DCA Dashboard</title>
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/bitcoin-dca-icon-v3.png">
 <link rel="mask-icon" href="/safari-pinned-tab-v3.svg" color="#8bafff">
-<meta name="theme-color" content="#0b1020">
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <style>
-:root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#26324a;--text:#edf2ff;--muted:#9ba9c4;--accent:#8bafff;--green:#61d7ae;--red:#ff8f9e}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#1b2a49 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
 .dashboard-brand{display:flex;align-items:center;gap:12px;margin-bottom:0;min-width:0}.dashboard-logo{display:block;width:48px;height:48px;flex:0 0 48px;border-radius:11px}.dashboard-brand h1{min-width:0;overflow-wrap:anywhere}
 main{max-width:1180px;margin:0 auto;padding:36px 22px 64px}.top{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:26px}.eyebrow{color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}h1{font-size:30px;margin:4px 0}.sub{color:var(--muted);margin:0}
@@ -223,14 +224,6 @@ body.header-actions-hidden .top-actions{opacity:0;transform:translateY(-8px);vis
  .top-actions button,.top-actions select{min-height:44px}
 }
 
-button{transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease,filter .16s ease,transform .16s ease}
-button:disabled{cursor:not-allowed;filter:none;transform:none;box-shadow:none}
-button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-@media(hover:hover) and (pointer:fine){
- button:not(:disabled):not(#previousPage):not(#nextPage):not(#goToPage):hover{filter:brightness(1.13);border-color:var(--accent);box-shadow:0 0 8px #8bafff55,0 4px 20px #8bafff66;transform:translateY(-1px)}
- button:not(:disabled):not(#previousPage):not(#nextPage):not(#goToPage):active{transform:translateY(0);box-shadow:0 1px 5px #8bafff20}
-}
-@media(prefers-reduced-motion:reduce){button{transition:none}button:not(:disabled):not(#previousPage):not(#nextPage):not(#goToPage):hover{transform:none}}
 
 .btc-balance-card{display:flex;flex-direction:column;align-items:flex-start}
 .btc-balance-card .withdraw-action{align-items:flex-start;width:100%;margin-top:auto;padding-top:12px}
@@ -296,10 +289,11 @@ th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-se
 .feedback-close{flex:0 0 24px;width:24px;min-height:24px;padding:0;margin-top:10px;font-size:16px;line-height:22px;border-radius:6px}
 .withdraw-action>.feedback-wrap{width:100%}
 .withdraw-action .feedback-close{margin-top:4px}
+__DESIGN_CSS__
 </style>
 </head>
-<body>
-<div class="compact-brand-bar"><div class="compact-brand-inner"><img src="/bitcoin-dca-icon-v3.png" width="36" height="36" alt=""><span>Bitcoin DCA Dashboard</span></div></div><main>
+<body class="dashboard-page"><a class="skip-link" href="#main-content">Skip to content</a>
+<div class="compact-brand-bar"><div class="compact-brand-inner"><img src="/bitcoin-dca-icon-v3.png" width="36" height="36" alt=""><span>Bitcoin DCA Dashboard</span></div></div><main id="main-content" tabindex="-1">
 <header class="top"><div><div class="dashboard-brand"><img class="dashboard-logo" src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Dashboard</h1></div></div><div class="top-actions"><button id="openSettings" type="button" aria-haspopup="dialog" aria-controls="settingsDialog">Settings</button><form method="post" action="/logout"><button type="submit" class="secondary logout-button">Log out</button></form></div></header>
 <details open class="panel" aria-labelledby="configurationHeading">
 <summary class="panel-heading"><h2 id="configurationHeading">Configuration</h2></summary>
@@ -744,14 +738,14 @@ LOGIN_HTML = """<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bitcoin DCA Bot</title>
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/bitcoin-dca-icon-v3.png">
 <link rel="mask-icon" href="/safari-pinned-tab-v3.svg" color="#8bafff">
-<meta name="theme-color" content="#0b1020">
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <style>
-:root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#26324a;--text:#edf2ff;--muted:#9ba9c4;--accent:#8bafff;--red:#ff8f9e}
 *{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:22px;background:radial-gradient(ellipse at 15% 0%,#1b2a49 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
 .card{width:min(100%,520px);padding:32px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(145deg,rgba(21,31,52,.98),rgba(15,22,39,.98));box-shadow:0 18px 48px #0005}
 .eyebrow{color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}h1{font-size:27px;margin:6px 0 4px}.sub{color:var(--muted);margin:0 0 24px}
@@ -761,19 +755,12 @@ button{width:100%;margin-top:22px;padding:12px;border:1px solid var(--accent);bo
 .error{min-height:20px;margin:12px 0 0;color:var(--red);font-size:13px}.foot{margin-top:20px;color:var(--muted);font-size:12px}
 @media(max-width:480px){body{padding:16px;min-height:100svh}.card{padding:24px}input{font-size:16px}}
 
-button{transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease,filter .16s ease,transform .16s ease}
-button:disabled{cursor:not-allowed;filter:none;transform:none;box-shadow:none}
-button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-@media(hover:hover) and (pointer:fine){
- button:not(:disabled):not(#previousPage):not(#nextPage):not(#goToPage):hover{filter:brightness(1.13);border-color:var(--accent);box-shadow:0 0 8px #8bafff55,0 4px 20px #8bafff66;transform:translateY(-1px)}
- button:not(:disabled):not(#previousPage):not(#nextPage):not(#goToPage):active{transform:translateY(0);box-shadow:0 1px 5px #8bafff20}
-}
-@media(prefers-reduced-motion:reduce){button{transition:none}button:not(:disabled):not(#previousPage):not(#nextPage):not(#goToPage):hover{transform:none}}
 .login-support{margin:16px 0 0;padding-top:16px;border-top:1px solid var(--line);font-size:10px;line-height:1.6;color:var(--muted)}.login-support>span{color:#ff8f9e}.login-support code{display:inline;overflow-wrap:anywhere;font-size:10px}
 @media(max-width:600px){.card{border-radius:10px}}
+__DESIGN_CSS__
 </style>
 </head>
-<body><main class="card">
+<body class="login-page"><a class="skip-link" href="#main-content">Skip to sign in</a><main class="card" id="main-content" tabindex="-1">
 
 <div class="login-brand"><img src="/bitcoin-dca-icon-v3.png" width="48" height="48" alt=""><h1>Bitcoin DCA Dashboard</h1></div>
 
@@ -784,7 +771,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 <input id="password" name="password" type="password" autocomplete="current-password" required>
 <button type="submit">Sign in</button>
 </form>
-<p class="error">{{ERROR}}</p>
+<p class="error" role="alert">{{ERROR}}</p>
 <p class="login-support"><span aria-hidden="true">♥</span> If you want to support the creator of this application, buy him a BTC coffee: <code>bc1qg7crlvea9rsacfgnujhrjy6judvjnkjz9crvvq</code></p>
 
 </main></body></html>
@@ -796,7 +783,8 @@ _LOGIN_ATTEMPTS = AttemptLimiter()
 _SESSIONS = {}
 
 
-HTML = HTML.replace("__SCROLL_CSS__", SCROLL_CSS).replace("__SCROLL_SCRIPT__", SCROLL_SCRIPT)
+HTML = HTML.replace("__SCROLL_CSS__", SCROLL_CSS).replace("__SCROLL_SCRIPT__", SCROLL_SCRIPT).replace("__DESIGN_CSS__", DESIGN_CSS)
+LOGIN_HTML = LOGIN_HTML.replace("__DESIGN_CSS__", DESIGN_CSS)
 
 def _login_page(error=""):
     return LOGIN_HTML.replace("{{ERROR}}", html.escape(error))

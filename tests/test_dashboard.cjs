@@ -2,8 +2,8 @@
 const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
 const html=JSON.parse(execFileSync(process.env.PYTHON||'python3',['-c',`import ast,json
 from pathlib import Path
-import sys;sys.path.insert(0,'.');from app.webpage.scroll_ui import SCROLL_CSS,SCROLL_SCRIPT
-m=ast.parse(Path('app/webpage/web_ui.py').read_text());page=next(ast.literal_eval(n.value) for n in m.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='HTML' for t in n.targets) and isinstance(n.value,ast.Constant));print(json.dumps(page.replace('__SCROLL_CSS__',SCROLL_CSS).replace('__SCROLL_SCRIPT__',SCROLL_SCRIPT)))`],{encoding:'utf8'}));
+import sys;sys.path.insert(0,'.');from app.webpage.scroll_ui import SCROLL_CSS,SCROLL_SCRIPT;from app.webpage.design_system import DESIGN_CSS
+m=ast.parse(Path('app/webpage/web_ui.py').read_text());page=next(ast.literal_eval(n.value) for n in m.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='HTML' for t in n.targets) and isinstance(n.value,ast.Constant));print(json.dumps(page.replace('__SCROLL_CSS__',SCROLL_CSS).replace('__SCROLL_SCRIPT__',SCROLL_SCRIPT).replace('__DESIGN_CSS__',DESIGN_CSS)))`],{encoding:'utf8'}));
 const script=html.split('<script>')[1].split('</script>')[0];
 class Element{
  constructor(){this.value='';this.children=[];this.handlers={};this.textContent='';this.disabled=false;this.classList={toggle(){},add(){},remove(){}}}

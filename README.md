@@ -56,10 +56,10 @@ Submitted withdrawals block further withdrawals until resolved. Uncertain Kraken
 The web UI is fully responsive on desktop, tablet and mobile. Card rows and tables scroll horizontally only when needed.
 
 - **Configuration:** exchange, purchase settings and withdrawal target.
-- **Schedule:** exchange balances, purchase timing and estimated automatic withdrawal timing. **Expected monthly deposit** is a browser-saved forecast assumption; it adds funds on each deposit day and recalculates future intervals using actual calendar months. It does not initiate deposits or change trading.
+- **Schedule:** exchange balances, purchase timing and estimated automatic withdrawal timing. **Expected monthly deposit** is a volume-saved forecast assumption; it adds funds on each deposit day and recalculates future intervals using actual calendar months. It does not initiate deposits or change trading.
 - **Period Analysis:** date filters, summary, activity status (confirmed, pending, failed or simulated) and CSV export. Activities cannot be deleted through the UI.
 
-View preferences are saved in this browser; the To field resets to now on page load. Refreshes preserve existing values; withdrawal confirmations show the destination, gross BTC, fee and net BTC.
+The interface adapts to system light/dark appearance and supports keyboard navigation and reduced motion. View preferences are saved in this browser; the To field resets to now on page load. Refreshes preserve existing values; withdrawal confirmations show the destination, gross BTC, fee and net BTC.
 
 Display currency is set to EUR or USD in Settings. Reference BTC prices come from Kraken’s public [BTC/EUR](https://www.kraken.com/convert/btc/eur) and [BTC/USD](https://www.kraken.com/convert/btc/usd) pages, including when trading on Bitvavo. Saved or cached prices are labelled.
 

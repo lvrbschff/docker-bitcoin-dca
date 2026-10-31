@@ -69,7 +69,7 @@ assert.equal(setupRequests.length,0,'Step two reviews settings without editing a
 console.log('First-run step two passed without credential fields');
 
 // The dashboard owns a native modal and accepts messages only from its settings frame.
-const dashboard=execFileSync('python3',['-c',`import ast,sys;from pathlib import Path;sys.path.insert(0,'.');from app.webpage.scroll_ui import SCROLL_CSS,SCROLL_SCRIPT;m=ast.parse(Path('app/webpage/web_ui.py').read_text());page=next(ast.literal_eval(n.value) for n in m.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='HTML' for t in n.targets) and isinstance(n.value,ast.Constant));print(page.replace('__SCROLL_CSS__',SCROLL_CSS).replace('__SCROLL_SCRIPT__',SCROLL_SCRIPT))`],{cwd:root,encoding:'utf8'});
+const dashboard=execFileSync('python3',['-c',`import ast,sys;from pathlib import Path;sys.path.insert(0,'.');from app.webpage.scroll_ui import SCROLL_CSS,SCROLL_SCRIPT;from app.webpage.design_system import DESIGN_CSS;m=ast.parse(Path('app/webpage/web_ui.py').read_text());page=next(ast.literal_eval(n.value) for n in m.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='HTML' for t in n.targets) and isinstance(n.value,ast.Constant));print(page.replace('__SCROLL_CSS__',SCROLL_CSS).replace('__SCROLL_SCRIPT__',SCROLL_SCRIPT).replace('__DESIGN_CSS__',DESIGN_CSS))`],{cwd:root,encoding:'utf8'});
 const modalScript=dashboard.match(/<script data-ui-settings>([\s\S]*?)<\/script>/)[1];
 const modalElements=Object.fromEntries(['settingsDialog','settingsFrame','openSettings','closeSettings'].map(id=>[id,new Element()]));
 const frameWindow={},events={};modalElements.settingsFrame.contentWindow=frameWindow;let reloads=0;

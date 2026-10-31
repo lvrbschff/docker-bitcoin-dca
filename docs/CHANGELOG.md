@@ -4,6 +4,10 @@ Release history based on the published [GitHub Releases](https://github.com/oli7
 
 ## Unreleased
 
+- Unified dashboard, login, setup and settings around an Apple HIG-inspired design system with automatic light/dark appearance.
+- Added system typography, consistent grouped surfaces, accessible contrast, larger control targets, keyboard skip links and reduced-motion/transparency support.
+- Replaced decorative button glow with restrained interaction feedback and applied shared styling to all dialogs and credential editors.
+
 - Removed Adaptive DCA, its settings and dashboard statistics; preserved the reorganized application packages. Existing volumes ignore the retired settings.
 
 - Organized application modules into webpage, trading, exchanges, data and core packages; updated imports, Docker startup and health checks.
